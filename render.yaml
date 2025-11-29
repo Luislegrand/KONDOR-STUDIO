@@ -197,4 +197,4 @@ services:
 databases:
   - name: kondor-db
     region: oregon
-    plan: micro
+    plan: large
