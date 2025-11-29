@@ -92,23 +92,24 @@ services:
           name: kondor-redis
           property: connectionString
 
-  # -----------------------------
+    # -----------------------------
   # 🟩 SPA FRONTEND (VITE)
   # -----------------------------
   - type: web
     name: kondor-front
     env: node
-    rootDir: ./front
+    rootDir: .        # 👈 agora o root é a raiz do repo
     plan: starter
     region: oregon
 
     buildCommand: |
+      cd front        # 👈 entra na pasta do front
       npm install
       npm run build
 
     startCommand: |
       npm install -g serve
-      serve -s dist -l 3000
+      serve -s front/dist -l 3000   # 👈 serve o dist que está dentro de front/
 
     envVars:
       - key: NODE_ENV
