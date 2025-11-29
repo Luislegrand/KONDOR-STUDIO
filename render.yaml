@@ -114,7 +114,7 @@ services:
       - key: NODE_ENV
         value: production
 
-  # -----------------------------
+    # -----------------------------
   # 🔥 REDIS (BULLMQ)
   # -----------------------------
   - type: redis
@@ -129,4 +129,6 @@ services:
 databases:
   - name: kondor-db
     region: oregon
-    plan: starter
+    plan: free
+    diskSizeGB: 1
+
