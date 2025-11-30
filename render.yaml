@@ -24,7 +24,7 @@ services:
         value: production
 
       - key: PORT
-        value: "4000"
+        value: 4000
 
       # ==== DATABASE + REDIS ====
       - key: DATABASE_URL
@@ -62,6 +62,56 @@ services:
       - key: S3_SECRET_ACCESS_KEY
         sync: false
 
+      # ==== WHATSAPP ====
+      - key: WHATSAPP_API_URL
+        sync: false
+      - key: WHATSAPP_API_KEY
+        sync: false
+      - key: WHATSAPP_FROM_NUMBER
+        sync: false
+      - key: WHATSAPP_TIMEOUT_MS
+        sync: false
+
+      # ==== MÉTRICAS ====
+      - key: META_GRAPH_BASE_URL
+        sync: false
+      - key: META_DEFAULT_FIELDS
+        sync: false
+      - key: GOOGLE_ADS_API_BASE_URL
+        sync: false
+      - key: GOOGLE_ADS_DEFAULT_FIELDS
+        sync: false
+
+      # ==== AUDIT LOG ====
+      - key: AUDIT_LOG_ENABLED
+        sync: false
+      - key: AUDITLOG_SKIP_REGEX
+        sync: false
+      - key: AUDITLOG_BODY_MAX
+        sync: false
+
+      # ==== BILLING ====
+      - key: CHECK_SUBSCRIPTION_ENABLED
+        sync: false
+
+      # ==== WORKER SETTINGS (COMPARTILHADAS) ====
+      - key: WORKER_POLL_INTERVAL
+        sync: false
+      - key: WORKER_MAX_ATTEMPTS
+        sync: false
+      - key: METRICS_AGG_PERIOD_MS
+        sync: false
+      - key: REPORTS_GENERATION_PERIOD_MS
+        sync: false
+      - key: WHATSAPP_AUTOMATION_PERIOD_MS
+        sync: false
+      - key: METRICS_BACKOFF_MS
+        sync: false
+      - key: REPORT_BACKOFF_MS
+        sync: false
+      - key: WHATSAPP_BACKOFF_MS
+        sync: false
+
     healthCheckPath: /healthz
 
   # -----------------------------
@@ -92,42 +142,51 @@ services:
           name: kondor-redis
           property: connectionString
 
+      # ==== WORKER SETTINGS ====
+      - key: WORKER_POLL_INTERVAL
+        sync: false
+      - key: WORKER_MAX_ATTEMPTS
+        sync: false
+      - key: METRICS_AGG_PERIOD_MS
+        sync: false
+      - key: REPORTS_GENERATION_PERIOD_MS
+        sync: false
+      - key: WHATSAPP_AUTOMATION_PERIOD_MS
+        sync: false
+      - key: METRICS_BACKOFF_MS
+        sync: false
+      - key: REPORT_BACKOFF_MS
+        sync: false
+      - key: WHATSAPP_BACKOFF_MS
+        sync: false
+
   # -----------------------------
   # 🟩 SPA FRONTEND (VITE)
   # -----------------------------
   - type: web
     name: kondor-front
     env: node
-    rootDir: .
+    rootDir: ./front
     plan: starter
     region: oregon
 
     buildCommand: |
-      echo "PWD:"
-      pwd
-      echo "Listing root:"
-      ls
-      echo "Listing ./front:"
-      ls front || echo "front NOT FOUND"
-      echo "Listing ./front/src:"
-      ls front/src || echo "front/src NOT FOUND"
-      cd front
-      echo "Inside /front:"
-      pwd
-      ls
-      cat package.json || echo "NO package.json HERE"
-      npm install
+      # garante que devDependencies (vite) sejam instaladas mesmo com NODE_ENV=production
+      npm install --include=dev
       npm run build
 
     startCommand: |
       npm install -g serve
-      serve -s front/dist -l 3000
+      serve -s dist -l 3000
 
     envVars:
       - key: NODE_ENV
         value: production
+      # força instalar devDependencies (onde está o vite) caso Render respeite esse env no runtime
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
 
-    # -----------------------------
+  # -----------------------------
   # 🔥 REDIS (BULLMQ)
   # -----------------------------
   - type: redis
@@ -143,5 +202,3 @@ databases:
   - name: kondor-db
     region: oregon
     plan: free
-
-
