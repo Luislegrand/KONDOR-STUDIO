@@ -2,18 +2,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Layout from "./Layout.jsx";
 
 // IMPORTS DAS PAGES
-import Dashboard from "./pages/Dashboard.jsx";
-import Clients from "./pages/Clients.jsx";
-import Posts from "./pages/Posts.jsx";
-import Tasks from "./pages/Tasks.jsx";
-import Biblioteca from "./pages/Biblioteca.jsx";
-import Financeiro from "./pages/Financeiro.jsx";
-import Team from "./pages/Team.jsx";
-import Metrics from "./pages/Metrics.jsx";
-import Integrations from "./pages/Integrations.jsx";
-import Settings from "./pages/Settings.jsx";
-import ClientPortal from "./pages/ClientPortal.jsx";
-import Pricing from "./pages/Pricing.jsx";
+import Dashboard from "./Pages/Dashboard.jsx";
+import Clients from "./Pages/Clients.jsx";
+import Posts from "./Pages/Posts.jsx";
+import Tasks from "./Pages/Tasks.jsx";
+import Biblioteca from "./Pages/Biblioteca.jsx";
+import Financeiro from "./Pages/Financeiro.jsx";
+import Team from "./Pages/Team.jsx";
+import Metrics from "./Pages/Metrics.jsx";
+import Integrations from "./Pages/Integrations.jsx";
+import Settings from "./Pages/Settings.jsx";
+import ClientPortal from "./Pages/ClientPortal.jsx";
+import Pricing from "./Pages/Pricing.jsx";
 
 export default function App() {
   return (
