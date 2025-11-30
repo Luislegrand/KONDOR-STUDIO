@@ -25,7 +25,7 @@ const STATUS_OPTIONS = [
   { value: "BLOCKED", label: "Bloqueada" },
 ];
 
-export default function TaskFormDialog({
+export default function Taskformdialog({
   open,
   onClose,
   task,

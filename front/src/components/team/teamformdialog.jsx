@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function TeamFormDialog({ open, onClose, member }) {
+export default function Teamformdialog({ open, onClose, member }) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     name: "",

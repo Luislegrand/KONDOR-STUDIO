@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter } from "lucide-react";
-import CreativeFormDialog from "../components/library/CreativeFormDialog";
-import CreativeGrid from "../components/library/CreativeGrid";
+import Creativeformdialog from "../components/library/creativeformdialog.jsx";
+import Creativegrid from "../components/library/creativegrid.jsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Biblioteca() {
@@ -95,12 +95,12 @@ export default function Biblioteca() {
           </div>
         </div>
 
-        <CreativeGrid
+        <Creativegrid
           creatives={filteredCreatives}
           clients={clients}
         />
 
-        <CreativeFormDialog
+        <Creativeformdialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           clients={clients}

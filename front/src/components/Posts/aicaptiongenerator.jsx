@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Sparkles, Copy, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function AICaptionGenerator({ post, client, onApply }) {
+export default function Aicaptiongenerator({ post, client, onApply }) {
   const [generating, setGenerating] = useState(false);
   const [captions, setCaptions] = useState([]);
   const [copiedIndex, setCopiedIndex] = useState(null);

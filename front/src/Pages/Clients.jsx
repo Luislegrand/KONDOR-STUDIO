@@ -3,9 +3,9 @@ import { base44 } from "../apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Pencil, Trash2, Building2, Globe, Instagram, Facebook } from "lucide-react";
-import ClientFormDialog from "../components/clients/ClientFormDialog";
-import ClientCard from "../components/clients/ClientCard";
+import { Plus, Building2 } from "lucide-react";
+import ClientFormDialog from "../components/clients/clientformdialog.jsx";
+import ClientCard from "../components/clients/clientcard.jsx";
 
 export default function Clients() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -13,15 +13,15 @@ export default function Clients() {
   const queryClient = useQueryClient();
 
   const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list()
+    queryKey: ["clients"],
+    queryFn: () => base44.entities.Client.list(),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Client.remove(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    },
   });
 
   const handleEdit = (client) => {
@@ -30,7 +30,7 @@ export default function Clients() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
+    if (confirm("Tem certeza que deseja excluir este cliente?")) {
       await deleteMutation.mutateAsync(id);
     }
   };

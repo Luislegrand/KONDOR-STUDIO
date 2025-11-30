@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { base44 } from "@/apiClient/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,9 @@ import {
   MessageSquare,
   Eye,
 } from "lucide-react";
-import PostApprovalCard from "../components/portal/PostApprovalCard";
+import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 
-export default function ClientPortal() {
+export default function Clientportal() {
   const [tenant, setTenant] = useState(null);
   const [client, setClient] = useState(null);
 
@@ -300,7 +300,7 @@ export default function ClientPortal() {
                   const approval = approvalsByPostId.get(post.id) || null;
 
                   return (
-                    <PostApprovalCard
+                    <Postapprovalcard
                       key={post.id}
                       post={post}
                       approval={approval}

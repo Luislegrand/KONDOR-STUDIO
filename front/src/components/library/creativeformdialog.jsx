@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Upload } from "lucide-react";
 
-export default function CreativeFormDialog({ open, onClose, clients }) {
+export default function Creativeformdialog({ open, onClose, clients }) {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({

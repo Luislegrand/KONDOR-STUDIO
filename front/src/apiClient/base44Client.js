@@ -1,8 +1,11 @@
-// apiClient/base44Client.js
+// src/apiClient/base44Client.js
 
+// ⚙️ Base URL da API — usando variáveis do Vite, sem "process"
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.REACT_APP_API_URL ||
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    (import.meta.env.VITE_API_URL ||
+      import.meta.env.VITE_APP_API_URL)) ||
   "http://localhost:4000";
 
 // --------------------
@@ -61,7 +64,8 @@ function getTokenId() {
 // --------------------
 
 async function rawFetch(path, options = {}) {
-  const url = API_BASE_URL.replace(/\/+$/, "") + path;
+  const base = API_BASE_URL.replace(/\/+$/, "");
+  const url = base + path;
   const defaultHeaders = {
     "Content-Type": "application/json",
   };
@@ -197,7 +201,6 @@ async function tryRefreshToken() {
       body: JSON.stringify({ refreshToken, tokenId }),
     });
 
-    // Se falhar (400/401/etc), não tenta de novo
     if (!res.ok) return false;
 
     const data = await res.json();
@@ -288,16 +291,11 @@ const Report = buildCrudEntity("/reports");
 const TeamMember = buildCrudEntity("/team-members");
 const Tenant = buildCrudEntity("/tenants");
 
-// Approval: CRUD genérico + métodos específicos de workflow
 const ApprovalBase = buildCrudEntity("/approvals");
 
 const Approval = {
   ...ApprovalBase,
 
-  /**
-   * Atualiza o status de uma approval via endpoint dedicado.
-   * Ex: Approval.updateStatus(id, { status: "APPROVED", clientFeedback: "ok" })
-   */
   async updateStatus(id, payload = {}) {
     const res = await authFetch(`/approvals/${id}/status`, {
       method: "POST",
@@ -306,10 +304,6 @@ const Approval = {
     return parseJsonOrThrow(res);
   },
 
-  /**
-   * Atalho para aprovar uma approval.
-   * Ex: Approval.approve(id, { clientFeedback: "ok" })
-   */
   async approve(id, payload = {}) {
     const data = {
       ...payload,
@@ -318,10 +312,6 @@ const Approval = {
     return this.updateStatus(id, data);
   },
 
-  /**
-   * Atalho para rejeitar uma approval.
-   * Ex: Approval.reject(id, { clientFeedback: "ajustar legenda" })
-   */
   async reject(id, payload = {}) {
     const data = {
       ...payload,
@@ -331,7 +321,6 @@ const Approval = {
   },
 };
 
-// Dashboard (não é CRUD padrão)
 const Dashboard = {
   async summary(params) {
     const query = buildQuery(params);
@@ -369,7 +358,7 @@ export const base44 = {
   },
   storage: {
     loadAuthFromStorage,
-    saveAuthToStorage,
+    saveAuthFromStorage: saveAuthToStorage,
     clearAuthFromStorage,
     getAccessToken,
     getRefreshToken,

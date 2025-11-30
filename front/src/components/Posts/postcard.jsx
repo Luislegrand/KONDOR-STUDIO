@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, CalendarDays } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Select,
   SelectTrigger,
@@ -18,11 +18,12 @@ import {
 } from "@/components/ui/select";
 
 const STATUS_OPTIONS = [
-  { value: "TODO", label: "A fazer" },
-  { value: "IN_PROGRESS", label: "Em andamento" },
-  { value: "REVIEW", label: "Revisão" },
-  { value: "DONE", label: "Concluída" },
-  { value: "BLOCKED", label: "Bloqueada" },
+  { value: "DRAFT", label: "Rascunho" },
+  { value: "PENDING_APPROVAL", label: "Aguardando aprovação" },
+  { value: "APPROVED", label: "Aprovado" },
+  { value: "SCHEDULED", label: "Programado" },
+  { value: "PUBLISHED", label: "Publicado" },
+  { value: "ARCHIVED", label: "Arquivado" },
 ];
 
 function formatStatusLabel(value) {
@@ -34,25 +35,21 @@ function formatDate(dt) {
   if (!dt) return null;
   const d = new Date(dt);
   if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("pt-BR", {
+  return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-export default function TaskCard({
-  task,
-  client,
-  onEdit,
-  onDelete,
-  onStatusChange,
-}) {
+export default function Postcard({ post, client, onEdit, onStatusChange }) {
   const handleStatusChange = (newStatus) => {
     if (!onStatusChange) return;
-    onStatusChange(task.id, newStatus);
+    onStatusChange(post.id, newStatus);
   };
 
-  const dueLabel = formatDate(task.dueDate);
+  const scheduledLabel = formatDate(post.scheduledAt);
 
   return (
     <Card className="border border-purple-100 shadow-sm">
@@ -60,7 +57,7 @@ export default function TaskCard({
         <div className="flex justify-between items-start gap-2">
           <div>
             <CardTitle className="text-sm font-semibold text-gray-900 line-clamp-2">
-              {task.title || "Tarefa sem título"}
+              {post.title || "Post sem título"}
             </CardTitle>
             {client && (
               <p className="text-xs text-gray-500 mt-1">
@@ -68,36 +65,30 @@ export default function TaskCard({
               </p>
             )}
           </div>
-          <Badge
-            variant="outline"
-            className="text-[10px] border-purple-200 text-purple-700"
-          >
-            {formatStatusLabel(task.status)}
+          <Badge variant="outline" className="text-[10px] border-purple-200 text-purple-700">
+            {formatStatusLabel(post.status)}
           </Badge>
         </div>
       </CardHeader>
 
-      {task.description && (
+      {post.body && (
         <CardContent className="pb-2">
           <p className="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">
-            {task.description}
+            {post.body}
           </p>
         </CardContent>
       )}
 
       <CardFooter className="pt-2 flex flex-col gap-2">
-        {dueLabel && (
-          <div className="flex items-center justify-between w-full text-[11px] text-gray-500">
-            <div className="flex items-center gap-1">
-              <CalendarDays className="w-3 h-3" />
-              <span>Prazo: {dueLabel}</span>
-            </div>
+        {scheduledLabel && (
+          <div className="w-full text-[11px] text-gray-500">
+            Programado para: <span className="font-medium">{scheduledLabel}</span>
           </div>
         )}
 
         <div className="flex items-center justify-between gap-2 w-full">
           <Select
-            value={task.status}
+            value={post.status}
             onValueChange={handleStatusChange}
           >
             <SelectTrigger className="h-8 text-xs w-[140px]">
@@ -112,24 +103,14 @@ export default function TaskCard({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 border-purple-200"
-              onClick={() => onEdit && onEdit(task)}
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 border-red-200 text-red-600 hover:bg-red-50"
-              onClick={() => onDelete && onDelete(task.id)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 border-purple-200"
+            onClick={() => onEdit && onEdit(post)}
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
         </div>
       </CardFooter>
     </Card>

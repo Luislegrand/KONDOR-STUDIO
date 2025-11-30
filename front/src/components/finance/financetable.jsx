@@ -29,7 +29,7 @@ function formatDate(dt) {
   });
 }
 
-export default function FinanceTable({
+export default function Financetable({
   records = [],
   clients = [],
   isLoading,

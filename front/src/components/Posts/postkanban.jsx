@@ -1,37 +1,29 @@
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import TaskCard from "./TaskCard";
+import Postcard from "./postcard.jsx";
 
-const DEFAULT_COLUMNS = [
-  { status: "TODO", title: "A fazer" },
-  { status: "IN_PROGRESS", title: "Em andamento" },
-  { status: "REVIEW", title: "Revisão" },
-  { status: "DONE", title: "Concluída" },
-  { status: "BLOCKED", title: "Bloqueada" },
+const COLUMNS = [
+  { status: "DRAFT", title: "Rascunho" },
+  { status: "PENDING_APPROVAL", title: "Aguardando aprovação" },
+  { status: "APPROVED", title: "Aprovado" },
+  { status: "SCHEDULED", title: "Programado" },
+  { status: "PUBLISHED", title: "Publicado" },
+  { status: "ARCHIVED", title: "Arquivado" },
 ];
 
-export default function Taskboard({
-  tasks = [],
+export default function Postkanban({
+  posts = [],
   clients = [],
-  isLoading,
   onEdit,
-  onDelete,
   onStatusChange,
+  isLoading,
 }) {
-  const getClient = (id) => clients.find((c) => c.id === id) || null;
-
-  // Garante que a gente tenha colunas mesmo que o status vindo do backend seja diferente
-  const allStatuses = Array.from(new Set(tasks.map((t) => t.status).filter(Boolean)));
-  const columnsFromData = allStatuses
-    .filter((s) => !DEFAULT_COLUMNS.find((c) => c.status === s))
-    .map((s) => ({ status: s, title: s }));
-
-  const columns = [...DEFAULT_COLUMNS, ...columnsFromData];
+  const getClientById = (id) => clients.find((c) => c.id === id) || null;
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {columns.map((col) => (
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {COLUMNS.map((col) => (
           <Card key={col.status} className="border-dashed border-purple-200">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-gray-800">
@@ -55,9 +47,9 @@ export default function Taskboard({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {columns.map((col) => {
-        const columnTasks = tasks.filter((t) => t.status === col.status);
+    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {COLUMNS.map((col) => {
+        const columnPosts = posts.filter((p) => p.status === col.status);
 
         return (
           <Card key={col.status} className="bg-slate-50/60">
@@ -67,23 +59,22 @@ export default function Taskboard({
                   {col.title}
                 </CardTitle>
                 <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
-                  {columnTasks.length}
+                  {columnPosts.length}
                 </span>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-              {columnTasks.length === 0 ? (
+              {columnPosts.length === 0 ? (
                 <div className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg p-3 text-center">
-                  Nenhuma tarefa aqui ainda.
+                  Nenhum post aqui ainda.
                 </div>
               ) : (
-                columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    client={getClient(task.clientId)}
+                columnPosts.map((post) => (
+                  <Postcard
+                    key={post.id}
+                    post={post}
+                    client={getClientById(post.clientId)}
                     onEdit={onEdit}
-                    onDelete={onDelete}
                     onStatusChange={onStatusChange}
                   />
                 ))

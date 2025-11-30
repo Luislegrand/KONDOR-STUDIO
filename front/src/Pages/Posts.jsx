@@ -3,8 +3,8 @@ import { base44 } from "../apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import PostKanban from "../components/posts/PostKanban";
-import PostFormDialog from "../components/posts/PostFormDialog";
+import Postkanban from "../components/Posts/postkanban.jsx";
+import Postformdialog from "../components/Posts/postformdialog.jsx";
 
 export default function Posts() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function Posts() {
           </Button>
         </div>
 
-        <PostKanban
+        <Postkanban
           posts={posts}
           clients={clients}
           onEdit={handleEdit}
@@ -72,7 +72,7 @@ export default function Posts() {
           isLoading={isLoading}
         />
 
-        <PostFormDialog
+        <Postformdialog
           open={dialogOpen}
           onClose={handleDialogClose}
           post={editingPost}

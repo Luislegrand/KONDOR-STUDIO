@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export default function ClientFormDialog({ open, onClose, client }) {
+export default function Clientformdialog({ open, onClose, client }) {
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({

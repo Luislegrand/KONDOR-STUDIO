@@ -1,19 +1,19 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Layout from "./Layout.jsx";
+import Layout from "./layout.jsx";
 
 // IMPORTS DAS PAGES
-import Dashboard from "./Pages/Dashboard.jsx";
-import Clients from "./Pages/Clients.jsx";
-import Posts from "./Pages/Posts.jsx";
-import Tasks from "./Pages/Tasks.jsx";
-import Biblioteca from "./Pages/Biblioteca.jsx";
-import Financeiro from "./Pages/Financeiro.jsx";
-import Team from "./Pages/Team.jsx";
-import Metrics from "./Pages/Metrics.jsx";
-import Integrations from "./Pages/Integrations.jsx";
-import Settings from "./Pages/Settings.jsx";
-import ClientPortal from "./Pages/ClientPortal.jsx";
-import Pricing from "./Pages/Pricing.jsx";
+import Dashboard from "./pages/dashboard.jsx";
+import Clients from "./pages/clients.jsx";
+import Posts from "./pages/posts.jsx";
+import Tasks from "./pages/tasks.jsx";
+import Biblioteca from "./pages/biblioteca.jsx";
+import Financeiro from "./pages/financeiro.jsx";
+import Team from "./pages/team.jsx";
+import Metrics from "./pages/metrics.jsx";
+import Integrations from "./pages/integrations.jsx";
+import Settings from "./pages/settings.jsx";
+import Clientportal from "./pages/clientportal.jsx";
+import Pricing from "./pages/pricing.jsx";
 
 export default function App() {
   return (
@@ -34,7 +34,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
 
           {/* CLIENT PORTAL */}
-          <Route path="/portal" element={<ClientPortal />} />
+          <Route path="/portal" element={<Clientportal />} />
 
           {/* PRICING */}
           <Route path="/pricing" element={<Pricing />} />

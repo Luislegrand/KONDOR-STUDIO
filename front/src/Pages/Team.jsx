@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, UserCircle, Mail, Shield } from "lucide-react";
-import TeamFormDialog from "../components/team/TeamFormDialog";
+import Teamformdialog from "../components/team/teamformdialog.jsx";
 
 const roleLabels = {
   admin: "Administrador",
@@ -175,7 +175,7 @@ export default function Team() {
           </div>
         )}
 
-        <TeamFormDialog
+        <Teamformdialog
           open={dialogOpen}
           onClose={handleDialogClose}
           member={editingMember}

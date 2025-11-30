@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
  *  - approval: objeto da approval associada a este post (id, status, notes, etc.)
  *  - primaryColor: (mantido para compatibilidade, caso usado em temas)
  */
-export default function PostApprovalCard({ post, approval, primaryColor }) {
+export default function Postapprovalcard({ post, approval, primaryColor }) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState("");
   const queryClient = useQueryClient();

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Globe, Instagram, Facebook, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export default function ClientCard({ client, onEdit, onDelete }) {
+export default function Clientcard({ client, onEdit, onDelete }) {
   return (
     <Card className="hover:shadow-lg transition-all duration-300 overflow-hidden">
       <CardHeader className="bg-gradient-to-br from-purple-100 to-purple-200 pb-16 relative">

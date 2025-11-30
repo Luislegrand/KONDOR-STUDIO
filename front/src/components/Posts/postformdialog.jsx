@@ -28,7 +28,7 @@ const STATUS_OPTIONS = [
   { value: "ARCHIVED", label: "Arquivado" },
 ];
 
-export default function PostFormDialog({ open, onClose, post, clients = [] }) {
+export default function Postformdialog({ open, onClose, post, clients = [] }) {
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({

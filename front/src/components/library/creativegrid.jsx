@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Eye, TrendingUp, Image as ImageIcon, Video } from "lucide-react";
 
-export default function CreativeGrid({ creatives, clients }) {
+export default function Creativegrid({ creatives, clients }) {
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({

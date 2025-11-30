@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import FinanceFormDialog from "../components/finance/FinanceFormDialog";
-import FinanceTable from "../components/finance/FinanceTable";
+import Financeformdialog from "../components/finance/financeformdialog.jsx";
+import Financetable from "../components/finance/financetable.jsx";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 function formatCurrencyBRL(value) {
@@ -136,7 +136,7 @@ export default function Financeiro() {
         </div>
 
         {/* Tabela de lançamentos */}
-        <FinanceTable
+        <Financetable
           records={records}
           clients={clients}
           isLoading={isLoading}
@@ -144,7 +144,7 @@ export default function Financeiro() {
           onDelete={handleDelete}
         />
 
-        <FinanceFormDialog
+        <Financeformdialog
           open={dialogOpen}
           onClose={handleCloseDialog}
           record={editingRecord}

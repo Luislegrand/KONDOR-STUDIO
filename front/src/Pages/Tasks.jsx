@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import Taskboard from "../components/tasks/Taskboard";
-import TaskFormDialog from "../components/tasks/TaskFormDialog";
+import Taskboard from "../components/tasks/taskboard.jsx";
+import Taskformdialog from "../components/tasks/taskformdialog.jsx";
 
 export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -111,7 +111,7 @@ export default function Tasks() {
           onStatusChange={handleStatusChange}
         />
 
-        <TaskFormDialog
+        <Taskformdialog
           open={dialogOpen}
           onClose={handleCloseDialog}
           task={editingTask}

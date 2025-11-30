@@ -26,7 +26,7 @@ const TYPE_OPTIONS = [
   { value: "other", label: "Outro" },
 ];
 
-export default function FinanceFormDialog({ open, onClose, record, clients = [] }) {
+export default function Financeformdialog({ open, onClose, record, clients = [] }) {
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
