@@ -1,8 +1,13 @@
 import React, { useState } from "react";
 import { base44 } from "../apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button.jsx";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.jsx";
 import { Plus, Building2 } from "lucide-react";
 import ClientFormDialog from "../components/clients/clientformdialog.jsx";
 import ClientCard from "../components/clients/clientcard.jsx";
@@ -45,8 +50,12 @@ export default function Clients() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Clientes</h1>
-            <p className="text-gray-600">Gerencie sua carteira de clientes</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Clientes
+            </h1>
+            <p className="text-gray-600">
+              Gerencie sua carteira de clientes
+            </p>
           </div>
           <Button
             onClick={() => setDialogOpen(true)}
@@ -81,7 +90,8 @@ export default function Clients() {
               Nenhum cliente cadastrado
             </h2>
             <p className="text-gray-500 mb-6">
-              Comece adicionando seu primeiro cliente para organizar sua operação.
+              Comece adicionando seu primeiro cliente para organizar sua
+              operação.
             </p>
             <Button
               onClick={() => setDialogOpen(true)}

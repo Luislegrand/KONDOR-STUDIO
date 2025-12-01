@@ -1,88 +1,64 @@
 import React from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Globe, Instagram, Facebook, TrendingUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Building2, Pencil, Trash2, User } from "lucide-react";
 
-export default function Clientcard({ client, onEdit, onDelete }) {
+export default function ClientCard({ client, onEdit, onDelete }) {
   return (
-    <Card className="hover:shadow-lg transition-all duration-300 overflow-hidden">
-      <CardHeader className="bg-gradient-to-br from-purple-100 to-purple-200 pb-16 relative">
-        {client.logo_url ? (
-          <img src={client.logo_url} alt={client.name} className="w-16 h-16 rounded-lg bg-white p-2 shadow-md" />
-        ) : (
-          <div className="w-16 h-16 rounded-lg bg-white flex items-center justify-center shadow-md">
-            <span className="text-2xl font-bold text-purple-600">{client.name[0]}</span>
+    <Card className="hover:shadow-md transition-shadow border border-purple-100">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+            {client.logo_url ? (
+              <img
+                src={client.logo_url}
+                alt={client.name}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <User className="w-6 h-6 text-purple-600" />
+            )}
           </div>
-        )}
-
-        <div className="absolute top-4 right-4 flex gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onEdit(client)}
-            className="bg-white/80 hover:bg-white"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(client.id)}
-            className="bg-white/80 hover:bg-white text-red-600"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <CardTitle className="text-base font-semibold text-gray-900">
+            {client.name}
+          </CardTitle>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-1">{client.name}</h3>
-        <p className="text-sm text-gray-500 mb-4">{client.sector || 'Setor não definido'}</p>
-
-        {client.monthly_value && (
-          <div className="flex items-center gap-2 mb-4 text-green-600">
-            <TrendingUp className="w-4 h-4" />
-            <span className="font-semibold">R$ {client.monthly_value.toFixed(2)}/mês</span>
-          </div>
+      <CardContent className="space-y-4 text-sm text-gray-700">
+        {client.sector && (
+          <p className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-purple-500" />
+            {client.sector}
+          </p>
         )}
 
-        <div className="flex gap-2 mb-4">
-          {client.website && (
-            <a href={client.website} target="_blank" rel="noopener noreferrer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-purple-50">
-                <Globe className="w-3 h-3 mr-1" />
-                Site
-              </Badge>
-            </a>
-          )}
-          {client.instagram && (
-            <a href={`https://instagram.com/${client.instagram}`} target="_blank" rel="noopener noreferrer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-purple-50">
-                <Instagram className="w-3 h-3 mr-1" />
-                IG
-              </Badge>
-            </a>
-          )}
-          {client.facebook && (
-            <a href={client.facebook} target="_blank" rel="noopener noreferrer">
-              <Badge variant="outline" className="cursor-pointer hover:bg-purple-50">
-                <Facebook className="w-3 h-3 mr-1" />
-                FB
-              </Badge>
-            </a>
-          )}
+        <div className="flex gap-2 pt-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onEdit(client)}
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-red-600 hover:bg-red-50 flex-1"
+            onClick={() => onDelete(client.id)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Excluir
+          </Button>
         </div>
-
-        {client.tags && client.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {client.tags.map((tag, idx) => (
-              <Badge key={idx} className="bg-purple-100 text-purple-700 text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );

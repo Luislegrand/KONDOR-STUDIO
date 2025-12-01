@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { base44 } from "@/apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button.jsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Plus, UserCircle, Mail, Shield } from "lucide-react";
-import Teamformdialog from "../components/team/teamformdialog.jsx";
+import TeamFormDialog from "../components/team/teamformdialog.jsx";
 
 const roleLabels = {
   admin: "Administrador",
@@ -13,7 +13,7 @@ const roleLabels = {
   designer: "Designer",
   social_media: "Social Media",
   copywriter: "Copywriter",
-  videomaker: "Videomaker"
+  videomaker: "Videomaker",
 };
 
 const roleColors = {
@@ -22,7 +22,7 @@ const roleColors = {
   designer: "bg-pink-100 text-pink-700",
   social_media: "bg-green-100 text-green-700",
   copywriter: "bg-yellow-100 text-yellow-700",
-  videomaker: "bg-orange-100 text-orange-700"
+  videomaker: "bg-orange-100 text-orange-700",
 };
 
 export default function Team() {
@@ -31,15 +31,15 @@ export default function Team() {
   const queryClient = useQueryClient();
 
   const { data: team = [], isLoading } = useQuery({
-    queryKey: ['team'],
-    queryFn: () => base44.entities.TeamMember.list('-created_date')
+    queryKey: ["team"],
+    queryFn: () => base44.entities.TeamMember.list("-created_date"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.TeamMember.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ["team"] });
+    },
   });
 
   const handleEdit = (member) => {
@@ -48,7 +48,7 @@ export default function Team() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm('Tem certeza que deseja remover este membro?')) {
+    if (confirm("Tem certeza que deseja remover este membro?")) {
       await deleteMutation.mutateAsync(id);
     }
   };
@@ -102,7 +102,10 @@ export default function Team() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {team.map((member) => (
-              <Card key={member.id} className="hover:shadow-lg transition-shadow">
+              <Card
+                key={member.id}
+                className="hover:shadow-lg transition-shadow"
+              >
                 <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100">
                   <div className="flex items-center gap-4">
                     {member.avatar_url ? (
@@ -119,8 +122,13 @@ export default function Team() {
                       </div>
                     )}
                     <div className="flex-1">
-                      <CardTitle className="text-lg">{member.name}</CardTitle>
-                      <Badge className={`${roleColors[member.role]} mt-2`} variant="secondary">
+                      <CardTitle className="text-lg">
+                        {member.name}
+                      </CardTitle>
+                      <Badge
+                        className={`${roleColors[member.role]} mt-2`}
+                        variant="secondary"
+                      >
                         {roleLabels[member.role]}
                       </Badge>
                     </div>
@@ -142,12 +150,13 @@ export default function Team() {
                       <div className="flex flex-wrap gap-1">
                         {Object.entries(member.permissions)
                           .filter(([_, value]) => value)
-                          .map(([key, _]) => (
+                          .map(([key]) => (
                             <Badge key={key} variant="outline" className="text-xs">
                               {key}
                             </Badge>
                           ))}
                       </div>
+                    </div>
                   )}
 
                   <div className="flex gap-2 pt-4">
@@ -174,7 +183,7 @@ export default function Team() {
           </div>
         )}
 
-        <Teamformdialog
+        <TeamFormDialog
           open={dialogOpen}
           onClose={handleDialogClose}
           member={editingMember}

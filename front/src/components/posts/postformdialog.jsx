@@ -1,66 +1,50 @@
 import React, { useEffect, useState } from "react";
-import { base44 } from "@/apiClient/base44Client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Label } from "@/components/ui/label.jsx";
+import { Textarea } from "@/components/ui/textarea.jsx";
 import {
   Select,
   SelectTrigger,
-  SelectContent,
   SelectValue,
+  SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@/components/ui/select.jsx";
+import { base44 } from "@/apiClient/base44Client";
+import { Upload, Image as ImageIcon, Video } from "lucide-react";
 
-const STATUS_OPTIONS = [
-  { value: "DRAFT", label: "Rascunho" },
-  { value: "PENDING_APPROVAL", label: "Aguardando aprovação" },
-  { value: "APPROVED", label: "Aprovado" },
-  { value: "SCHEDULED", label: "Programado" },
-  { value: "PUBLISHED", label: "Publicado" },
-  { value: "ARCHIVED", label: "Arquivado" },
-];
-
-export default function Postformdialog({ open, onClose, post, clients = [] }) {
-  const queryClient = useQueryClient();
-
+export default function Postformdialog({
+  open,
+  onClose,
+  post,
+  clients = [],
+  onSubmit,
+  isSaving,
+}) {
   const [formData, setFormData] = useState({
     title: "",
     body: "",
     clientId: "",
     status: "DRAFT",
-    mediaUrl: "",
-    scheduledAtDate: "",
-    scheduledAtTime: "",
+    media_url: "",
+    media_type: "image",
   });
 
-  // Preenche form se estiver editando
   useEffect(() => {
     if (post) {
-      let scheduledAtDate = "";
-      let scheduledAtTime = "";
-
-      if (post.scheduledAt) {
-        const d = new Date(post.scheduledAt);
-        scheduledAtDate = d.toISOString().slice(0, 10);
-        scheduledAtTime = d.toTimeString().slice(0, 5);
-      }
-
       setFormData({
         title: post.title || "",
         body: post.body || "",
         clientId: post.clientId || "",
         status: post.status || "DRAFT",
-        mediaUrl: post.mediaUrl || "",
-        scheduledAtDate,
-        scheduledAtTime,
+        media_url: post.media_url || "",
+        media_type: post.media_type || "image",
       });
     } else {
       setFormData({
@@ -68,44 +52,11 @@ export default function Postformdialog({ open, onClose, post, clients = [] }) {
         body: "",
         clientId: "",
         status: "DRAFT",
-        mediaUrl: "",
-        scheduledAtDate: "",
-        scheduledAtTime: "",
+        media_url: "",
+        media_type: "image",
       });
     }
   }, [post]);
-
-  const mutation = useMutation({
-    mutationFn: async (data) => {
-      // monta scheduledAt (se tiver data/hora)
-      let scheduledAt = null;
-      if (data.scheduledAtDate) {
-        const dateStr = data.scheduledAtDate;
-        const timeStr = data.scheduledAtTime || "09:00";
-        const iso = `${dateStr}T${timeStr}:00`;
-        scheduledAt = new Date(iso).toISOString();
-      }
-
-      const payload = {
-        title: data.title,
-        body: data.body,
-        clientId: data.clientId || null,
-        status: data.status || "DRAFT",
-        mediaUrl: data.mediaUrl || null,
-        scheduledAt,
-      };
-
-      if (post) {
-        return base44.entities.Post.update(post.id, payload);
-      } else {
-        return base44.entities.Post.create(payload);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      onClose();
-    },
-  });
 
   const handleChange = (field) => (e) => {
     const value = e?.target ? e.target.value : e;
@@ -115,14 +66,29 @@ export default function Postformdialog({ open, onClose, post, clients = [] }) {
     }));
   };
 
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setFormData((prev) => ({ ...prev, media_url: file_url }));
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Falha ao enviar arquivo. Tente novamente.");
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    mutation.mutate(formData);
+    if (onSubmit) {
+      onSubmit(formData);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {post ? "Editar Post" : "Novo Post"}
@@ -130,46 +96,6 @@ export default function Postformdialog({ open, onClose, post, clients = [] }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Linha: Cliente + Status */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <Select
-                value={formData.clientId}
-                onValueChange={handleChange("clientId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={handleChange("status")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
           {/* Título */}
           <div className="space-y-2">
@@ -177,46 +103,102 @@ export default function Postformdialog({ open, onClose, post, clients = [] }) {
             <Input
               value={formData.title}
               onChange={handleChange("title")}
-              placeholder="Ex: Post da campanha de Dia das Mães"
+              placeholder="Título do post"
               required
             />
           </div>
 
-          {/* Legenda / Corpo */}
+          {/* Corpo */}
           <div className="space-y-2">
-            <Label>Legenda / Copy</Label>
+            <Label>Legenda / Corpo</Label>
             <Textarea
               value={formData.body}
               onChange={handleChange("body")}
-              rows={5}
-              placeholder="Escreva aqui a legenda do post..."
+              placeholder="Texto ou legenda do post"
+              rows={4}
             />
           </div>
 
-          {/* Mídia + Agendamento */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label>URL da Mídia (temporário)</Label>
-              <Input
-                value={formData.mediaUrl}
-                onChange={handleChange("mediaUrl")}
-                placeholder="https://... (upload real será implementado depois)"
-              />
-            </div>
+          {/* Cliente */}
+          <div className="space-y-2">
+            <Label>Cliente</Label>
+            <Select
+              value={formData.clientId}
+              onValueChange={handleChange("clientId")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <Label>Data de publicação</Label>
+          {/* Status */}
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select
+              value={formData.status}
+              onValueChange={handleChange("status")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DRAFT">Rascunho</SelectItem>
+                <SelectItem value="PENDING_APPROVAL">
+                  Aguardando aprovação
+                </SelectItem>
+                <SelectItem value="APPROVED">Aprovado</SelectItem>
+                <SelectItem value="SCHEDULED">Programado</SelectItem>
+                <SelectItem value="PUBLISHED">Publicado</SelectItem>
+                <SelectItem value="ARCHIVED">Arquivado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Upload de mídia */}
+          <div className="space-y-2">
+            <Label>Mídia</Label>
+
+            {formData.media_url && (
+              <div className="w-full aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                {formData.media_type === "video" ? (
+                  <Video className="w-16 h-16 text-gray-400" />
+                ) : (
+                  <img
+                    src={formData.media_url}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
               <Input
-                type="date"
-                value={formData.scheduledAtDate}
-                onChange={handleChange("scheduledAtDate")}
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleUpload}
               />
-              <Input
-                type="time"
-                value={formData.scheduledAtTime}
-                onChange={handleChange("scheduledAtTime")}
-                className="mt-2"
-              />
+
+              <Select
+                value={formData.media_type}
+                onValueChange={handleChange("media_type")}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="image">Imagem</SelectItem>
+                  <SelectItem value="video">Vídeo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -226,22 +208,23 @@ export default function Postformdialog({ open, onClose, post, clients = [] }) {
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={mutation.isPending}
+              disabled={isSaving}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               className="bg-purple-600 hover:bg-purple-700"
-              disabled={mutation.isPending}
+              disabled={isSaving}
             >
-              {mutation.isPending
+              {isSaving
                 ? "Salvando..."
                 : post
                 ? "Atualizar Post"
                 : "Criar Post"}
             </Button>
           </div>
+
         </form>
       </DialogContent>
     </Dialog>

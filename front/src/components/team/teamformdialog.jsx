@@ -6,18 +6,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@/components/ui/dialog.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Label } from "@/components/ui/label.jsx";
+import { Checkbox } from "@/components/ui/checkbox.jsx";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select.jsx";
 
 export default function Teamformdialog({ open, onClose, member }) {
   const queryClient = useQueryClient();
@@ -31,8 +31,8 @@ export default function Teamformdialog({ open, onClose, member }) {
       tasks: true,
       metrics: false,
       team: false,
-      settings: false
-    }
+      settings: false,
+    },
   });
 
   useEffect(() => {
@@ -41,14 +41,15 @@ export default function Teamformdialog({ open, onClose, member }) {
         name: member.name || "",
         email: member.email || "",
         role: member.role || "social_media",
-        permissions: member.permissions || {
-          clients: true,
-          posts: true,
-          tasks: true,
-          metrics: false,
-          team: false,
-          settings: false
-        }
+        permissions:
+          member.permissions || {
+            clients: true,
+            posts: true,
+            tasks: true,
+            metrics: false,
+            team: false,
+            settings: false,
+          },
       });
     } else {
       setFormData({
@@ -61,8 +62,8 @@ export default function Teamformdialog({ open, onClose, member }) {
           tasks: true,
           metrics: false,
           team: false,
-          settings: false
-        }
+          settings: false,
+        },
       });
     }
   }, [member]);
@@ -72,7 +73,7 @@ export default function Teamformdialog({ open, onClose, member }) {
       const tenants = await base44.entities.Tenant.list();
       const payload = {
         ...data,
-        tenant_id: tenants[0].id
+        tenant_id: tenants[0].id,
       };
 
       if (member) {
@@ -82,9 +83,9 @@ export default function Teamformdialog({ open, onClose, member }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team'] });
+      queryClient.invalidateQueries({ queryKey: ["team"] });
       onClose();
-    }
+    },
   });
 
   const handleSubmit = (e) => {
@@ -93,12 +94,12 @@ export default function Teamformdialog({ open, onClose, member }) {
   };
 
   const togglePermission = (key) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       permissions: {
         ...prev.permissions,
-        [key]: !prev.permissions[key]
-      }
+        [key]: !prev.permissions[key],
+      },
     }));
   };
 
@@ -106,7 +107,9 @@ export default function Teamformdialog({ open, onClose, member }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-xl bg-white">
         <DialogHeader>
-          <DialogTitle className="text-gray-900">{member ? 'Editar Membro' : 'Novo Membro'}</DialogTitle>
+          <DialogTitle className="text-gray-900">
+            {member ? "Editar Membro" : "Novo Membro"}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -114,7 +117,9 @@ export default function Teamformdialog({ open, onClose, member }) {
             <Label className="text-gray-900">Nome *</Label>
             <Input
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               required
               className="bg-white border-gray-300"
             />
@@ -125,7 +130,9 @@ export default function Teamformdialog({ open, onClose, member }) {
             <Input
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
               required
               className="bg-white border-gray-300"
             />
@@ -135,14 +142,18 @@ export default function Teamformdialog({ open, onClose, member }) {
             <Label className="text-gray-900">Função</Label>
             <Select
               value={formData.role}
-              onValueChange={(value) => setFormData({...formData, role: value})}
+              onValueChange={(value) =>
+                setFormData({ ...formData, role: value })
+              }
             >
               <SelectTrigger className="bg-white border-gray-300">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-white">
                 <SelectItem value="admin">Administrador</SelectItem>
-                <SelectItem value="traffic_manager">Gestor de Tráfego</SelectItem>
+                <SelectItem value="traffic_manager">
+                  Gestor de Tráfego
+                </SelectItem>
                 <SelectItem value="designer">Designer</SelectItem>
                 <SelectItem value="social_media">Social Media</SelectItem>
                 <SelectItem value="copywriter">Copywriter</SelectItem>
@@ -161,8 +172,11 @@ export default function Teamformdialog({ open, onClose, member }) {
                     checked={formData.permissions[key]}
                     onCheckedChange={() => togglePermission(key)}
                   />
-                  <label htmlFor={key} className="text-sm capitalize cursor-pointer text-gray-900">
-                    {key.replace('_', ' ')}
+                  <label
+                    htmlFor={key}
+                    className="text-sm capitalize cursor-pointer text-gray-900"
+                  >
+                    {key.replace("_", " ")}
                   </label>
                 </div>
               ))}
@@ -178,7 +192,11 @@ export default function Teamformdialog({ open, onClose, member }) {
               className="bg-purple-600 hover:bg-purple-700"
               disabled={mutation.isPending}
             >
-              {mutation.isPending ? 'Salvando...' : member ? 'Atualizar' : 'Adicionar Membro'}
+              {mutation.isPending
+                ? "Salvando..."
+                : member
+                ? "Atualizar"
+                : "Adicionar Membro"}
             </Button>
           </div>
         </form>

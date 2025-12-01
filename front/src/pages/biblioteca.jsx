@@ -1,12 +1,18 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+"@/apiClient/base44Client"
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
 import { Plus, Search, Filter } from "lucide-react";
 import Creativeformdialog from "../components/library/creativeformdialog.jsx";
 import Creativegrid from "../components/library/creativegrid.jsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.jsx";
 
 export default function Biblioteca() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -15,20 +21,25 @@ export default function Biblioteca() {
   const [filterType, setFilterType] = useState("all");
 
   const { data: creatives = [] } = useQuery({
-    queryKey: ['creatives'],
-    queryFn: () => base44.entities.Creative.list('-created_date')
+    queryKey: ["creatives"],
+    queryFn: () => base44.entities.Creative.list("-created_date"),
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list()
+    queryKey: ["clients"],
+    queryFn: () => base44.entities.Client.list(),
   });
 
-  const filteredCreatives = creatives.filter(creative => {
-    const matchesSearch = creative.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         creative.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesClient = filterClient === "all" || creative.client_id === filterClient;
-    const matchesType = filterType === "all" || creative.file_type === filterType;
+  const filteredCreatives = creatives.filter((creative) => {
+    const matchesSearch =
+      creative.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      creative.tags?.some((tag) =>
+        tag.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    const matchesClient =
+      filterClient === "all" || creative.client_id === filterClient;
+    const matchesType =
+      filterType === "all" || creative.file_type === filterType;
 
     return matchesSearch && matchesClient && matchesType;
   });
@@ -38,8 +49,12 @@ export default function Biblioteca() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Biblioteca de Criativos</h1>
-            <p className="text-gray-600">Gerencie seus assets e criativos</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Biblioteca de Criativos
+            </h1>
+            <p className="text-gray-600">
+              Gerencie seus assets e criativos
+            </p>
           </div>
           <Button
             onClick={() => setDialogOpen(true)}
@@ -69,7 +84,7 @@ export default function Biblioteca() {
               </SelectTrigger>
               <SelectContent className="bg-white">
                 <SelectItem value="all">Todos os clientes</SelectItem>
-                {clients.map(client => (
+                {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
                   </SelectItem>
@@ -95,10 +110,7 @@ export default function Biblioteca() {
           </div>
         </div>
 
-        <Creativegrid
-          creatives={filteredCreatives}
-          clients={clients}
-        />
+        <Creativegrid creatives={filteredCreatives} clients={clients} />
 
         <Creativeformdialog
           open={dialogOpen}

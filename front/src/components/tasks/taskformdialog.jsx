@@ -4,18 +4,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Label } from "@/components/ui/label.jsx";
+import { Textarea } from "@/components/ui/textarea.jsx";
 import {
   Select,
   SelectTrigger,
   SelectContent,
   SelectValue,
   SelectItem,
-} from "@/components/ui/select";
+} from "@/components/ui/select.jsx";
 
 const STATUS_OPTIONS = [
   { value: "TODO", label: "A fazer" },
@@ -136,26 +136,26 @@ export default function Taskformdialog({
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Prazo</Label>
+              <Input
+                type="date"
+                value={formData.dueDate}
+                onChange={handleChange("dueDate")}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Prazo</Label>
-            <Input
-              type="date"
-              value={formData.dueDate}
-              onChange={handleChange("dueDate")}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"

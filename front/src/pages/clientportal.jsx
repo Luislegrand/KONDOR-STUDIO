@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/apiClient/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs.jsx";
 import {
   FileText,
   CheckCircle,
@@ -41,7 +51,7 @@ export default function Clientportal() {
     }
   };
 
-  // Posts do cliente
+  // posts do cliente
   const { data: posts = [] } = useQuery({
     queryKey: ["client-posts", client?.id],
     queryFn: () =>
@@ -335,7 +345,9 @@ export default function Clientportal() {
                           />
                         )}
                         <CardContent className="pt-4">
-                          <h4 className="font-semibold mb-2">{post.title}</h4>
+                          <h4 className="font-semibold mb-2">
+                            {post.title}
+                          </h4>
                           <Badge
                             className={
                               post.status === "published"

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { base44 } from "@/apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import { Plus } from "lucide-react";
-import Postkanban from "../components/Posts/postkanban.jsx";
-import Postformdialog from "../components/Posts/postformdialog.jsx";
+import Postkanban from "../components/posts/postkanban.jsx";
+import Postformdialog from "../components/posts/postformdialog.jsx";
 
 export default function Posts() {
   const [dialogOpen, setDialogOpen] = useState(false);

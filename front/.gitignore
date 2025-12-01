@@ -27,6 +27,7 @@ vite-temp/
 
 # OS / editor junk
 .DS_Store
+*/.DS_Store
 Thumbs.db
 .idea/
 .vscode/
@@ -34,3 +35,5 @@ Thumbs.db
 
 # Misc
 *.pid
+*.save
+*.backup

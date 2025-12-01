@@ -1,5 +1,7 @@
 import React from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import { Button } from "@/components/ui/button.jsx";
 import Taskcard from "./taskcard.jsx";
 
 const DEFAULT_COLUMNS = [
@@ -20,7 +22,6 @@ export default function Taskboard({
 }) {
   const getClient = (id) => clients.find((c) => c.id === id) || null;
 
-  // Garante que a gente tenha colunas mesmo que o status vindo do backend seja diferente
   const allStatuses = Array.from(new Set(tasks.map((t) => t.status).filter(Boolean)));
   const columnsFromData = allStatuses
     .filter((s) => !DEFAULT_COLUMNS.find((c) => c.status === s))

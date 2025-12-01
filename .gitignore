@@ -12,6 +12,7 @@ pnpm-debug.log*
 
 # OS / editor junk
 .DS_Store
+*/.DS_Store
 Thumbs.db
 .idea/
 .vscode/
@@ -49,3 +50,7 @@ docker-data/
 # Misc
 .sass-cache/
 .cache/
+
+# Backup / editor artefacts
+*.save
+*.backup

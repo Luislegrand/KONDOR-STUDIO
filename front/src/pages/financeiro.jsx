@@ -1,11 +1,16 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import { Plus } from "lucide-react";
 import Financeformdialog from "../components/finance/financeformdialog.jsx";
 import Financetable from "../components/finance/financetable.jsx";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card.jsx";
 
 function formatCurrencyBRL(value) {
   if (typeof value !== "number") return "R$ 0,00";

@@ -6,18 +6,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Label } from "@/components/ui/label.jsx";
+import { Textarea } from "@/components/ui/textarea.jsx";
 import {
   Select,
   SelectTrigger,
   SelectContent,
   SelectValue,
   SelectItem,
-} from "@/components/ui/select";
+} from "@/components/ui/select.jsx";
 
 const TYPE_OPTIONS = [
   { value: "income", label: "Receita (income)" },

@@ -1,7 +1,7 @@
 // front/src/utils/index.js
 
 // Converte rótulos/urls de menu em caminhos de rota estáveis.
-// Ex: "Dashboard" -> "/", "Posts" -> "/posts", "Métricas" -> "/metricas"
+// Ex: "Dashboard" -> "/", "posts" -> "/posts", "Métricas" -> "/metricas"
 export function createPageUrl(labelOrPath) {
   if (!labelOrPath) return "/";
 

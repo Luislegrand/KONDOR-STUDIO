@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import { Plus } from "lucide-react";
 import Taskboard from "../components/tasks/taskboard.jsx";
 import Taskformdialog from "../components/tasks/taskformdialog.jsx";
@@ -93,6 +93,7 @@ export default function Tasks() {
               Organize o fluxo de trabalho da sua agência
             </p>
           </div>
+
           <Button
             onClick={handleNew}
             className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
@@ -102,6 +103,7 @@ export default function Tasks() {
           </Button>
         </div>
 
+        {/* Taskboard */}
         <Taskboard
           tasks={tasks}
           clients={clients}
@@ -111,13 +113,13 @@ export default function Tasks() {
           onStatusChange={handleStatusChange}
         />
 
+        {/* Dialog */}
         <Taskformdialog
           open={dialogOpen}
           onClose={handleCloseDialog}
+          onSubmit={handleSubmitForm}
           task={editingTask}
           clients={clients}
-          onSubmit={handleSubmitForm}
-          isSaving={saveMutation.isPending}
         />
       </div>
     </div>

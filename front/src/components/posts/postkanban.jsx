@@ -1,5 +1,10 @@
 import React from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card.jsx";
 import Postcard from "./postcard.jsx";
 
 const COLUMNS = [
@@ -18,33 +23,29 @@ export default function Postkanban({
   onStatusChange,
   isLoading,
 }) {
-  const getClientById = (id) => clients.find((c) => c.id === id) || null;
+  const getClientById = (clientId) => {
+    if (!clientId || !Array.isArray(clients)) return null;
+    return clients.find((c) => c.id === clientId) || null;
+  };
 
-  if (isLoading) {
+  const renderSkeletonColumn = () => {
     return (
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {COLUMNS.map((col) => (
-          <Card key={col.status} className="border-dashed border-purple-200">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold text-gray-800">
-                {col.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {[1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="h-16 bg-gray-100 rounded-lg animate-pulse"
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-20 rounded-md bg-slate-100 animate-pulse"
+          />
         ))}
       </div>
     );
-  }
+  };
+
+  const renderEmptyColumn = () => (
+    <div className="text-xs text-gray-400 italic">
+      Nenhum post nesta coluna.
+    </div>
+  );
 
   return (
     <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -52,33 +53,31 @@ export default function Postkanban({
         const columnPosts = posts.filter((p) => p.status === col.status);
 
         return (
-          <Card key={col.status} className="bg-slate-50/60">
+          <Card key={col.status} className="bg-slate-50/60 flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-gray-800">
                   {col.title}
                 </CardTitle>
-                <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                <span className="text-xs px-2 py-1 rounded-full bg-white text-gray-600 border border-slate-200">
                   {columnPosts.length}
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-              {columnPosts.length === 0 ? (
-                <div className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg p-3 text-center">
-                  Nenhum post aqui ainda.
-                </div>
-              ) : (
-                columnPosts.map((post) => (
-                  <Postcard
-                    key={post.id}
-                    post={post}
-                    client={getClientById(post.clientId)}
-                    onEdit={onEdit}
-                    onStatusChange={onStatusChange}
-                  />
-                ))
-              )}
+            <CardContent className="pt-0 flex-1 overflow-y-auto space-y-3">
+              {isLoading
+                ? renderSkeletonColumn()
+                : columnPosts.length === 0
+                ? renderEmptyColumn()
+                : columnPosts.map((post) => (
+                    <Postcard
+                      key={post.id}
+                      post={post}
+                      client={getClientById(post.clientId)}
+                      onEdit={onEdit}
+                      onStatusChange={onStatusChange}
+                    />
+                  ))}
             </CardContent>
           </Card>
         );

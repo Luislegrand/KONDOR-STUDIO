@@ -1,7 +1,23 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Zap, Sparkles, Crown, Users, BarChart3, Calendar, MessageSquare, Image as ImageIcon, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button.jsx";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.jsx";
+import {
+  Check,
+  Zap,
+  Sparkles,
+  Crown,
+  Users,
+  BarChart3,
+  Calendar,
+  MessageSquare,
+  Image as ImageIcon,
+  DollarSign,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -19,9 +35,9 @@ const plans = [
       "Relatórios básicos",
       "Biblioteca de posts",
       "Dashboard simples",
-      "Tema visual do cliente"
+      "Tema visual do cliente",
     ],
-    color: "from-purple-400 to-purple-500"
+    color: "from-purple-400 to-purple-500",
   },
   {
     name: "Pro",
@@ -37,10 +53,10 @@ const plans = [
       "Automações WhatsApp",
       "Kanban avançado",
       "Tarefas e pipeline",
-      "Tema visual avançado"
+      "Tema visual avançado",
     ],
     popular: true,
-    color: "from-purple-500 to-purple-600"
+    color: "from-purple-500 to-purple-600",
   },
   {
     name: "Agency",
@@ -56,51 +72,57 @@ const plans = [
       "Multi-equipe",
       "Subdomínio customizado",
       "Módulo financeiro",
-      "Prioridade no suporte"
+      "Prioridade no suporte",
     ],
-    color: "from-purple-600 to-purple-700"
-  }
+    color: "from-purple-600 to-purple-700",
+  },
 ];
 
 const features = [
   {
     icon: Users,
     title: "Gestão de Clientes",
-    description: "Centralize todas as informações dos seus clientes em um único lugar. Briefings, contratos e histórico completo."
+    description:
+      "Centralize todas as informações dos seus clientes em um único lugar. Briefings, contratos e histórico completo.",
   },
   {
     icon: Calendar,
-    title: "Calendário de Posts",
-    description: "Kanban visual para planejar, criar e aprovar posts. Arraste e solte entre as etapas do processo."
+    title: "Calendário de posts",
+    description:
+      "Kanban visual para planejar, criar e aprovar posts. Arraste e solte entre as etapas do processo.",
   },
   {
     icon: MessageSquare,
     title: "Aprovação por WhatsApp",
-    description: "Seus clientes aprovam posts direto pelo WhatsApp, sem precisar logar na plataforma."
+    description:
+      "Seus clientes aprovam posts direto pelo WhatsApp, sem precisar logar na plataforma.",
   },
   {
     icon: ImageIcon,
     title: "Biblioteca de Criativos",
-    description: "Organize todos os seus assets com tags inteligentes e filtros avançados para encontrar qualquer arquivo rapidamente."
+    description:
+      "Organize todos os seus assets com tags inteligentes e filtros avançados para encontrar qualquer arquivo rapidamente.",
   },
   {
     icon: BarChart3,
     title: "Métricas e Relatórios",
-    description: "Acompanhe performance de campanhas com dashboards em tempo real e relatórios automáticos."
+    description:
+      "Acompanhe performance de campanhas com dashboards em tempo real e relatórios automáticos.",
   },
   {
     icon: DollarSign,
     title: "Controle Financeiro",
-    description: "Gerencie receitas e despesas por cliente. Visualize margem de lucro e saúde financeira da agência."
-  }
+    description:
+      "Gerencie receitas e despesas por cliente. Visualize margem de lucro e saúde financeira da agência.",
+  },
 ];
 
-const formatCurrency = (value, locale = 'pt-BR', currency = 'BRL') => {
+const formatCurrency = (value, locale = "pt-BR", currency = "BRL") => {
   return new Intl.NumberFormat(locale, {
-    style: 'currency',
+    style: "currency",
     currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
 };
 
@@ -117,7 +139,10 @@ export default function Pricing() {
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center" aria-hidden="true">
+            <div
+              className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center"
+              aria-hidden="true"
+            >
               <Zap className="w-6 h-6 text-white" fill="currentColor" />
             </div>
             <div>
@@ -137,13 +162,24 @@ export default function Pricing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20 text-center" aria-labelledby="hero-title">
+      <section
+        className="max-w-7xl mx-auto px-6 py-20 text-center"
+        aria-labelledby="hero-title"
+      >
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full mb-6">
-          <Sparkles className="w-4 h-4 text-purple-600" aria-hidden="true" />
-          <span className="text-sm font-medium text-purple-900">A plataforma que sua agência precisa</span>
+          <Sparkles
+            className="w-4 h-4 text-purple-600"
+            aria-hidden="true"
+          />
+          <span className="text-sm font-medium text-purple-900">
+            A plataforma que sua agência precisa
+          </span>
         </div>
 
-        <h2 id="hero-title" className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+        <h2
+          id="hero-title"
+          className="text-5xl md:text-6xl font-bold text-gray-900 mb-6"
+        >
           Gerencie sua agência
           <span className="block mt-2 bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">
             com eficiência e elegância
@@ -151,7 +187,9 @@ export default function Pricing() {
         </h2>
 
         <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-          KONDOR STUDIO é a plataforma completa para agências e freelancers gerenciarem clientes, posts, aprovações, criativos e finanças em um único lugar.
+          KONDOR STUDIO é a plataforma completa para agências e freelancers
+          gerenciarem clientes, posts, aprovações, criativos e finanças em um
+          único lugar.
         </p>
 
         <div className="flex gap-4 justify-center mb-16">
@@ -166,7 +204,11 @@ export default function Pricing() {
           <Button
             size="lg"
             variant="outline"
-            onClick={() => document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() =>
+              document
+                .getElementById("plans")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
             aria-label="Ver planos e preços"
           >
             Ver planos
@@ -174,7 +216,11 @@ export default function Pricing() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto" role="list" aria-label="Estatísticas da plataforma">
+        <div
+          className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
+          role="list"
+          aria-label="Estatísticas da plataforma"
+        >
           <div role="listitem">
             <p className="text-4xl font-bold text-purple-600 mb-2">3 dias</p>
             <p className="text-gray-600">Teste gratuito</p>
@@ -195,13 +241,20 @@ export default function Pricing() {
       </section>
 
       {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20 bg-white/50" aria-labelledby="features-title">
+      <section
+        className="max-w-7xl mx-auto px-6 py-20 bg-white/50"
+        aria-labelledby="features-title"
+      >
         <div className="text-center mb-16">
-          <h2 id="features-title" className="text-4xl font-bold text-gray-900 mb-4">
+          <h2
+            id="features-title"
+            className="text-4xl font-bold text-gray-900 mb-4"
+          >
             Tudo que você precisa em um só lugar
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Funcionalidades desenvolvidas especialmente para o dia a dia de agências de social media
+            Funcionalidades desenvolvidas especialmente para o dia a dia de
+            agências de social media
           </p>
         </div>
 
@@ -209,17 +262,22 @@ export default function Pricing() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card key={index} className="border-2 border-gray-100 hover:border-purple-200 hover:shadow-lg transition-all" role="listitem">
+              <Card
+                key={index}
+                className="border-2 border-gray-100 hover:border-purple-200 hover:shadow-lg transition-all"
+                role="listitem"
+              >
                 <CardContent className="pt-8">
-                  <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center mb-4" aria-hidden="true">
+                  <div
+                    className="w-14 h-14 bg-gradient-to-br from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center mb-4"
+                    aria-hidden="true"
+                  >
                     <Icon className="w-7 h-7 text-purple-600" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">
                     {feature.title}
                   </h3>
-                  <p className="text-gray-600">
-                    {feature.description}
-                  </p>
+                  <p className="text-gray-600">{feature.description}</p>
                 </CardContent>
               </Card>
             );
@@ -228,7 +286,10 @@ export default function Pricing() {
       </section>
 
       {/* Benefits Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20" aria-labelledby="benefits-title">
+      <section
+        className="max-w-7xl mx-auto px-6 py-20"
+        aria-labelledby="benefits-title"
+      >
         <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-3xl p-12 text-white">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
@@ -237,70 +298,127 @@ export default function Pricing() {
               </h2>
               <ul className="space-y-4" role="list">
                 <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
+                  <div
+                    className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                    aria-hidden="true"
+                  >
                     <Check className="w-4 h-4 text-gray-900" />
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1">Economia de tempo</h4>
-                    <p className="text-purple-100">Reduza em até 70% o tempo gasto com gestão operacional</p>
+                    <h4 className="font-semibold mb-1">
+                      Economia de tempo
+                    </h4>
+                    <p className="text-purple-100">
+                      Reduza em até 70% o tempo gasto com gestão operacional
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
+                  <div
+                    className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                    aria-hidden="true"
+                  >
                     <Check className="w-4 h-4 text-gray-900" />
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1">Aprovações mais rápidas</h4>
-                    <p className="text-purple-100">Clientes aprovam posts pelo WhatsApp em minutos</p>
+                    <h4 className="font-semibold mb-1">
+                      Aprovações mais rápidas
+                    </h4>
+                    <p className="text-purple-100">
+                      Clientes aprovam posts pelo WhatsApp em minutos
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
+                  <div
+                    className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                    aria-hidden="true"
+                  >
                     <Check className="w-4 h-4 text-gray-900" />
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1">Organização profissional</h4>
-                    <p className="text-purple-100">Impressione seus clientes com portais personalizados</p>
+                    <h4 className="font-semibold mb-1">
+                      Organização profissional
+                    </h4>
+                    <p className="text-purple-100">
+                      Impressione seus clientes com portais personalizados
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1" aria-hidden="true">
+                  <div
+                    className="w-6 h-6 bg-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1"
+                    aria-hidden="true"
+                  >
                     <Check className="w-4 h-4 text-gray-900" />
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1">Controle financeiro</h4>
-                    <p className="text-purple-100">Saiba exatamente quanto cada cliente rende para sua agência</p>
+                    <h4 className="font-semibold mb-1">
+                      Controle financeiro
+                    </h4>
+                    <p className="text-purple-100">
+                      Saiba exatamente quanto cada cliente rende para sua
+                      agência
+                    </p>
                   </div>
                 </li>
               </ul>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
               <div className="space-y-6" role="list">
-                <div className="flex items-center gap-4" role="listitem">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <div
+                  className="flex items-center gap-4"
+                  role="listitem"
+                >
+                  <div
+                    className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"
+                    aria-hidden="true"
+                  >
                     <Zap className="w-6 h-6 text-accent" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">Automação inteligente</p>
-                    <p className="text-purple-100">IA para gerar legendas</p>
+                    <p className="text-2xl font-bold">
+                      Automação inteligente
+                    </p>
+                    <p className="text-purple-100">
+                      IA para gerar legendas
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4" role="listitem">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <div
+                  className="flex items-center gap-4"
+                  role="listitem"
+                >
+                  <div
+                    className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"
+                    aria-hidden="true"
+                  >
                     <Users className="w-6 h-6 text-accent" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">Multi-equipe</p>
-                    <p className="text-purple-100">Colaboração em tempo real</p>
+                    <p className="text-purple-100">
+                      Colaboração em tempo real
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4" role="listitem">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center" aria-hidden="true">
+                <div
+                  className="flex items-center gap-4"
+                  role="listitem"
+                >
+                  <div
+                    className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center"
+                    aria-hidden="true"
+                  >
                     <BarChart3 className="w-6 h-6 text-accent" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">Analytics avançado</p>
-                    <p className="text-purple-100">Dashboards personalizados</p>
+                    <p className="text-2xl font-bold">
+                      Analytics avançado
+                    </p>
+                    <p className="text-purple-100">
+                      Dashboards personalizados
+                    </p>
                   </div>
                 </div>
               </div>
@@ -310,31 +428,54 @@ export default function Pricing() {
       </section>
 
       {/* Plans Section */}
-      <section id="plans" className="max-w-7xl mx-auto px-6 pb-20" aria-labelledby="plans-title">
+      <section
+        id="plans"
+        className="max-w-7xl mx-auto px-6 pb-20"
+        aria-labelledby="plans-title"
+      >
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full mb-6">
-            <Sparkles className="w-4 h-4 text-purple-600" aria-hidden="true" />
-            <span className="text-sm font-medium text-purple-900">3 dias grátis • Sem cartão</span>
+            <Sparkles
+              className="w-4 h-4 text-purple-600"
+              aria-hidden="true"
+            />
+            <span className="text-sm font-medium text-purple-900">
+              3 dias grátis • Sem cartão
+            </span>
           </div>
 
-          <h2 id="plans-title" className="text-4xl font-bold text-gray-900 mb-4">
+          <h2
+            id="plans-title"
+            className="text-4xl font-bold text-gray-900 mb-4"
+          >
             Escolha o plano ideal para sua agência
           </h2>
 
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Todos os planos incluem teste gratuito de 3 dias. Cancele quando quiser.
+            Todos os planos incluem teste gratuito de 3 dias. Cancele quando
+            quiser.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8" role="list" aria-label="Planos disponíveis">
+        <div
+          className="grid md:grid-cols-3 gap-8"
+          role="list"
+          aria-label="Planos disponíveis"
+        >
           {plans.map((plan) => {
             const Icon = plan.icon;
             return (
               <Card
                 key={plan.name}
-                className={`relative overflow-hidden ${plan.popular ? 'pricing-card-popular border-2 border-accent' : 'border-gray-200'}`}
+                className={`relative overflow-hidden ${
+                  plan.popular
+                    ? "pricing-card-popular border-2 border-accent"
+                    : "border-gray-200"
+                }`}
                 role="listitem"
-                aria-label={`Plano ${plan.name} - ${formatCurrency(plan.price)} por mês`}
+                aria-label={`Plano ${plan.name} - ${formatCurrency(
+                  plan.price
+                )} por mês`}
               >
                 {plan.popular && (
                   <div className="absolute top-0 right-0 bg-gradient-to-r from-accent to-green-400 text-gray-900 px-4 py-1 text-xs font-bold rounded-bl-lg">
@@ -343,7 +484,10 @@ export default function Pricing() {
                 )}
 
                 <CardHeader className="pb-8 pt-8">
-                  <div className={`w-16 h-16 bg-gradient-to-br ${plan.color} rounded-2xl flex items-center justify-center mb-4`} aria-hidden="true">
+                  <div
+                    className={`w-16 h-16 bg-gradient-to-br ${plan.color} rounded-2xl flex items-center justify-center mb-4`}
+                    aria-hidden="true"
+                  >
                     <Icon className="w-8 h-8 text-white" />
                   </div>
                   <CardTitle className="text-3xl font-bold text-gray-900">
@@ -351,16 +495,27 @@ export default function Pricing() {
                   </CardTitle>
                   <p className="text-gray-500">{plan.description}</p>
                   <div className="mt-6">
-                    <span className="text-5xl font-bold text-gray-900">{formatCurrency(plan.price)}</span>
+                    <span className="text-5xl font-bold text-gray-900">
+                      {formatCurrency(plan.price)}
+                    </span>
                     <span className="text-gray-500">/mês</span>
                   </div>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <ul role="list" aria-label={`Recursos do plano ${plan.name}`}>
+                  <ul
+                    role="list"
+                    aria-label={`Recursos do plano ${plan.name}`}
+                  >
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-3 mb-4">
-                        <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
+                      <li
+                        key={idx}
+                        className="flex items-start gap-3 mb-4"
+                      >
+                        <div
+                          className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5"
+                          aria-hidden="true"
+                        >
                           <Check className="w-3 h-3 text-purple-600" />
                         </div>
                         <span className="text-gray-700">{feature}</span>
@@ -371,8 +526,8 @@ export default function Pricing() {
                   <Button
                     className={`w-full mt-8 ${
                       plan.popular
-                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
-                        : 'bg-purple-400 hover:bg-purple-500'
+                        ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                        : "bg-purple-400 hover:bg-purple-500"
                     }`}
                     size="lg"
                     onClick={() => navigate(createPageUrl("Dashboard"))}
@@ -393,7 +548,8 @@ export default function Pricing() {
               ✨ Todos os planos incluem 3 dias de teste gratuito
             </p>
             <p className="text-purple-700">
-              Teste TODAS as funcionalidades sem compromisso • Não precisa de cartão
+              Teste TODAS as funcionalidades sem compromisso • Não precisa de
+              cartão
             </p>
           </div>
         </div>

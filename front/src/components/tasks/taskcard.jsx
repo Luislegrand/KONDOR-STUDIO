@@ -5,9 +5,9 @@ import {
   CardTitle,
   CardContent,
   CardFooter,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+} from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
 import { Pencil, Trash2, CalendarDays } from "lucide-react";
 import {
   Select,
@@ -15,7 +15,7 @@ import {
   SelectContent,
   SelectValue,
   SelectItem,
-} from "@/components/ui/select";
+} from "@/components/ui/select.jsx";
 
 const STATUS_OPTIONS = [
   { value: "TODO", label: "A fazer" },

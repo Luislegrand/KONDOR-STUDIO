@@ -1,18 +1,36 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card.jsx";
+
+import { Button } from "@/components/ui/button.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.jsx";
+
+import { Label } from "@/components/ui/label.jsx";
+
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select.jsx";
+
+import { Textarea } from "@/components/ui/textarea.jsx";
+
 import { RefreshCw, PlugZap2, Trash2 } from "lucide-react";
 
 const PROVIDER_OPTIONS = [
@@ -46,7 +64,12 @@ export default function Integrations() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [configText, setConfigText] = useState("");
 
-  const { data: integrations = [], isLoading, isFetching, refetch } = useQuery({
+  const {
+    data: integrations = [],
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery({
     queryKey: ["integrations"],
     queryFn: () => base44.entities.Integration.list(),
   });
@@ -57,9 +80,7 @@ export default function Integrations() {
 
       const payload = {
         provider: selectedProvider,
-        // status simbólico; backend salva como String
         status: "connected",
-        // por enquanto, tratamos config como texto simples (JSON ou não)
         config: configText ? { raw: configText } : null,
       };
 
@@ -107,7 +128,8 @@ export default function Integrations() {
               Integrações
             </h1>
             <p className="text-gray-600">
-              Conecte suas contas de anúncios e canais para puxar métricas automaticamente.
+              Conecte suas contas de anúncios e canais para puxar métricas
+              automaticamente.
             </p>
           </div>
 
@@ -118,9 +140,14 @@ export default function Integrations() {
               disabled={isFetching}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${
+                  isFetching ? "animate-spin" : ""
+                }`}
+              />
               Atualizar
             </Button>
+
             <Button
               onClick={handleOpenDialog}
               className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 flex items-center gap-2"
@@ -150,7 +177,8 @@ export default function Integrations() {
               </div>
             ) : integrations.length === 0 ? (
               <p className="text-sm text-gray-500">
-                Nenhuma integração configurada ainda. Clique em &quot;Nova integração&quot; para começar.
+                Nenhuma integração configurada ainda. Clique em "Nova
+                integração" para começar.
               </p>
             ) : (
               <div className="space-y-3">
@@ -164,6 +192,7 @@ export default function Integrations() {
                         <span className="text-sm font-medium text-gray-900">
                           {formatProviderLabel(integration.provider)}
                         </span>
+
                         {integration.status && (
                           <Badge
                             variant="outline"
@@ -177,6 +206,7 @@ export default function Integrations() {
                           </Badge>
                         )}
                       </div>
+
                       <div className="flex flex-wrap gap-3 text-[11px] text-gray-500">
                         <span>
                           Último sync:{" "}
@@ -184,6 +214,7 @@ export default function Integrations() {
                             {formatDate(integration.lastSyncAt)}
                           </span>
                         </span>
+
                         {integration.errorMessage && (
                           <span className="text-red-500">
                             Erro: {integration.errorMessage}
@@ -226,6 +257,7 @@ export default function Integrations() {
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um provedor" />
                   </SelectTrigger>
+
                   <SelectContent>
                     {PROVIDER_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
@@ -237,17 +269,15 @@ export default function Integrations() {
               </div>
 
               <div className="space-y-2">
-                <Label>
-                  Configuração (opcional)
-                </Label>
+                <Label>Configuração (opcional)</Label>
                 <Textarea
                   rows={4}
                   value={configText}
                   onChange={(e) => setConfigText(e.target.value)}
-                  placeholder='Tokens, IDs de conta, etc. Você pode colar JSON ou notas livres por enquanto.'
+                  placeholder="Tokens, IDs de conta, etc. Você pode colar JSON ou notas livres."
                 />
                 <p className="text-[11px] text-gray-500">
-                  Nesta versão, os dados são salvos como JSON bruto em
+                  O conteúdo será salvo como JSON bruto em{" "}
                   <code className="px-1 rounded bg-gray-100 ml-1">config</code>.
                 </p>
               </div>
@@ -261,6 +291,7 @@ export default function Integrations() {
                 >
                   Cancelar
                 </Button>
+
                 <Button
                   type="submit"
                   className="bg-purple-600 hover:bg-purple-700"
