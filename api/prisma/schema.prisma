@@ -195,15 +195,16 @@ model Team {
 }
 
 model TeamMember {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  teamId    String
-  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role     @default(MEMBER)
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role     @default(MEMBER)
+  permissions Json?    // permissões específicas por membro
+  createdAt   DateTime @default(now())
 
   @@map("team_members")
   @@unique([teamId, userId])
@@ -211,24 +212,29 @@ model TeamMember {
 }
 
 model Client {
-  id             String    @id @default(uuid())
-  tenantId       String
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name           String
-  email          String?
-  phone          String?
-  metadata       Json?
-  contacts       Json?
-  whatsappOptIn  Boolean   @default(false) // Cliente autorizou receber mensagens via WhatsApp
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String
+  email              String?
+  phone              String?
+  metadata           Json?
+  contacts           Json?
+  whatsappOptIn      Boolean   @default(false) // Cliente autorizou receber mensagens via WhatsApp
 
-  projects       Project[]
-  posts          Post[]
+  // Login específico do portal do cliente
+  portalEmail        String?
+  portalPasswordHash String?
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  projects           Project[]
+  posts              Post[]
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("clients")
   @@index([tenantId])
+  @@index([portalEmail])
 }
 
 model Project {
@@ -650,11 +656,3 @@ model JobHistory {
   @@map("job_history")
   @@index([tenantId])
 }
-
-// Index & map conventions applied consistentemente acima.
-//
-// Notes:
-// - Use `prisma migrate dev --name init` localmente para gerar migrations baseadas neste schema.
-// - Confirme seeds e services com estes nomes de modelos/campos antes de aplicar em produção.
-// - Referential actions (Cascade / SetNull / Restrict) alinhadas com política de cleanup multi-tenant.
-// - Se preferir Plan como enum em vez de model, é possível alterar depois; hoje Plan como model permite pricing/features dinâmicos.

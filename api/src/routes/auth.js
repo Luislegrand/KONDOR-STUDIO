@@ -156,6 +156,95 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 /**
+ * POST /auth/client-login
+ * Body: { email, password }
+ *
+ * Login específico para CLIENTE do portal.
+ * - Localiza Client pelo email.
+ * - Usa campo JSON "metadata.portalPasswordHash" para guardar a senha do portal.
+ *   - Se NÃO existir hash ainda -> considera primeiro acesso, salva o hash da senha informada.
+ *   - Se já existir -> compara a senha.
+ * - Gera JWT com payload { type: 'client', clientId, tenantId }.
+ */
+router.post('/client-login', loginRateLimiter, async (req, res) => {
+  try {
+    const parseResult = loginSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      const details = parseResult.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      return res.status(400).json({ error: 'Dados inválidos', details });
+    }
+
+    const { email, password } = parseResult.data;
+
+    // 1) Localiza o cliente pelo e-mail principal (pode evoluir depois para portalEmail)
+    const client = await prisma.client.findFirst({
+      where: { email },
+      select: {
+        id: true,
+        tenantId: true,
+        name: true,
+        email: true,
+        metadata: true,
+      },
+    });
+
+    if (!client) {
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+
+    let metadata = client.metadata || {};
+    const existingHash = metadata.portalPasswordHash || null;
+
+    // 2) Se ainda não há senha de portal, considera primeiro acesso e grava o hash
+    if (!existingHash) {
+      const newHash = await hashPassword(password);
+      metadata = {
+        ...metadata,
+        portalPasswordHash: newHash,
+      };
+
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { metadata },
+      });
+    } else {
+      // 3) Se já existe hash, valida a senha
+      const ok = await comparePassword(password, existingHash);
+      if (!ok) {
+        return res.status(401).json({ error: 'Credenciais inválidas' });
+      }
+    }
+
+    // 4) Gera token específico de CLIENTE
+    const payload = {
+      type: 'client',
+      clientId: client.id,
+      tenantId: client.tenantId,
+    };
+
+    const accessToken = createAccessToken(payload);
+
+    return res.json({
+      accessToken,
+      client: {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        tenantId: client.tenantId,
+      },
+    });
+  } catch (err) {
+    console.error('POST /auth/client-login error', err);
+    return res
+      .status(500)
+      .json({ error: 'Erro interno no login do cliente' });
+  }
+});
+
+/**
  * POST /auth/refresh
  * Body: { tokenId, refreshToken }
  *

@@ -42,6 +42,21 @@ export default function Team() {
     },
   });
 
+  const inviteMutation = useMutation({
+    mutationFn: (id) =>
+      base44.jsonFetch(`/team/${id}/send-invite`, {
+        method: "POST",
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["team"] });
+      if (data && data.tempPassword) {
+        alert(`Senha temporária gerada:\n\n${data.tempPassword}`);
+      } else {
+        alert("Convite gerado com sucesso.");
+      }
+    },
+  });
+
   const handleEdit = (member) => {
     setEditingMember(member);
     setDialogOpen(true);
@@ -51,6 +66,10 @@ export default function Team() {
     if (confirm("Tem certeza que deseja remover este membro?")) {
       await deleteMutation.mutateAsync(id);
     }
+  };
+
+  const handleSendInvite = async (member) => {
+    await inviteMutation.mutateAsync(member.id);
   };
 
   const handleDialogClose = () => {
@@ -101,85 +120,110 @@ export default function Team() {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {team.map((member) => (
-              <Card
-                key={member.id}
-                className="hover:shadow-lg transition-shadow"
-              >
-                <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100">
-                  <div className="flex items-center gap-4">
-                    {member.avatar_url ? (
-                      <img
-                        src={member.avatar_url}
-                        alt={member.name}
-                        className="w-16 h-16 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
-                        <span className="text-white font-bold text-2xl">
-                          {member.name[0]}
-                        </span>
+            {team.map((member) => {
+              const canSendInvite =
+                !member._raw ||
+                !member._raw.user ||
+                !member._raw.user.passwordHash;
+
+              return (
+                <Card
+                  key={member.id}
+                  className="hover:shadow-lg transition-shadow"
+                >
+                  <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100">
+                    <div className="flex items-center gap-4">
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt={member.name}
+                          className="w-16 h-16 rounded-full"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+                          <span className="text-white font-bold text-2xl">
+                            {member.name[0]}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">
+                          {member.name}
+                        </CardTitle>
+                        <Badge
+                          className={`${roleColors[member.role]} mt-2`}
+                          variant="secondary"
+                        >
+                          {roleLabels[member.role] || member.role}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Mail className="w-4 h-4" />
+                      <span>{member.email}</span>
+                    </div>
+
+                    {member.permissions && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Shield className="w-4 h-4" />
+                          <span className="font-medium">Permissões:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(member.permissions)
+                            .filter(([_, value]) => value)
+                            .map(([key]) => (
+                              <Badge
+                                key={key}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {key}
+                              </Badge>
+                            ))}
+                        </div>
                       </div>
                     )}
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">
-                        {member.name}
-                      </CardTitle>
-                      <Badge
-                        className={`${roleColors[member.role]} mt-2`}
-                        variant="secondary"
-                      >
-                        {roleLabels[member.role]}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
 
-                <CardContent className="pt-6 space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Mail className="w-4 h-4" />
-                    <span>{member.email}</span>
-                  </div>
-
-                  {member.permissions && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Shield className="w-4 h-4" />
-                        <span className="font-medium">Permissões:</span>
+                    <div className="flex flex-col gap-2 pt-4">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleEdit(member)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => handleDelete(member.id)}
+                        >
+                          Remover
+                        </Button>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {Object.entries(member.permissions)
-                          .filter(([_, value]) => value)
-                          .map(([key]) => (
-                            <Badge key={key} variant="outline" className="text-xs">
-                              {key}
-                            </Badge>
-                          ))}
-                      </div>
+                      {canSendInvite && (
+                        <Button
+                          size="sm"
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                          disabled={inviteMutation.isPending}
+                          onClick={() => handleSendInvite(member)}
+                        >
+                          {inviteMutation.isPending
+                            ? "Gerando convite..."
+                            : "Enviar convite"}
+                        </Button>
+                      )}
                     </div>
-                  )}
-
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleEdit(member)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => handleDelete(member.id)}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 

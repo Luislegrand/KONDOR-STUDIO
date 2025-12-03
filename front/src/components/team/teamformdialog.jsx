@@ -19,20 +19,23 @@ import {
   SelectValue,
 } from "@/components/ui/select.jsx";
 
+const DEFAULT_PERMISSIONS = {
+  clients: true,
+  posts: true,
+  approvals: true,
+  tasks: true,
+  metrics: false,
+  team: false,
+  settings: false,
+};
+
 export default function Teamformdialog({ open, onClose, member }) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "social_media",
-    permissions: {
-      clients: true,
-      posts: true,
-      tasks: true,
-      metrics: false,
-      team: false,
-      settings: false,
-    },
+    permissions: { ...DEFAULT_PERMISSIONS },
   });
 
   useEffect(() => {
@@ -41,39 +44,25 @@ export default function Teamformdialog({ open, onClose, member }) {
         name: member.name || "",
         email: member.email || "",
         role: member.role || "social_media",
-        permissions:
-          member.permissions || {
-            clients: true,
-            posts: true,
-            tasks: true,
-            metrics: false,
-            team: false,
-            settings: false,
-          },
+        permissions: {
+          ...DEFAULT_PERMISSIONS,
+          ...(member.permissions || {}),
+        },
       });
     } else {
       setFormData({
         name: "",
         email: "",
         role: "social_media",
-        permissions: {
-          clients: true,
-          posts: true,
-          tasks: true,
-          metrics: false,
-          team: false,
-          settings: false,
-        },
+        permissions: { ...DEFAULT_PERMISSIONS },
       });
     }
   }, [member]);
 
   const mutation = useMutation({
     mutationFn: async (data) => {
-      const tenants = await base44.entities.Tenant.list();
       const payload = {
         ...data,
-        tenant_id: tenants[0].id,
       };
 
       if (member) {
@@ -169,7 +158,7 @@ export default function Teamformdialog({ open, onClose, member }) {
                 <div key={key} className="flex items-center gap-2">
                   <Checkbox
                     id={key}
-                    checked={formData.permissions[key]}
+                    checked={!!formData.permissions[key]}
                     onCheckedChange={() => togglePermission(key)}
                   />
                   <label

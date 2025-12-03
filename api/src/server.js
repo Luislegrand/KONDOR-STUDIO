@@ -1,6 +1,6 @@
 /**
- * KONDOR STUDIO — SERVER.JS (FASE 5 FINAL)
- * API Express + Prisma + Multi-tenant + AuditLog + CheckSubscription
+ * KONDOR STUDIO — SERVER.JS (VERSÃO BLINDADA + CLIENT PORTAL)
+ * API Express + Prisma + Multi-tenant + AuditLog
  */
 
 require("dotenv").config();
@@ -15,23 +15,37 @@ const { prisma } = require("./prisma");
 const authMiddleware = require("./middleware/auth");
 const tenantMiddleware = require("./middleware/tenant");
 const auditLog = require("./middleware/auditLog");
-const checkSubscription = require("./middleware/checkSubscription");
-
-/* ============================================
-   APP / MIDDLEWARES BÁSICOS
-============================================ */
+// checkSubscription desativado por enquanto
+// const checkSubscription = require("./middleware/checkSubscription");
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 
-// Body parsers
+/* ============================================
+   HELPERS
+============================================ */
+
+/**
+ * Monta rotas de forma segura:
+ * - Se o router não for uma função (express.Router), NÃO monta e loga aviso.
+ */
+function safeMount(path, router) {
+  if (router && typeof router === "function") {
+    app.use(path, router);
+  } else {
+    console.warn(
+      `⚠️ Rota "${path}" NÃO montada: export inválido em require(...) (esperado express.Router, recebido ${typeof router}).`
+    );
+  }
+}
+
+/* ============================================
+   MIDDLEWARES BÁSICOS
+============================================ */
+
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
-
-// Segurança básica
 app.use(helmet());
-
-// Logs HTTP
 app.use(morgan(isProduction ? "combined" : "dev"));
 
 /* ============================================
@@ -41,7 +55,7 @@ app.use(morgan(isProduction ? "combined" : "dev"));
 const devOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  "http://localhost:4173"
+  "http://localhost:4173",
 ];
 
 let envOrigins = [];
@@ -61,7 +75,6 @@ if (isProduction && envOrigins.length === 0) {
 
 const corsOptions = {
   origin(origin, callback) {
-    // Requisições sem origem (ex: curl, healthchecks) são permitidas
     if (!origin) {
       return callback(null, true);
     }
@@ -73,7 +86,7 @@ const corsOptions = {
     console.warn(`🚫 CORS bloqueado para origem: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
-  credentials: true
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -88,7 +101,6 @@ app.get("/health", (req, res) => {
 
 app.get("/healthz", async (req, res) => {
   try {
-    // Verifica conexão com o banco
     await prisma.$queryRaw`SELECT 1`;
     return res.json({ status: "ok", db: "ok" });
   } catch (err) {
@@ -101,15 +113,15 @@ app.get("/healthz", async (req, res) => {
    ROTAS PÚBLICAS
 ============================================ */
 
-// Auth (login, refresh, etc.)
 const authRoutes = require("./routes/auth");
-// Aprovações públicas / links externos
+
+// Portal do cliente usa JWT próprio (type: "client")
+const clientPortalRoutes = require("./routes/clientPortal");
+
 let publicRoutes;
 try {
-  // Ajuste aqui se o nome do arquivo for diferente (ex: publicApprovals)
   publicRoutes = require("./routes/public");
 } catch (e) {
-  // Fallback se você estiver usando outro nome de arquivo
   try {
     publicRoutes = require("./routes/publicApprovals");
   } catch (err) {
@@ -120,21 +132,27 @@ try {
   }
 }
 
-app.use("/api/auth", authRoutes);
+// Auth de usuário interno (painel)
+safeMount("/api/auth", authRoutes);
 
+// Rotas públicas (links de aprovação etc.)
 if (publicRoutes) {
-  app.use("/api/public", publicRoutes);
+  safeMount("/api/public", publicRoutes);
 }
 
+// 🔹 Portal do cliente – protegido pelo clientAuth dentro do router
+// IMPORTANTE: montado ANTES do app.use("/api", authMiddleware...)
+safeMount("/api/client-portal", clientPortalRoutes);
+
 /* ============================================
-   ROTAS AUTENTICADAS / MULTI-TENANT
+   ROTAS AUTENTICADAS / MULTI-TENANT (USUÁRIO INTERNO)
 ============================================ */
 
-// A partir daqui, tudo em /api/* exige auth + tenant
+// Tudo em /api depois daqui exige auth + tenant (usuário da agência)
 app.use("/api", authMiddleware, tenantMiddleware);
 
 /* ============================================
-   AUDIT LOG (FASE 5)
+   AUDIT LOG (opcional)
 ============================================ */
 
 const auditLogEnabled = process.env.AUDIT_LOG_ENABLED === "true";
@@ -147,12 +165,11 @@ if (auditLogEnabled) {
 
   console.log("📝 Audit Log ATIVADO", { skip, bodyMax });
 
-  // Importante: usamos os nomes corretos esperados pelo middleware (skip, bodyMax)
   app.use(
     "/api",
     auditLog({
       skip,
-      bodyMax
+      bodyMax,
     })
   );
 } else {
@@ -160,26 +177,7 @@ if (auditLogEnabled) {
 }
 
 /* ============================================
-   CHECK SUBSCRIPTION (FASE 5)
-============================================ */
-
-const subscriptionEnabled =
-  process.env.CHECK_SUBSCRIPTION_ENABLED !== "false";
-
-function applySubscriptionGuard(router) {
-  // Se desabilitado via env, devolve o router original sem alterações
-  if (!subscriptionEnabled) {
-    return router;
-  }
-
-  const guarded = express.Router();
-  guarded.use(checkSubscription);
-  guarded.use(router);
-  return guarded;
-}
-
-/* ============================================
-   ROTAS DE NEGÓCIO (PROTEGIDAS)
+   ROTAS DE NEGÓCIO (PROTEGIDAS - USUÁRIOS INTERNOS)
 ============================================ */
 
 const tenantsRoutes = require("./routes/tenants");
@@ -202,19 +200,20 @@ try {
   );
 }
 
-app.use("/api/tenants", applySubscriptionGuard(tenantsRoutes));
-app.use("/api/clients", applySubscriptionGuard(clientsRoutes));
-app.use("/api/posts", applySubscriptionGuard(postsRoutes));
-app.use("/api/tasks", applySubscriptionGuard(tasksRoutes));
-app.use("/api/metrics", applySubscriptionGuard(metricsRoutes));
-app.use("/api/approvals", applySubscriptionGuard(approvalsRoutes));
-app.use("/api/integrations", applySubscriptionGuard(integrationsRoutes));
-app.use("/api/reports", applySubscriptionGuard(reportsRoutes));
-app.use("/api/billing", applySubscriptionGuard(billingRoutes));
-app.use("/api/team", applySubscriptionGuard(teamRoutes));
+// Montagem protegida: se alguma rota exportar objeto errado, apenas loga e segue o jogo.
+safeMount("/api/tenants", tenantsRoutes);
+safeMount("/api/clients", clientsRoutes);
+safeMount("/api/posts", postsRoutes);
+safeMount("/api/tasks", tasksRoutes);
+safeMount("/api/metrics", metricsRoutes);
+safeMount("/api/approvals", approvalsRoutes);
+safeMount("/api/integrations", integrationsRoutes);
+safeMount("/api/reports", reportsRoutes);
+safeMount("/api/billing", billingRoutes);
+safeMount("/api/team", teamRoutes);
 
 if (automationRoutes) {
-  app.use("/api/automation", applySubscriptionGuard(automationRoutes));
+  safeMount("/api/automation", automationRoutes);
 }
 
 /* ============================================

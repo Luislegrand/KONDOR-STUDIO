@@ -40,23 +40,23 @@ function clearAuthFromStorage() {
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch (err) {
-    console.error("Error clearing auth storage", err);
+    console.error("Error clearing auth from storage", err);
   }
 }
 
 function getAccessToken() {
-  const auth = loadAuthFromStorage();
-  return auth?.accessToken || null;
+  const data = loadAuthFromStorage();
+  return data?.accessToken || null;
 }
 
 function getRefreshToken() {
-  const auth = loadAuthFromStorage();
-  return auth?.refreshToken || null;
+  const data = loadAuthFromStorage();
+  return data?.refreshToken || null;
 }
 
 function getTokenId() {
-  const auth = loadAuthFromStorage();
-  return auth?.tokenId || null;
+  const data = loadAuthFromStorage();
+  return data?.tokenId || null;
 }
 
 // --------------------
@@ -65,7 +65,8 @@ function getTokenId() {
 
 async function rawFetch(path, options = {}) {
   const base = API_BASE_URL.replace(/\/+$/, "");
-  const url = base + path;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${base}/api${normalizedPath}`;
   const defaultHeaders = {
     "Content-Type": "application/json",
   };
@@ -89,18 +90,23 @@ function buildQuery(params) {
     if (value === undefined || value === null || value === "") return;
     search.append(key, String(value));
   });
-  const query = search.toString();
-  return query ? `?${query}` : "";
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
 }
 
-async function authFetch(path, options = {}, allowRetry = true) {
-  const accessToken = getAccessToken();
+// --------------------
+// Fetch com auth (access token)
+// --------------------
+
+async function authedFetch(path, options = {}) {
+  const token = getAccessToken();
 
   const headers = {
     ...(options.headers || {}),
   };
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const res = await rawFetch(path, {
@@ -108,35 +114,31 @@ async function authFetch(path, options = {}, allowRetry = true) {
     headers,
   });
 
-  if (res.status === 401 && allowRetry) {
-    const refreshed = await tryRefreshToken();
-    if (!refreshed) {
-      clearAuthFromStorage();
-      throw new Error("unauthorized");
-    }
-    const resRetry = await authFetch(path, options, false);
-    return resRetry;
-  }
-
+  // Se deu 401/403, podemos tratar depois (ex: logo out automático)
   return res;
 }
 
-async function parseJsonOrThrow(res) {
+// --------------------
+// Wrapper com tratamento de JSON + erro
+// --------------------
+
+async function jsonFetch(path, options = {}) {
+  const res = await authedFetch(path, options);
+
   let data = null;
   try {
     data = await res.json();
-  } catch (_) {}
+  } catch (err) {
+    // se não deu pra parsear JSON, mantém null
+  }
 
   if (!res.ok) {
-    const message =
-      data?.error ||
-      data?.message ||
-      `Request failed with status ${res.status}`;
-    const err = new Error(message);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+    const error = new Error(data?.error || "Request failed");
+    error.status = res.status;
+    error.data = data;
+    throw error;
   }
+
   return data;
 }
 
@@ -150,39 +152,27 @@ async function login({ email, password }) {
     body: JSON.stringify({ email, password }),
   });
 
-  const data = await parseJsonOrThrow(res);
+  const data = await res.json();
 
-  const tenant =
-    data.tenant != null
-      ? data.tenant
-      : data.user?.tenantId != null
-      ? data.user.tenantId
-      : null;
+  if (!res.ok) {
+    const error = new Error(data?.error || "Login failed");
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
 
-  saveAuthToStorage({
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    tokenId: data.tokenId,
-    user: data.user,
-    tenant,
-    expiresAt: data.expiresAt || null,
-  });
-
-  return data;
-}
-
-async function me() {
-  const res = await authFetch("/me", { method: "GET" });
-  const data = await parseJsonOrThrow(res);
+  // Esperado: { accessToken, refreshToken, tokenId?, user, tenant }
+  saveAuthToStorage(data);
   return data;
 }
 
 async function logout() {
-  const refreshToken = getRefreshToken();
   try {
     await rawFetch("/auth/logout", {
       method: "POST",
-      body: JSON.stringify({ refreshToken }),
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
     });
   } catch (err) {
     console.error("logout error", err);
@@ -201,159 +191,278 @@ async function tryRefreshToken() {
       body: JSON.stringify({ refreshToken, tokenId }),
     });
 
-    if (!res.ok) return false;
-
     const data = await res.json();
-
-    const current = loadAuthFromStorage() || {};
-    const tenant =
-      current.tenant != null
-        ? current.tenant
-        : data.tenant != null
-        ? data.tenant
-        : current.user?.tenantId ?? null;
+    if (!res.ok) {
+      console.error("refresh token failed", data);
+      clearAuthFromStorage();
+      return false;
+    }
 
     saveAuthToStorage({
-      ...current,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      tokenId: data.tokenId,
-      tenant,
-      expiresAt: data.expiresAt || current.expiresAt || null,
+      ...loadAuthFromStorage(),
+      ...data,
     });
 
     return true;
   } catch (err) {
     console.error("refresh token error", err);
+    clearAuthFromStorage();
     return false;
   }
 }
 
 // --------------------
-// CRUD genérico
+// Helpers gerais de CRUD
 // --------------------
 
-function buildCrudEntity(basePath) {
+function createEntityClient(basePath) {
   return {
     async list(params) {
-      const query = buildQuery(params);
-      const res = await authFetch(`${basePath}${query}`, { method: "GET" });
-      return parseJsonOrThrow(res);
+      const qs = buildQuery(params);
+      return jsonFetch(`${basePath}${qs}`, {
+        method: "GET",
+      });
     },
-    async filter(params, sort, limit) {
-      const queryParams = { ...(params || {}) };
-      if (sort) queryParams._sort = sort;
-      if (limit) queryParams._limit = limit;
-      const query = buildQuery(queryParams);
-      const res = await authFetch(`${basePath}${query}`, { method: "GET" });
-      return parseJsonOrThrow(res);
-    },
+
     async get(id) {
-      const res = await authFetch(`${basePath}/${id}`, { method: "GET" });
-      return parseJsonOrThrow(res);
+      return jsonFetch(`${basePath}/${id}`, {
+        method: "GET",
+      });
     },
+
     async create(payload) {
-      const res = await authFetch(basePath, {
+      return jsonFetch(basePath, {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      return parseJsonOrThrow(res);
     },
+
     async update(id, payload) {
-      const res = await authFetch(`${basePath}/${id}`, {
+      return jsonFetch(`${basePath}/${id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
-      return parseJsonOrThrow(res);
     },
-    async remove(id) {
-      const res = await authFetch(`${basePath}/${id}`, { method: "DELETE" });
-      return parseJsonOrThrow(res);
-    },
+
     async delete(id) {
-      return this.remove(id);
+      return jsonFetch(`${basePath}/${id}`, {
+        method: "DELETE",
+      });
     },
   };
 }
 
 // --------------------
-// Entidades
+// Clients
 // --------------------
 
-const Client = buildCrudEntity("/clients");
-const Post = buildCrudEntity("/posts");
-const Task = buildCrudEntity("/tasks");
-const FinancialRecord = buildCrudEntity("/financial-records");
-const Integration = buildCrudEntity("/integrations");
-const Metric = buildCrudEntity("/metrics");
-const Creative = buildCrudEntity("/creatives");
-const Report = buildCrudEntity("/reports");
-const TeamMember = buildCrudEntity("/team-members");
-const Tenant = buildCrudEntity("/tenants");
+const Clients = createEntityClient("/clients");
 
-const ApprovalBase = buildCrudEntity("/approvals");
+// --------------------
+// Posts
+// --------------------
 
-const Approval = {
-  ...ApprovalBase,
+const Posts = {
+  ...createEntityClient("/posts"),
 
-  async updateStatus(id, payload = {}) {
-    const res = await authFetch(`/approvals/${id}/status`, {
+  async sendToApproval(id) {
+    return jsonFetch(`/posts/${id}/send-to-approval`, {
+      method: "POST",
+    });
+  },
+};
+
+// --------------------
+// Approvals
+// --------------------
+
+const Approvals = {
+  async list(params) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/approvals${qs}`, {
+      method: "GET",
+    });
+  },
+
+  async get(id) {
+    return jsonFetch(`/approvals/${id}`, {
+      method: "GET",
+    });
+  },
+
+  async approve(id, payload) {
+    return jsonFetch(`/approvals/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async reject(id, payload) {
+    return jsonFetch(`/approvals/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+};
+
+// --------------------
+// Metrics
+// --------------------
+
+const Metrics = {
+  async overview(params) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/metrics/overview${qs}`, {
+      method: "GET",
+    });
+  },
+
+  async campaigns(params) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/metrics/campaigns${qs}`, {
+      method: "GET",
+    });
+  },
+};
+
+// --------------------
+// Tasks
+// --------------------
+
+const Tasks = createEntityClient("/tasks");
+
+// --------------------
+// Tenants (config / tema)
+// --------------------
+
+const Tenant = {
+  async getCurrent() {
+    return jsonFetch("/dashboard/tenant", {
+      method: "GET",
+    });
+  },
+
+  async update(payload) {
+    return jsonFetch("/tenants/current", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+// --------------------
+// Dashboard
+// --------------------
+
+const Dashboard = {
+  async overview() {
+    return jsonFetch("/dashboard/overview", {
+      method: "GET",
+    });
+  },
+};
+
+// --------------------
+// Aprovação pública (portal cliente via link)
+// --------------------
+
+const PublicApprovals = {
+  async getPublicApproval(token) {
+    return jsonFetch(`/public/approvals/${token}`, {
+      method: "GET",
+    });
+  },
+
+  async publicApprove(token, payload) {
+    return jsonFetch(`/public/approvals/${token}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async publicReject(token, payload) {
+    return jsonFetch(`/public/approvals/${token}/reject`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+};
+
+// --------------------
+// Billing
+// --------------------
+
+const Billing = {
+  async getPlans() {
+    return jsonFetch("/billing/plans", { method: "GET" });
+  },
+
+  async getStatus() {
+    return jsonFetch("/billing/status", { method: "GET" });
+  },
+
+  async subscribe(planId) {
+    return jsonFetch("/billing/subscribe", {
+      method: "POST",
+      body: JSON.stringify({ planId }),
+    });
+  },
+};
+
+// --------------------
+// Equipe / Team
+// --------------------
+
+const TeamMember = {
+  async list() {
+    return jsonFetch("/team", { method: "GET" });
+  },
+
+  async create(payload) {
+    return jsonFetch("/team", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    return parseJsonOrThrow(res);
   },
 
-  async approve(id, payload = {}) {
-    const data = {
-      ...payload,
-      status: "APPROVED",
-    };
-    return this.updateStatus(id, data);
-  },
-
-  async reject(id, payload = {}) {
-    const data = {
-      ...payload,
-      status: "REJECTED",
-    };
-    return this.updateStatus(id, data);
-  },
-};
-
-const Dashboard = {
-  async summary(params) {
-    const query = buildQuery(params);
-    const res = await authFetch(`/dashboard/summary${query}`, {
-      method: "GET",
+  async update(id, payload) {
+    return jsonFetch(`/team/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
     });
-    return parseJsonOrThrow(res);
+  },
+
+  async remove(id) {
+    return jsonFetch(`/team/${id}`, {
+      method: "DELETE",
+    });
   },
 };
 
 // --------------------
-// Export
+// Export principal
 // --------------------
 
 export const base44 = {
+  API_BASE_URL,
+  rawFetch,
+  jsonFetch,
+  authedFetch,
   auth: {
     login,
-    me,
     logout,
     tryRefreshToken,
   },
   entities: {
-    Client,
-    Post,
-    Task,
-    FinancialRecord,
-    Integration,
-    Metric,
-    Creative,
-    Report,
-    TeamMember,
+    Clients,
+    Posts,
+    Tasks,
+    Metrics,
+    Approvals,
+    PublicApprovals,
+    Billing,
     Tenant,
-    Approval,
+    TeamMember,
     Dashboard,
   },
   storage: {
