@@ -1,21 +1,3 @@
-// api/src/jobs/automationWhatsAppJob.js
-// Job/Worker para processar automações via WhatsApp.
-// - Consome JobQueue com type = 'automation_whatsapp' e status = 'queued'
-// - Faz claim condicional (updateMany) para evitar race
-// - Suporta payloads típicos:
-//   { type: 'post_pending'|'post_approved'|'payment_reminder'|'campaign_status', to, vars, referenceId, clientId? }
-// - Usa services/whatsappProvider.js (espera função send(tenantId, to, message, opts))
-// - Atualiza JobQueue com status done/failed e implementa retry/backoff básico.
-//
-// IMPORTANTE:
-// - ESTE MÓDULO NÃO TEM MAIS LOOP start/stop COM setTimeout.
-// - O agendamento periódico é feito pelo worker BullMQ (repeatable jobs).
-// - Aqui expomos apenas pollOnce(), para ser chamado pelo Worker.
-//
-// Configs via env:
-// - WORKER_MAX_ATTEMPTS             -> nº máximo de tentativas antes de marcar como failed (default: 5)
-// - WHATSAPP_BACKOFF_MS (opcional)  -> backoff fixo entre tentativas (default: exponencial até 1min)
-
 const { prisma } = require('../prisma');
 
 const MAX_ATTEMPTS = Number(process.env.WORKER_MAX_ATTEMPTS) || 5;
@@ -25,14 +7,11 @@ const BACKOFF_MS_OVERRIDE = process.env.WHATSAPP_BACKOFF_MS
 
 function safeLog(...args) {
   if (process.env.NODE_ENV === 'test') return;
-  // eslint-disable-next-line no-console
   console.log('[automationWhatsAppJob]', ...args);
 }
 
-// Lazy require do provider
 function getWhatsappProvider() {
   try {
-    // eslint-disable-next-line global-require
     const provider = require('../services/whatsappProvider');
     if (!provider || typeof provider.send !== 'function') {
       safeLog('whatsappProvider encontrado, mas sem método send');
@@ -40,18 +19,11 @@ function getWhatsappProvider() {
     }
     return provider;
   } catch (err) {
-    safeLog(
-      'whatsappProvider não disponível, pulando envio',
-      err && err.message ? err.message : err,
-    );
+    safeLog('whatsappProvider não disponível, pulando envio', err?.message || err);
     return null;
   }
 }
 
-/**
- * renderMessage(entry)
- * - Usa message pronto se vier no payload, senão monta um texto simples por tipo.
- */
 function renderMessage(entry) {
   const payload = entry.payload || {};
   const type = payload.type || 'generic';
@@ -93,30 +65,19 @@ function renderMessage(entry) {
     );
   }
 
-  // default genérico
   return vars.custom || 'Você recebeu uma nova notificação da sua agência.';
 }
 
-/**
- * calculaBackoffMs
- * - Usa override WHATSAPP_BACKOFF_MS se existir; senão backoff exponencial limitado.
- */
 function calculaBackoffMs(attempts) {
   if (BACKOFF_MS_OVERRIDE && !Number.isNaN(BACKOFF_MS_OVERRIDE)) {
     return BACKOFF_MS_OVERRIDE;
   }
-  const base = 5000; // 5s
-  const max = 60000; // 1min
+  const base = 5000;
+  const max = 60000;
   const backoff = base * Math.pow(2, Math.max(0, attempts - 1));
   return Math.min(backoff, max);
 }
 
-/**
- * findAndClaim()
- * - busca uma JobQueue entry para type='automation_whatsapp' e status='queued'
- *   cujo runAt seja null ou <= now.
- * - tenta fazer claim via updateMany condicional (id + status='queued')
- */
 async function findAndClaim() {
   const now = new Date();
   const candidate = await prisma.jobQueue.findFirst({
@@ -130,7 +91,6 @@ async function findAndClaim() {
 
   if (!candidate) return null;
 
-  // tenta claim
   const claimed = await prisma.jobQueue.updateMany({
     where: { id: candidate.id, status: 'queued' },
     data: {
@@ -140,21 +100,12 @@ async function findAndClaim() {
     },
   });
 
-  if (claimed.count === 0) {
-    // alguém mais claimou
-    return null;
-  }
+  if (claimed.count === 0) return null;
 
-  // re-fetch com attempts atualizados
   const entry = await prisma.jobQueue.findUnique({ where: { id: candidate.id } });
   return entry || null;
 }
 
-/**
- * processEntry(entry)
- * - Resolve tenant, checa opt-in (se clientId vier no payload),
- *   renderiza mensagem, chama whatsappProvider.send e aplica retry/backoff.
- */
 async function processEntry(entry) {
   if (!entry) return false;
 
@@ -166,9 +117,7 @@ async function processEntry(entry) {
       data: {
         status: 'failed',
         updatedAt: new Date(),
-        result: {
-          error: 'whatsappProvider indisponível',
-        },
+        result: { error: 'whatsappProvider indisponível' },
       },
     });
     return false;
@@ -185,15 +134,12 @@ async function processEntry(entry) {
       data: {
         status: 'failed',
         updatedAt: new Date(),
-        result: {
-          error: 'Parâmetro "to" ausente no payload do job',
-        },
+        result: { error: 'Parâmetro "to" ausente no payload do job' },
       },
     });
     return false;
   }
 
-  // Checa opt-in se vier clientId
   if (payload.clientId) {
     try {
       const client = await prisma.client.findFirst({
@@ -230,7 +176,7 @@ async function processEntry(entry) {
         await prisma.jobQueue.update({
           where: { id: entry.id },
           data: {
-            status: 'done', // concluído, mas sem envio
+            status: 'done',
             updatedAt: new Date(),
             result: {
               skipped: true,
@@ -242,11 +188,7 @@ async function processEntry(entry) {
         return true;
       }
     } catch (err) {
-      safeLog(
-        'Erro ao buscar client para checar opt-in',
-        err && err.message ? err.message : err,
-      );
-      // Não aborta o job; segue com o envio, mas registra no result
+      safeLog('Erro ao buscar client para checar opt-in', err?.message || err);
     }
   }
 
@@ -265,15 +207,13 @@ async function processEntry(entry) {
 
     if (!sendResult || !sendResult.ok) {
       const now = new Date();
-      const maxAttempts = MAX_ATTEMPTS;
       const backoffMs = calculaBackoffMs(attempts);
       const nextRunAt = new Date(Date.now() + backoffMs);
 
-      if (attempts < maxAttempts) {
+      if (attempts < MAX_ATTEMPTS) {
         safeLog('Envio WhatsApp falhou; requeue com backoff', {
           jobId: entry.id,
           attempts,
-          maxAttempts,
           backoffMs,
         });
 
@@ -285,9 +225,7 @@ async function processEntry(entry) {
             updatedAt: now,
             result: {
               ...(entry.result || {}),
-              lastError: sendResult && sendResult.error
-                ? sendResult.error
-                : 'Falha ao enviar WhatsApp',
+              lastError: sendResult?.error || 'Falha ao enviar WhatsApp',
               attempts,
             },
           },
@@ -296,11 +234,9 @@ async function processEntry(entry) {
         return false;
       }
 
-      // ultrapassou maxAttempts -> failed definitivo
       safeLog('Envio WhatsApp falhou; maxAttempts atingido, marcando como failed', {
         jobId: entry.id,
         attempts,
-        maxAttempts,
       });
 
       await prisma.jobQueue.update({
@@ -311,9 +247,7 @@ async function processEntry(entry) {
           updatedAt: now,
           result: {
             ...(entry.result || {}),
-            lastError: sendResult && sendResult.error
-              ? sendResult.error
-              : 'Falha ao enviar WhatsApp (maxAttempts atingido)',
+            lastError: sendResult?.error || 'Falha ao enviar WhatsApp',
             attempts,
           },
         },
@@ -322,7 +256,6 @@ async function processEntry(entry) {
       return false;
     }
 
-    // sucesso 🎉
     await prisma.jobQueue.update({
       where: { id: entry.id },
       data: {
@@ -331,7 +264,7 @@ async function processEntry(entry) {
         result: {
           ...(entry.result || {}),
           success: true,
-          attempts: entry.attempts || 1,
+          attempts,
           providerStatus: sendResult.status || null,
         },
       },
@@ -340,23 +273,21 @@ async function processEntry(entry) {
     safeLog('Mensagem WhatsApp enviada com sucesso', {
       jobId: entry.id,
       to,
-      attempts: entry.attempts || 1,
+      attempts,
     });
 
     return true;
   } catch (err) {
     const attempts = entry.attempts || 1;
     const now = new Date();
-    const maxAttempts = MAX_ATTEMPTS;
     const backoffMs = calculaBackoffMs(attempts);
     const nextRunAt = new Date(Date.now() + backoffMs);
-    const msg = err && err.message ? err.message : String(err);
+    const msg = err?.message || String(err);
 
-    if (attempts < maxAttempts) {
+    if (attempts < MAX_ATTEMPTS) {
       safeLog('Erro inesperado no envio WhatsApp; requeue com backoff', {
         jobId: entry.id,
         attempts,
-        maxAttempts,
         backoffMs,
         error: msg,
       });
@@ -381,7 +312,6 @@ async function processEntry(entry) {
     safeLog('Erro inesperado no envio WhatsApp; maxAttempts atingido, marcando como failed', {
       jobId: entry.id,
       attempts,
-      maxAttempts,
       error: msg,
     });
 
@@ -403,21 +333,14 @@ async function processEntry(entry) {
   }
 }
 
-/**
- * pollOnce
- * - tenta claim e processar 1 job por chamada.
- */
 async function pollOnce() {
   const entry = await findAndClaim();
-  if (!entry) {
-    return false;
-  }
+  if (!entry) return false;
   return processEntry(entry);
 }
 
 module.exports = {
   pollOnce,
-  // internals for debug/test
   _findAndClaim: findAndClaim,
   _processEntry: processEntry,
 };

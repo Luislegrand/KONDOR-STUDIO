@@ -1,29 +1,21 @@
-// api/src/routes/posts.js
 const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/auth");
 const tenantMiddleware = require("../middleware/tenant");
 const postsService = require("../services/postsService");
+const { prisma } = require("../prisma");
+const { whatsappQueue } = require("../queues/whatsappQueue"); // opcional, se estiver ativo
 
-// Todas as rotas protegidas
 router.use(authMiddleware);
 router.use(tenantMiddleware);
 
 /**
  * GET /posts
- * Lista posts do tenant com filtros e paginação
- * Query:
- *  ?status=
- *  ?clientId=
- *  ?q=
- *  ?page=
- *  ?perPage=
  */
 router.get("/", async (req, res) => {
   try {
     const { status, clientId, q, page, perPage } = req.query;
-
     const result = await postsService.list(req.tenantId, {
       status,
       clientId,
@@ -31,7 +23,6 @@ router.get("/", async (req, res) => {
       page: page ? Number(page) : undefined,
       perPage: perPage ? Number(perPage) : undefined,
     });
-
     return res.json(result);
   } catch (err) {
     console.error("GET /posts error:", err);
@@ -40,8 +31,7 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * GET /posts/suggest?q=...
- * Autosuggest para busca rápida
+ * GET /posts/suggest
  */
 router.get("/suggest", async (req, res) => {
   try {
@@ -60,7 +50,6 @@ router.get("/suggest", async (req, res) => {
 
 /**
  * GET /posts/:id
- * Busca post por ID
  */
 router.get("/:id", async (req, res) => {
   try {
@@ -75,8 +64,6 @@ router.get("/:id", async (req, res) => {
 
 /**
  * POST /posts
- * Cria novo post
- * Body deve conter ao menos title/caption/mediaUrl/clientId
  */
 router.post("/", async (req, res) => {
   try {
@@ -91,7 +78,6 @@ router.post("/", async (req, res) => {
 
 /**
  * PUT /posts/:id
- * Atualiza post
  */
 router.put("/:id", async (req, res) => {
   try {
@@ -101,7 +87,6 @@ router.put("/:id", async (req, res) => {
       req.body
     );
     if (!updated) return res.status(404).json({ error: "Post não encontrado" });
-
     return res.json(updated);
   } catch (err) {
     console.error("PUT /posts/:id error:", err);
@@ -111,17 +96,68 @@ router.put("/:id", async (req, res) => {
 
 /**
  * DELETE /posts/:id
- * Remove post
  */
 router.delete("/:id", async (req, res) => {
   try {
     const removed = await postsService.remove(req.tenantId, req.params.id);
     if (!removed) return res.status(404).json({ error: "Post não encontrado" });
-
     return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /posts/:id error:", err);
     return res.status(500).json({ error: "Erro ao remover post" });
+  }
+});
+
+/**
+ * POST /posts/:id/send-to-approval
+ * Atualiza o post para status AGUARDANDO_APROVACAO e cria uma approval
+ */
+router.post("/:id/send-to-approval", async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const tenantId = req.tenantId;
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post || post.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Post não encontrado" });
+    }
+
+    // Atualizar status do post
+    await prisma.post.update({
+      where: { id: postId },
+      data: {
+        status: "AWAITING_APPROVAL",
+      },
+    });
+
+    // Criar registro em approvals
+    await prisma.approval.create({
+      data: {
+        postId: post.id,
+        tenantId,
+        status: "PENDING",
+        requestedAt: new Date(),
+      },
+    });
+
+    // Enviar para fila WhatsApp (opcional)
+    if (whatsappQueue) {
+      await whatsappQueue.add("notifyNewPostApproval", {
+        tenantId,
+        postId,
+        clientId: post.clientId,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("POST /posts/:id/send-to-approval error:", err);
+    return res
+      .status(500)
+      .json({ error: "Erro ao enviar post para aprovação" });
   }
 });
 

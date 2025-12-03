@@ -1,8 +1,9 @@
-// front/src/pages/clientlogin.jsx
+// front/src/pages/ClientLogin.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { base44 } from "../base44Client";
 
-export default function Clientlogin() {
+export default function ClientLogin() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -16,39 +17,28 @@ export default function Clientlogin() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/client-login", {
+      const res = await base44.rawFetch("/auth/client-login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json();
 
       if (!res.ok) {
-        setError(data?.error || "Erro ao fazer login");
-        setLoading(false);
-        return;
+        const msg = data?.error || "Falha no login do cliente";
+        throw new Error(msg);
       }
 
-      const token = data.accessToken || data.token;
-      if (!token) {
-        setError("Resposta de login inválida (sem token)");
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem("kondor_client_token", token);
-
-      if (data.client) {
-        localStorage.setItem("kondor_client_info", JSON.stringify(data.client));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "kondor_client_auth",
+          JSON.stringify(data)
+        );
       }
 
       navigate("/clientportal", { replace: true });
     } catch (err) {
-      console.error("Erro no client-login:", err);
-      setError("Erro interno ao fazer login. Tente novamente.");
+      setError(err?.message || "Erro ao fazer login");
     } finally {
       setLoading(false);
     }
@@ -60,6 +50,9 @@ export default function Clientlogin() {
         <h1 className="text-xl font-semibold text-gray-900 mb-4">
           Login do Cliente
         </h1>
+        <p className="text-sm text-gray-600 mb-6">
+          Acesse o portal para aprovar posts, acompanhar métricas e baixar relatórios.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -72,7 +65,7 @@ export default function Clientlogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="cliente@empresa.com"
+              placeholder="cliente@email.com"
             />
           </div>
 
@@ -99,7 +92,7 @@ export default function Clientlogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-60"
+            className="w-full py-2.5 rounded-lg text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 disabled:opacity-60 transition"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>

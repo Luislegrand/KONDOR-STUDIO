@@ -1,57 +1,44 @@
-// front/src/app.jsx
-import { Routes, Route, Navigate } from "react-router-dom";
-import Layout from "./layout.jsx";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Dashboard from "./pages/dashboard";
+import Clients from "./pages/clients";
+import ClientLogin from "./pages/clientlogin";
+import ClientPortal from "./pages/clientportal";
+import Login from "./pages/login";
+import Onboarding from "./pages/onboarding";
+import Layout from "./components/layout";
+import PrivateRoute from "./components/PrivateRoute";
+import Navbar from "./components/Navbar";
 
-// PAGES DO PAINEL DA AGÊNCIA
-import Dashboard from "./pages/dashboard.jsx";
-import Clients from "./pages/clients.jsx";
-import Posts from "./pages/posts.jsx";
-import Tasks from "./pages/tasks.jsx";
-import Biblioteca from "./pages/biblioteca.jsx";
-import Financeiro from "./pages/financeiro.jsx";
-import Team from "./pages/team.jsx";
-import Metrics from "./pages/metrics.jsx";
-import Integrations from "./pages/integrations.jsx";
-import Settings from "./pages/settings.jsx";
-import Pricing from "./pages/pricing.jsx";
-
-// PORTAL DO CLIENTE
-import Clientportal from "./pages/clientportal.jsx";
-import Clientlogin from "./pages/clientlogin.jsx";
-
-export default function App() {
+function App() {
   return (
-    <Routes>
-      {/* ============================
-          ROTAS DO CLIENTE (SEM LAYOUT)
-         ============================ */}
-      <Route path="/clientlogin" element={<Clientlogin />} />
-      <Route path="/clientportal" element={<Clientportal />} />
-      {/* alias legado */}
-      <Route path="/portal" element={<Clientportal />} />
+    <BrowserRouter>
+      <Navbar />
 
-      {/* ============================
-          ROTAS DA AGÊNCIA (COM LAYOUT)
-         ============================ */}
-      <Route element={<Layout />}>
-        {/* rota base cai no dashboard */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Routes>
+        {/* Login da agência */}
+        <Route path="/login" element={<Login />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/clients" element={<Clients />} />
-        <Route path="/posts" element={<Posts />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/biblioteca" element={<Biblioteca />} />
-        <Route path="/financeiro" element={<Financeiro />} />
-        <Route path="/team" element={<Team />} />
-        <Route path="/metrics" element={<Metrics />} />
-        <Route path="/integrations" element={<Integrations />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/pricing" element={<Pricing />} />
+        {/* Onboarding pós-cadastro */}
+        <Route path="/onboarding" element={<Onboarding />} />
 
-        {/* fallback dentro do layout */}
+        {/* Portal do cliente (não protegido por PrivateRoute) */}
+        <Route path="/clientlogin" element={<ClientLogin />} />
+        <Route path="/clientportal" element={<ClientPortal />} />
+
+        {/* Rotas protegidas da agência */}
+        <Route element={<PrivateRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Route>
+
+        {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </BrowserRouter>
   );
 }
+
+export default App;

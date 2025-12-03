@@ -1,18 +1,3 @@
-// api/src/jobs/reportGenerationJob.js
-// Job/Worker para gerar relatórios por tenant.
-// - Consome jobQueue jobType='report_generation' e status='queued'
-// - Busca métricas no intervalo informado (ou fallback para últimos 30 dias)
-// - Cria ou atualiza um Report no DB
-// - Gera PDF e Upload através de buildAndPersistReport()
-// - Atualiza jobQueue com status done/failed + resultado
-//
-// IMPORTANTE:
-// - Este arquivo NÃO possui mais loop com setTimeout.
-// - O agendamento agora é feito EXCLUSIVAMENTE pelo worker BullMQ (repeatable jobs).
-// - Aqui expomos apenas pollOnce() para ser chamado pelo Worker.
-//
-// ------------------------------------------------------
-
 const { prisma } = require('../prisma');
 const { buildAndPersistReport } = require('../services/reportBuilder');
 
@@ -21,7 +6,6 @@ const BACKOFF_MS = Number(process.env.REPORT_BACKOFF_MS) || 60000;
 
 function safeLog(...args) {
   if (process.env.NODE_ENV === 'test') return;
-  // eslint-disable-next-line no-console
   console.log('[reportGenerationJob]', ...args);
 }
 
@@ -32,9 +16,6 @@ function parseDateOrNull(value) {
   return d;
 }
 
-// ------------------------------------------------------
-// Claim de job
-// ------------------------------------------------------
 async function claimNextReportJob() {
   const now = new Date();
 
@@ -42,10 +23,7 @@ async function claimNextReportJob() {
     where: {
       type: 'report_generation',
       status: 'queued',
-      OR: [
-        { runAt: null },
-        { runAt: { lte: now } },
-      ],
+      OR: [{ runAt: null }, { runAt: { lte: now } }],
     },
     orderBy: { createdAt: 'asc' },
   });
@@ -53,10 +31,7 @@ async function claimNextReportJob() {
   if (!candidate) return null;
 
   const claimed = await prisma.jobQueue.updateMany({
-    where: {
-      id: candidate.id,
-      status: 'queued',
-    },
+    where: { id: candidate.id, status: 'queued' },
     data: {
       status: 'processing',
       attempts: { increment: 1 },
@@ -66,14 +41,9 @@ async function claimNextReportJob() {
 
   if (!claimed.count) return null;
 
-  return prisma.jobQueue.findUnique({
-    where: { id: candidate.id },
-  });
+  return prisma.jobQueue.findUnique({ where: { id: candidate.id } });
 }
 
-// ------------------------------------------------------
-// Helpers
-// ------------------------------------------------------
 function buildSummary(metrics, from, to) {
   const byName = {};
 
@@ -96,7 +66,6 @@ function buildSummary(metrics, from, to) {
   });
 
   Object.values(byName).forEach((agg) => {
-    // eslint-disable-next-line no-param-reassign
     agg.avg = agg.count > 0 ? agg.sum / agg.count : 0;
   });
 
@@ -125,9 +94,6 @@ async function finalizeJob(entry, status, result, options = {}) {
   });
 }
 
-// ------------------------------------------------------
-// Processamento principal
-// ------------------------------------------------------
 async function processReportEntry(entry) {
   if (!entry) return null;
 
@@ -139,8 +105,6 @@ async function processReportEntry(entry) {
   }
 
   const payload = entry.payload || {};
-
-  // Intervalo de datas
   const now = new Date();
   let from = parseDateOrNull(payload.rangeFrom);
   let to = parseDateOrNull(payload.rangeTo);
@@ -151,7 +115,6 @@ async function processReportEntry(entry) {
     from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
   }
 
-  // Busca métricas do tenant no intervalo
   const metrics = await prisma.metric.findMany({
     where: {
       tenantId,
@@ -164,9 +127,8 @@ async function processReportEntry(entry) {
 
   const summary = buildSummary(metrics, from, to);
 
-  const baseParams = payload.params && typeof payload.params === 'object'
-    ? payload.params
-    : {};
+  const baseParams =
+    payload.params && typeof payload.params === 'object' ? payload.params : {};
 
   const name = payload.name || 'Relatório';
   const type = payload.type || 'custom';
@@ -186,11 +148,10 @@ async function processReportEntry(entry) {
     options.reportId = payload.reportId;
   }
 
-  // Gera PDF + Upload + Report
   const result = await buildAndPersistReport(tenantId, options);
 
   if (!result || !result.ok || !result.report) {
-    const errorMsg = (result && result.error) || 'Falha ao gerar relatório';
+    const errorMsg = result?.error || 'Falha ao gerar relatório';
     safeLog('buildAndPersistReport retornou erro', {
       jobId: entry.id,
       error: errorMsg,
@@ -207,7 +168,6 @@ async function processReportEntry(entry) {
 
   const { report, upload, filename } = result;
 
-  // Marca job como done
   await finalizeJob(entry, 'done', {
     ok: true,
     reportId: report.id,
@@ -219,15 +179,12 @@ async function processReportEntry(entry) {
   safeLog('Relatório gerado com sucesso', {
     jobId: entry.id,
     reportId: report.id,
-    uploadId: upload ? upload.id : null,
+    uploadId: upload?.id || null,
   });
 
   return report;
 }
 
-// ------------------------------------------------------
-// Uma iteração de polling
-// ------------------------------------------------------
 async function pollOnce() {
   const entry = await claimNextReportJob();
   if (!entry) return null;
@@ -266,7 +223,6 @@ async function pollOnce() {
 
 module.exports = {
   pollOnce,
-  // export internals para debug
   _claimNextReportJob: claimNextReportJob,
   _processReportEntry: processReportEntry,
 };

@@ -28,11 +28,16 @@ export default function Layout() {
       <aside className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-gray-200">
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-200">
-          <div className="h-8 w-8 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold">
+          <div
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-white font-bold"
+            style={{ background: "var(--primary)" }}
+          >
             K
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-sm">KONDOR</span>
+            <span className="font-semibold text-sm" style={{ color: "var(--primary)" }}>
+              KONDOR
+            </span>
             <span className="text-xs text-gray-500">STUDIO</span>
           </div>
         </div>
@@ -51,9 +56,17 @@ export default function Layout() {
                   [
                     "block px-3 py-2 rounded-lg text-sm transition-colors",
                     isActive
-                      ? "bg-purple-100 text-purple-700 font-medium"
+                      ? "font-medium"
                       : "text-gray-600 hover:bg-gray-100",
                   ].join(" ")
+                }
+                style={({ isActive }) =>
+                  isActive
+                    ? {
+                        background: "var(--primary-light)",
+                        color: "var(--primary)",
+                      }
+                    : {}
                 }
               >
                 {item.label}
@@ -68,7 +81,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* CONTAINER PRINCIPAL (TOPBAR MOBILE + CONTEÚDO) */}
+      {/* CONTAINER PRINCIPAL */}
       <div className="flex-1 flex flex-col">
         {/* TOPBAR MOBILE */}
         <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
@@ -81,11 +94,16 @@ export default function Layout() {
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold">
+              <div
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-white font-bold"
+                style={{ background: "var(--primary)" }}
+              >
                 K
               </div>
               <div className="flex flex-col leading-tight">
-                <span className="font-semibold text-sm">KONDOR</span>
+                <span className="font-semibold text-sm" style={{ color: "var(--primary)" }}>
+                  KONDOR
+                </span>
                 <span className="text-xs text-gray-500">STUDIO</span>
               </div>
             </div>
@@ -107,9 +125,17 @@ export default function Layout() {
                   [
                     "block px-3 py-2 rounded-lg text-sm transition-colors",
                     isActive
-                      ? "bg-purple-100 text-purple-700 font-medium"
+                      ? "font-medium"
                       : "text-gray-600 hover:bg-gray-100",
                   ].join(" ")
+                }
+                style={({ isActive }) =>
+                  isActive
+                    ? {
+                        background: "var(--primary-light)",
+                        color: "var(--primary)",
+                      }
+                    : {}
                 }
               >
                 {item.label}
@@ -118,7 +144,7 @@ export default function Layout() {
           </nav>
         )}
 
-        {/* CONTEÚDO DAS ROTAS DA AGÊNCIA */}
+        {/* CONTEÚDO */}
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <Outlet />
         </main>

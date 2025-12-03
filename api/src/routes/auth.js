@@ -1,4 +1,3 @@
-// api/src/routes/auth.js
 const express = require('express');
 const router = express.Router();
 
@@ -11,7 +10,6 @@ const {
   REFRESH_TOKEN_EXPIRES_IN,
 } = require('../utils/jwt');
 const authMiddleware = require('../middleware/auth');
-
 const rateLimit = require('express-rate-limit');
 const { loginSchema } = require('../validators/authValidator');
 
@@ -46,18 +44,16 @@ function computeExpiryDateFromString(expiresIn) {
       d.setMinutes(d.getMinutes() + (Number.isFinite(mins) ? mins : 60));
       return d;
     }
-  } catch (err) {
-    // fallback
-  }
-  // fallback 30 days
+  } catch (err) {}
+
   const d = new Date();
   d.setDate(d.getDate() + 30);
   return d;
 }
 
 const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 10, // limite de tentativas de login por IP
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -69,10 +65,6 @@ const loginRateLimiter = rateLimit({
 
 /**
  * POST /auth/login
- * Body: { email, password, deviceName? }
- *
- * Returns:
- * { accessToken, refreshToken, tokenId, user: { id, email, name, role, tenantId } }
  */
 router.post('/login', loginRateLimiter, async (req, res) => {
   try {
@@ -99,17 +91,11 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       },
     });
 
-    if (!user) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
-    }
+    if (!user) return res.status(401).json({ error: 'Credenciais inválidas' });
 
     const passwordOk = await comparePassword(password, user.passwordHash);
-    if (!passwordOk) {
-      // opcional: registrar tentativa falha
-      return res.status(401).json({ error: 'Credenciais inválidas' });
-    }
+    if (!passwordOk) return res.status(401).json({ error: 'Credenciais inválidas' });
 
-    // Payload mínimo para o access token
     const payload = {
       userId: user.id,
       role: user.role,
@@ -117,8 +103,6 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     };
 
     const accessToken = createAccessToken(payload);
-
-    // Refresh token: geramos random e guardamos hash no banco
     const rawRefreshToken = createRefreshToken();
     const hashed = await hashPassword(rawRefreshToken);
     const expiresAt = computeExpiryDateFromString(REFRESH_TOKEN_EXPIRES_IN);
@@ -157,14 +141,6 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
 /**
  * POST /auth/client-login
- * Body: { email, password }
- *
- * Login específico para CLIENTE do portal.
- * - Localiza Client pelo email.
- * - Usa campo JSON "metadata.portalPasswordHash" para guardar a senha do portal.
- *   - Se NÃO existir hash ainda -> considera primeiro acesso, salva o hash da senha informada.
- *   - Se já existir -> compara a senha.
- * - Gera JWT com payload { type: 'client', clientId, tenantId }.
  */
 router.post('/client-login', loginRateLimiter, async (req, res) => {
   try {
@@ -179,7 +155,6 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
 
     const { email, password } = parseResult.data;
 
-    // 1) Localiza o cliente pelo e-mail principal (pode evoluir depois para portalEmail)
     const client = await prisma.client.findFirst({
       where: { email },
       select: {
@@ -191,34 +166,26 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
       },
     });
 
-    if (!client) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
-    }
+    if (!client) return res.status(401).json({ error: 'Credenciais inválidas' });
 
     let metadata = client.metadata || {};
     const existingHash = metadata.portalPasswordHash || null;
 
-    // 2) Se ainda não há senha de portal, considera primeiro acesso e grava o hash
     if (!existingHash) {
       const newHash = await hashPassword(password);
       metadata = {
         ...metadata,
         portalPasswordHash: newHash,
       };
-
       await prisma.client.update({
         where: { id: client.id },
         data: { metadata },
       });
     } else {
-      // 3) Se já existe hash, valida a senha
       const ok = await comparePassword(password, existingHash);
-      if (!ok) {
-        return res.status(401).json({ error: 'Credenciais inválidas' });
-      }
+      if (!ok) return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // 4) Gera token específico de CLIENTE
     const payload = {
       type: 'client',
       clientId: client.id,
@@ -238,18 +205,12 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('POST /auth/client-login error', err);
-    return res
-      .status(500)
-      .json({ error: 'Erro interno no login do cliente' });
+    return res.status(500).json({ error: 'Erro interno no login do cliente' });
   }
 });
 
 /**
  * POST /auth/refresh
- * Body: { tokenId, refreshToken }
- *
- * TokenId é o id do registro de refreshToken (retornado no login). Isso evita buscas globais.
- * Se você usa cookies, pode enviar tokenId em cookie ou tokenId no body.
  */
 router.post('/refresh', async (req, res) => {
   try {
@@ -261,27 +222,17 @@ router.post('/refresh', async (req, res) => {
 
     const record = await prisma.refreshToken.findUnique({
       where: { id: tokenId },
-      include: {
-        user: true,
-      },
+      include: { user: true },
     });
 
-    if (!record) {
-      return res.status(401).json({ error: 'Refresh token inválido' });
-    }
-
-    if (record.revoked) {
-      return res.status(401).json({ error: 'Refresh token revogado' });
-    }
-
+    if (!record) return res.status(401).json({ error: 'Refresh token inválido' });
+    if (record.revoked) return res.status(401).json({ error: 'Refresh token revogado' });
     if (record.expiresAt && new Date(record.expiresAt) < new Date()) {
       return res.status(401).json({ error: 'Refresh token expirado' });
     }
 
-    // Compare hashed token
     const isValid = await comparePassword(refreshToken, record.tokenHash);
     if (!isValid) {
-      // possível tentativa de replay — revogar o token
       await prisma.refreshToken.update({
         where: { id: record.id },
         data: { revoked: true },
@@ -290,17 +241,13 @@ router.post('/refresh', async (req, res) => {
     }
 
     const user = record.user;
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
-    }
+    if (!user) return res.status(401).json({ error: 'Usuário não encontrado' });
 
-    // revoke old token
     await prisma.refreshToken.update({
       where: { id: record.id },
-      data: { revoked: true, replacedByTokenId: null },
+      data: { revoked: true },
     });
 
-    // create new refresh token
     const newRawRefresh = createRefreshToken();
     const newHashed = await hashPassword(newRawRefresh);
     const newExpiresAt = computeExpiryDateFromString(REFRESH_TOKEN_EXPIRES_IN);
@@ -315,7 +262,6 @@ router.post('/refresh', async (req, res) => {
         ip: req.ip || req.headers['x-forwarded-for'] || null,
         userAgent: req.headers['user-agent'] || null,
         tenantId: user.tenantId || null,
-        // replacedByTokenId: null
       },
     });
 
@@ -324,6 +270,7 @@ router.post('/refresh', async (req, res) => {
       role: user.role,
       tenantId: user.tenantId,
     };
+
     const accessToken = createAccessToken(payload);
 
     return res.json({
@@ -340,10 +287,6 @@ router.post('/refresh', async (req, res) => {
 
 /**
  * POST /auth/logout
- * Body: { tokenId? , revokeAll? }
- *
- * If tokenId provided -> revoke only that token
- * If revokeAll true -> revoke all tokens for that user (requires auth)
  */
 router.post('/logout', authMiddleware, async (req, res) => {
   try {
@@ -367,7 +310,6 @@ router.post('/logout', authMiddleware, async (req, res) => {
       return res.json({ ok: true, tokenId });
     }
 
-    // If no tokenId and not revokeAll: try to revoke by reading tokenId from body.cookie or header (best-effort)
     return res.json({ ok: true });
   } catch (err) {
     console.error('POST /auth/logout error', err);
@@ -377,7 +319,6 @@ router.post('/logout', authMiddleware, async (req, res) => {
 
 /**
  * GET /auth/me
- * Retorna os dados básicos do usuário autenticado
  */
 router.get('/me', authMiddleware, async (req, res) => {
   try {

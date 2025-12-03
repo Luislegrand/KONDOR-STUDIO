@@ -1,4 +1,3 @@
-// api/src/worker.js
 require('dotenv').config();
 const { Worker, QueueScheduler } = require('bullmq');
 const Redis = require('ioredis');
@@ -31,7 +30,6 @@ const WHATSAPP_AUTOMATION_PERIOD_MS =
 // ------------------------------------------------------
 async function runPollOnce(jobModule, label) {
   if (!jobModule || typeof jobModule.pollOnce !== 'function') {
-    // eslint-disable-next-line no-console
     console.warn(
       `[worker] módulo de job sem pollOnce(): ${label}. Nada será processado.`,
     );
@@ -40,12 +38,10 @@ async function runPollOnce(jobModule, label) {
 
   try {
     const result = await jobModule.pollOnce();
-    // eslint-disable-next-line no-console
     console.log(`[worker] pollOnce() executado para ${label}`, {
       ok: !!result,
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error(
       `[worker] erro ao executar pollOnce() em ${label}:`,
       err && err.stack ? err.stack : err,
@@ -67,17 +63,13 @@ const whatsappScheduler = new QueueScheduler(whatsappQueue.name, {
   connection,
 });
 
-// Apenas para logar erros de scheduler
 metricsScheduler.on('failed', (jobId, err) => {
-  // eslint-disable-next-line no-console
   console.error('[metrics-sync:scheduler] failed', jobId, err);
 });
 reportsScheduler.on('failed', (jobId, err) => {
-  // eslint-disable-next-line no-console
   console.error('[reports-generation:scheduler] failed', jobId, err);
 });
 whatsappScheduler.on('failed', (jobId, err) => {
-  // eslint-disable-next-line no-console
   console.error('[whatsapp-automation:scheduler] failed', jobId, err);
 });
 
@@ -87,7 +79,6 @@ whatsappScheduler.on('failed', (jobId, err) => {
 const metricsWorker = new Worker(
   metricsSyncQueue.name,
   async (job) => {
-    // eslint-disable-next-line no-console
     console.log('[metricsSync] processing job', job.id, job.name);
     await runPollOnce(updateMetricsJob, 'updateMetricsJob');
   },
@@ -97,7 +88,6 @@ const metricsWorker = new Worker(
 const reportsWorker = new Worker(
   reportsQueue.name,
   async (job) => {
-    // eslint-disable-next-line no-console
     console.log('[reports] processing job', job.id, job.name);
     await runPollOnce(reportGenerationJob, 'reportGenerationJob');
   },
@@ -107,7 +97,6 @@ const reportsWorker = new Worker(
 const whatsappWorker = new Worker(
   whatsappQueue.name,
   async (job) => {
-    // eslint-disable-next-line no-console
     console.log('[whatsapp] processing job', job.id, job.name);
     await runPollOnce(automationWhatsAppJob, 'automationWhatsAppJob');
   },
@@ -118,17 +107,14 @@ const whatsappWorker = new Worker(
 // Logs de sucesso
 // ------------------------------------------------------
 metricsWorker.on('completed', (job) => {
-  // eslint-disable-next-line no-console
   console.log('[metricsSync] job completed', job.id);
 });
 
 reportsWorker.on('completed', (job) => {
-  // eslint-disable-next-line no-console
   console.log('[reports] job completed', job.id);
 });
 
 whatsappWorker.on('completed', (job) => {
-  // eslint-disable-next-line no-console
   console.log('[whatsapp] job completed', job.id);
 });
 
@@ -136,17 +122,14 @@ whatsappWorker.on('completed', (job) => {
 // Logs de erro
 // ------------------------------------------------------
 metricsWorker.on('failed', (job, err) => {
-  // eslint-disable-next-line no-console
   console.error('[metricsSync] job failed', job?.id, err);
 });
 
 reportsWorker.on('failed', (job, err) => {
-  // eslint-disable-next-line no-console
   console.error('[reports] job failed', job?.id, err);
 });
 
 whatsappWorker.on('failed', (job, err) => {
-  // eslint-disable-next-line no-console
   console.error('[whatsapp] job failed', job?.id, err);
 });
 
@@ -154,14 +137,12 @@ whatsappWorker.on('failed', (job, err) => {
 // Agendamento de jobs recorrentes (repeatable jobs)
 // ------------------------------------------------------
 async function ensureRepeatableJobs() {
-  // eslint-disable-next-line no-console
   console.log('[worker] configurando repeatable jobs com períodos:', {
     METRICS_AGG_PERIOD_MS,
     REPORTS_GENERATION_PERIOD_MS,
     WHATSAPP_AUTOMATION_PERIOD_MS,
   });
 
-  // Métricas
   await metricsSyncQueue.add(
     'metrics-poll',
     {},
@@ -172,7 +153,6 @@ async function ensureRepeatableJobs() {
     },
   );
 
-  // Relatórios
   await reportsQueue.add(
     'reports-poll',
     {},
@@ -183,7 +163,6 @@ async function ensureRepeatableJobs() {
     },
   );
 
-  // WhatsApp automation
   await whatsappQueue.add(
     'whatsapp-poll',
     {},
@@ -194,13 +173,10 @@ async function ensureRepeatableJobs() {
     },
   );
 
-  // eslint-disable-next-line no-console
   console.log('[worker] repeatable jobs registrados com sucesso');
 }
 
-// dispara configuração de repeatable jobs ao subir o worker
 ensureRepeatableJobs().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(
     '[worker] erro ao configurar repeatable jobs:',
     err && err.stack ? err.stack : err,

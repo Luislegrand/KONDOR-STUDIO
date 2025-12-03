@@ -1,31 +1,8 @@
-// api/src/middleware/checkSubscription.js
-//
-// Middleware que verifica se o tenant tem uma assinatura válida.
-// Atualizado para:
-//  - Permitir registro, login, refresh, health, e subscribe SEM bloquear.
-//  - Liberar planos publicamente.
-//  - Considerar TRIAL e ACTIVE como status válidos.
-//  - Bloquear somente quando realmente expirado.
-//  - Evitar travar o sistema quando não deveria.
-//  - Ser totalmente compatível com seu fluxo atual.
-//
-// Ajuste nomes de modelos/campos conforme o seu Prisma (Subscription, Plan, tenantId etc.)
-//
-
 const dayjs = require("dayjs");
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
-/**
- * Paths que SEMPRE são liberados:
- * - login/logout/refresh
- * - registro da agência
- * - health checks
- * - listar planos
- * - escolher/alterar plano (subscribe) MESMO expirada
- * - rotas públicas (aprovação via link)
- */
 const ALWAYS_ALLOWED = [
   "/api/auth/login",
   "/api/auth/refresh",
@@ -38,10 +15,7 @@ const ALWAYS_ALLOWED = [
   "/api/healthz",
 ];
 
-// Prefixos de rotas públicas
-const PUBLIC_PREFIXES = [
-  "/api/public",
-];
+const PUBLIC_PREFIXES = ["/api/public"];
 
 function isAlwaysAllowed(path) {
   return ALWAYS_ALLOWED.some((allowed) => path.startsWith(allowed));
@@ -55,72 +29,67 @@ async function checkSubscription(req, res, next) {
   try {
     const path = req.originalUrl || req.path || "";
 
-    // 1) libera rotas públicas (aprovações por link)
-    if (isPublicRoute(path)) {
-      return next();
-    }
+    // Rotas públicas
+    if (isPublicRoute(path) || isAlwaysAllowed(path)) return next();
 
-    // 2) libera rotas essenciais (login, register, billing/plans, subscribe)
-    if (isAlwaysAllowed(path)) {
-      return next();
-    }
+    if (!req.tenantId) return next();
 
-    // 3) se nao tem tenantId, nao dá pra verificar assinatura
-    //    e normalmente significa rota pública → libera
-    if (!req.tenantId) {
-      return next();
-    }
-
-    // 4) buscar assinatura mais recente
-    const subscription = await prisma.subscription.findFirst({
-      where: {
-        tenantId: req.tenantId,
-      },
-      orderBy: {
-        createdAt: "desc",
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.tenantId },
+      select: {
+        id: true,
+        createdAt: true,
       },
     });
 
-    // 5) sem assinatura = bloqueado (exceto rotas liberadas acima)
-    if (!subscription) {
+    if (!tenant) {
+      return res.status(401).json({
+        error: "Tenant inválido",
+        code: "TENANT_NOT_FOUND",
+      });
+    }
+
+    // Trial de 3 dias baseado em createdAt
+    const now = dayjs();
+    const trialEnds = dayjs(tenant.createdAt).add(3, "day");
+
+    const subscription = await prisma.subscription.findFirst({
+      where: { tenantId: req.tenantId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const isTrial = !subscription && now.isBefore(trialEnds);
+
+    if (!subscription && !isTrial) {
       return res.status(402).json({
         error: "Assinatura necessária para continuar.",
         code: "SUBSCRIPTION_REQUIRED",
       });
     }
 
-    // 6) validar status
     const validStatuses = ["trial", "active"];
-    if (!validStatuses.includes(subscription.status)) {
+    const subValid =
+      subscription &&
+      validStatuses.includes(subscription.status) &&
+      subscription.currentPeriodEnd &&
+      dayjs(subscription.currentPeriodEnd).isAfter(now);
+
+    if (subscription && !subValid) {
       return res.status(402).json({
-        error: "Sua assinatura não está ativa.",
+        error: "Sua assinatura expirou.",
         code: "SUBSCRIPTION_EXPIRED",
       });
     }
 
-    // 7) validar data de expiração
-    const now = dayjs();
-    const end = subscription.currentPeriodEnd
-      ? dayjs(subscription.currentPeriodEnd)
-      : null;
+    req.subscription = subscription || {
+      status: "trial",
+      currentPeriodEnd: trialEnds.toDate(),
+    };
 
-    if (end && end.isBefore(now)) {
-      return res.status(402).json({
-        error: "Seu período terminou.",
-        code: "SUBSCRIPTION_EXPIRED",
-      });
-    }
-
-    // 8) assinatura válida → segue
-    req.subscription = subscription;
     return next();
-
   } catch (err) {
     console.error("[CHECK_SUBSCRIPTION_ERROR]", err);
-
-    // Para evitar travar a plataforma inteira com um erro de verificação,
-    // libera o acesso, mas loga o erro.
-    return next();
+    return next(); // fallback: libera para evitar travamentos
   }
 }
 

@@ -1,8 +1,3 @@
-/**
- * KONDOR STUDIO — SERVER.JS (VERSÃO BLINDADA + CLIENT PORTAL)
- * API Express + Prisma + Multi-tenant + AuditLog
- */
-
 require("dotenv").config();
 
 const express = require("express");
@@ -14,44 +9,28 @@ const { prisma } = require("./prisma");
 
 const authMiddleware = require("./middleware/auth");
 const tenantMiddleware = require("./middleware/tenant");
+const { checkSubscription } = require("./middleware/checkSubscription");
 const auditLog = require("./middleware/auditLog");
-// checkSubscription desativado por enquanto
-// const checkSubscription = require("./middleware/checkSubscription");
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 
-/* ============================================
-   HELPERS
-============================================ */
-
-/**
- * Monta rotas de forma segura:
- * - Se o router não for uma função (express.Router), NÃO monta e loga aviso.
- */
+// Helpers
 function safeMount(path, router) {
   if (router && typeof router === "function") {
     app.use(path, router);
   } else {
-    console.warn(
-      `⚠️ Rota "${path}" NÃO montada: export inválido em require(...) (esperado express.Router, recebido ${typeof router}).`
-    );
+    console.warn(`⚠️ Rota "${path}" NÃO montada: export inválido.`);
   }
 }
 
-/* ============================================
-   MIDDLEWARES BÁSICOS
-============================================ */
-
+// Básico
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(helmet());
 app.use(morgan(isProduction ? "combined" : "dev"));
 
-/* ============================================
-   CORS HARDENING
-============================================ */
-
+// CORS
 const devOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -60,29 +39,20 @@ const devOrigins = [
 
 let envOrigins = [];
 if (process.env.CORS_ORIGIN) {
-  envOrigins = process.env.CORS_ORIGIN.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
+  envOrigins = process.env.CORS_ORIGIN.split(",").map((o) => o.trim());
 }
 
 const allowedOrigins = Array.from(new Set([...devOrigins, ...envOrigins]));
 
 if (isProduction && envOrigins.length === 0) {
-  console.error(
-    "⚠️  CORS_ORIGIN não definido em produção. Configure domínios do painel/portal para evitar bloqueios."
-  );
+  console.error("⚠️  CORS_ORIGIN não definido. Configure no Render.");
 }
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin) {
+    if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
     console.warn(`🚫 CORS bloqueado para origem: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
@@ -91,14 +61,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* ============================================
-   HEALTHCHECKS
-============================================ */
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
+// Healthcheck
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 app.get("/healthz", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -109,140 +73,71 @@ app.get("/healthz", async (req, res) => {
   }
 });
 
-/* ============================================
-   ROTAS PÚBLICAS
-============================================ */
-
+// Rotas públicas
 const authRoutes = require("./routes/auth");
-
-// Portal do cliente usa JWT próprio (type: "client")
 const clientPortalRoutes = require("./routes/clientPortal");
 
 let publicRoutes;
 try {
   publicRoutes = require("./routes/public");
-} catch (e) {
+} catch {
   try {
     publicRoutes = require("./routes/publicApprovals");
-  } catch (err) {
+  } catch {
     publicRoutes = null;
-    console.warn(
-      "⚠️ Rotas públicas não foram carregadas. Verifique ./routes/public ou ./routes/publicApprovals."
-    );
+    console.warn("⚠️ Rotas públicas não foram carregadas.");
   }
 }
 
-// Auth de usuário interno (painel)
 safeMount("/api/auth", authRoutes);
-
-// Rotas públicas (links de aprovação etc.)
-if (publicRoutes) {
-  safeMount("/api/public", publicRoutes);
-}
-
-// 🔹 Portal do cliente – protegido pelo clientAuth dentro do router
-// IMPORTANTE: montado ANTES do app.use("/api", authMiddleware...)
 safeMount("/api/client-portal", clientPortalRoutes);
+if (publicRoutes) safeMount("/api/public", publicRoutes);
 
-/* ============================================
-   ROTAS AUTENTICADAS / MULTI-TENANT (USUÁRIO INTERNO)
-============================================ */
+// === ROTAS INTERNAS ===
+// Protegidas: auth → tenant → assinatura válida
+app.use("/api", authMiddleware, tenantMiddleware, checkSubscription);
 
-// Tudo em /api depois daqui exige auth + tenant (usuário da agência)
-app.use("/api", authMiddleware, tenantMiddleware);
-
-/* ============================================
-   AUDIT LOG (opcional)
-============================================ */
-
+// AuditLog (opcional)
 const auditLogEnabled = process.env.AUDIT_LOG_ENABLED === "true";
-
 if (auditLogEnabled) {
-  const skip = process.env.AUDITLOG_SKIP_REGEX
-    ? process.env.AUDITLOG_SKIP_REGEX
-    : "^/health(z)?$|^/health$|^/api/auth";
+  const skip = process.env.AUDITLOG_SKIP_REGEX || "^/health(z)?$|^/health$|^/api/auth";
   const bodyMax = Number(process.env.AUDITLOG_BODY_MAX || 2000);
-
-  console.log("📝 Audit Log ATIVADO", { skip, bodyMax });
-
-  app.use(
-    "/api",
-    auditLog({
-      skip,
-      bodyMax,
-    })
-  );
+  app.use("/api", auditLog({ skip, bodyMax }));
 } else {
-  console.log("📘 Audit Log DESATIVADO (AUDIT_LOG_ENABLED != 'true')");
+  console.log("📘 Audit Log desativado.");
 }
 
-/* ============================================
-   ROTAS DE NEGÓCIO (PROTEGIDAS - USUÁRIOS INTERNOS)
-============================================ */
-
-const tenantsRoutes = require("./routes/tenants");
-const clientsRoutes = require("./routes/clients");
-const postsRoutes = require("./routes/posts");
-const tasksRoutes = require("./routes/tasks");
-const metricsRoutes = require("./routes/metrics");
-const approvalsRoutes = require("./routes/approvals");
-const integrationsRoutes = require("./routes/integrations");
-const reportsRoutes = require("./routes/reports");
-const billingRoutes = require("./routes/billing");
-const teamRoutes = require("./routes/team");
-let automationRoutes = null;
-
+// Rotas protegidas
+safeMount("/api/tenants", require("./routes/tenants"));
+safeMount("/api/clients", require("./routes/clients"));
+safeMount("/api/posts", require("./routes/posts"));
+safeMount("/api/tasks", require("./routes/tasks"));
+safeMount("/api/metrics", require("./routes/metrics"));
+safeMount("/api/approvals", require("./routes/approvals"));
+safeMount("/api/integrations", require("./routes/integrations"));
+safeMount("/api/reports", require("./routes/reports"));
+safeMount("/api/billing", require("./routes/billing"));
+safeMount("/api/team", require("./routes/team"));
 try {
-  automationRoutes = require("./routes/automation");
-} catch (err) {
-  console.warn(
-    "ℹ️ Rotas de automation (WhatsApp / automações) não foram carregadas. Verifique ./routes/automation se necessário."
-  );
+  safeMount("/api/automation", require("./routes/automation"));
+} catch {
+  console.warn("ℹ️ Rotas de automation não carregadas.");
 }
 
-// Montagem protegida: se alguma rota exportar objeto errado, apenas loga e segue o jogo.
-safeMount("/api/tenants", tenantsRoutes);
-safeMount("/api/clients", clientsRoutes);
-safeMount("/api/posts", postsRoutes);
-safeMount("/api/tasks", tasksRoutes);
-safeMount("/api/metrics", metricsRoutes);
-safeMount("/api/approvals", approvalsRoutes);
-safeMount("/api/integrations", integrationsRoutes);
-safeMount("/api/reports", reportsRoutes);
-safeMount("/api/billing", billingRoutes);
-safeMount("/api/team", teamRoutes);
-
-if (automationRoutes) {
-  safeMount("/api/automation", automationRoutes);
-}
-
-/* ============================================
-   404 / ERRO GENÉRICO
-============================================ */
-
+// 404 / Erros
 app.use((req, res, next) => {
   if (res.headersSent) return next();
   return res.status(404).json({ error: "Rota não encontrada" });
 });
 
 app.use((err, req, res, next) => {
-  console.error("❌ Erro não tratado:", err && err.stack ? err.stack : err);
-
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  return res
-    .status(err.status || 500)
-    .json({ error: err.message || "Erro interno do servidor" });
+  console.error("❌ Erro não tratado:", err.stack || err);
+  if (res.headersSent) return next(err);
+  return res.status(err.status || 500).json({ error: err.message || "Erro interno do servidor" });
 });
 
-/* ============================================
-   START
-============================================ */
-
+// Start
 const PORT = process.env.PORT || 4000;
-
 app.listen(PORT, () => {
   console.log(`🚀 API rodando na porta ${PORT}`);
   console.log(`🩺 Healthcheck: http://localhost:${PORT}/healthz`);

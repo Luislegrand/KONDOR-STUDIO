@@ -16,26 +16,28 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs.jsx";
-import {
-  FileText,
-  CheckCircle,
-  FileDown,
-  Eye,
-} from "lucide-react";
+import { FileText, CheckCircle, FileDown, Eye } from "lucide-react";
 
+import Navbar from "../components/Navbar.jsx";
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
+import { base44 } from "../base44Client";
 
-// Helper para chamadas com token de CLIENTE
-async function fetchClient(path, token) {
-  const res = await fetch(path, {
+async function fetchClient(path, token, options = {}) {
+  const res = await base44.rawFetch(path, {
+    method: options.method || "GET",
+    body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
-      "Content-Type": "application/json",
+      ...(options.headers || {}),
       Authorization: `Bearer ${token}`,
     },
   });
 
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {}
+
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
     const msg =
       data?.error ||
       (res.status === 401
@@ -44,28 +46,47 @@ async function fetchClient(path, token) {
     throw new Error(msg);
   }
 
-  return res.json();
+  return data;
 }
 
-export default function Clientportal() {
+export default function ClientPortal() {
   const navigate = useNavigate();
   const [clientToken, setClientToken] = useState(null);
   const [authError, setAuthError] = useState("");
 
-  // Carrega token do cliente do localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("kondor_client_token");
-    if (!stored) {
-      navigate("/clientlogin");
-      return;
+    const raw =
+      (typeof window !== "undefined" &&
+        (window.localStorage.getItem("kondor_client_auth") ||
+          window.localStorage.getItem("kondor_client_token"))) ||
+      null;
+
+    if (!raw) return navigate("/clientlogin");
+
+    let token = null;
+    try {
+      if (raw.trim().startsWith("{")) {
+        const parsed = JSON.parse(raw);
+        token =
+          parsed.accessToken ||
+          parsed.token ||
+          parsed.clientToken ||
+          parsed.jwt ||
+          null;
+      } else {
+        token = raw;
+      }
+    } catch (err) {
+      console.error("Erro ao ler token do cliente:", err);
+      return navigate("/clientlogin");
     }
-    setClientToken(stored);
+
+    if (!token) return navigate("/clientlogin");
+    setClientToken(token);
   }, [navigate]);
 
-  // Se ainda não temos token carregado, não tenta bater API
   const queriesEnabled = !!clientToken;
 
-  // === /api/client-portal/me ===
   const {
     data: meData,
     isLoading: loadingMe,
@@ -73,21 +94,39 @@ export default function Clientportal() {
   } = useQuery({
     queryKey: ["client-portal", "me"],
     enabled: queriesEnabled,
-    queryFn: () => fetchClient("/api/client-portal/me", clientToken),
+    queryFn: () => fetchClient("/client-portal/me", clientToken),
   });
 
   useEffect(() => {
     if (meError) {
-      console.error(meError);
-      setAuthError(
-        meError.message || "Erro ao carregar dados do cliente. Faça login novamente."
-      );
+      setAuthError(meError.message || "Erro ao carregar dados do cliente");
     }
   }, [meError]);
 
   const client = meData?.client || null;
 
-  // === /api/client-portal/posts ===
+  const primaryColor =
+    client?.metadata?.primary_color ||
+    client?.metadata?.agency_primary_color ||
+    "#A78BFA";
+  const accentColor =
+    client?.metadata?.accent_color ||
+    client?.metadata?.agency_accent_color ||
+    "#39FF14";
+
+  useEffect(() => {
+    if (client) {
+      document.documentElement.style.setProperty(
+        "--primary",
+        primaryColor || "#A78BFA"
+      );
+      document.documentElement.style.setProperty(
+        "--accent",
+        accentColor || "#39FF14"
+      );
+    }
+  }, [client, primaryColor, accentColor]);
+
   const {
     data: postsData,
     isLoading: loadingPosts,
@@ -95,36 +134,34 @@ export default function Clientportal() {
   } = useQuery({
     queryKey: ["client-portal", "posts"],
     enabled: queriesEnabled,
-    queryFn: () => fetchClient("/api/client-portal/posts", clientToken),
+    queryFn: () => fetchClient("/client-portal/posts", clientToken),
   });
 
   const posts = postsData?.items || [];
 
-  // === /api/client-portal/metrics?days=7 ===
   const {
     data: metricsData,
     isLoading: loadingMetrics,
+    error: metricsError,
   } = useQuery({
-    queryKey: ["client-portal", "metrics", 7],
+    queryKey: ["client-portal", "metrics"],
     enabled: queriesEnabled,
-    queryFn: () => fetchClient("/api/client-portal/metrics?days=7", clientToken),
+    queryFn: () => fetchClient("/client-portal/metrics", clientToken),
   });
 
   const metrics = metricsData?.items || [];
 
-  // === /api/client-portal/reports ===
   const {
     data: reportsData,
     isLoading: loadingReports,
   } = useQuery({
     queryKey: ["client-portal", "reports"],
     enabled: queriesEnabled,
-    queryFn: () => fetchClient("/api/client-portal/reports", clientToken),
+    queryFn: () => fetchClient("/client-portal/reports", clientToken),
   });
 
   const reports = reportsData?.items || [];
 
-  // === /api/client-portal/approvals?status=PENDING ===
   const {
     data: approvalsData,
     isLoading: loadingApprovals,
@@ -132,194 +169,143 @@ export default function Clientportal() {
     queryKey: ["client-portal", "approvals", "PENDING"],
     enabled: queriesEnabled,
     queryFn: () =>
-      fetchClient("/api/client-portal/approvals?status=PENDING", clientToken),
+      fetchClient("/client-portal/approvals?status=PENDING", clientToken),
   });
 
   const approvals = approvalsData?.items || [];
 
-  // Mapeia approval PENDING por postId
   const approvalsByPostId = useMemo(() => {
     const map = new Map();
-    (approvals || []).forEach((approval) => {
+    approvals.forEach((approval) => {
       const postId = approval.postId || approval.post?.id;
       if (!postId) return;
-
       const existing = map.get(postId);
-      if (!existing) {
-        map.set(postId, approval);
-        return;
-      }
+      if (!existing) return map.set(postId, approval);
 
-      const existingDate = existing.createdAt
-        ? new Date(existing.createdAt).getTime()
-        : 0;
-      const newDate = approval.createdAt
-        ? new Date(approval.createdAt).getTime()
-        : 0;
-
-      if (newDate > existingDate) {
-        map.set(postId, approval);
-      }
+      const d1 = existing.createdAt ? new Date(existing.createdAt) : null;
+      const d2 = approval.createdAt ? new Date(approval.createdAt) : null;
+      if (!d1 || (d2 && d2 > d1)) map.set(postId, approval);
     });
     return map;
   }, [approvals]);
 
-  // Posts que têm aprovação pendente
   const pendingPosts = posts.filter((p) => approvalsByPostId.has(p.id));
-
-  // Posts aprovados/agendados/publicados
   const approvedPosts = posts.filter((p) =>
     ["APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status)
   );
 
-  // Agrega métricas básicas a partir de Metric.name / value
   const totalMetrics = metrics.reduce(
     (acc, m) => {
       const name = (m.name || "").toLowerCase();
-      const value = typeof m.value === "number" ? m.value : 0;
+      const val = typeof m.value === "number" ? m.value : 0;
 
-      if (name.includes("impression")) acc.impressions += value;
-      if (name.includes("click")) acc.clicks += value;
-      if (name.includes("conversion")) acc.conversions += value;
-      if (name.includes("spend") || name.includes("custo") || name.includes("invest"))
-        acc.spend += value;
-
+      if (name.includes("impression")) acc.impressions += val;
+      if (name.includes("click")) acc.clicks += val;
+      if (name.includes("spend") || name.includes("cost")) acc.spend += val;
       return acc;
     },
-    { impressions: 0, clicks: 0, conversions: 0, spend: 0 }
+    { impressions: 0, clicks: 0, spend: 0 }
   );
 
-  const primaryColor = "#A78BFA";
-  const accentColor = "#39FF14";
+  const isLoadingAny =
+    loadingMe || loadingPosts || loadingMetrics || loadingApprovals;
 
-  const loadingAny =
-    loadingMe || loadingPosts || loadingMetrics || loadingReports || loadingApprovals;
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md bg-white shadow rounded-lg p-6 text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Erro de autenticação
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">{authError}</p>
+          <Button onClick={() => navigate("/clientlogin")}>
+            Voltar para login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-  // Se der erro de auth ou não tiver token, força voltar pro login
-  useEffect(() => {
-    if (authError) {
-      localStorage.removeItem("kondor_client_token");
-      localStorage.removeItem("kondor_client_info");
-      navigate("/clientlogin");
-    }
-  }, [authError, navigate]);
+  if (isLoadingAny && !client) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md bg-white shadow rounded-lg p-6 text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            Carregando portal...
+          </h2>
+          <p className="text-sm text-gray-600">
+            Buscando suas informações e posts.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <style>{`
-        :root {
-          --brand-primary: ${primaryColor};
-          --brand-accent: ${accentColor};
-        }
-        .brand-bg {
-          background-color: var(--brand-primary);
-        }
-        .brand-text {
-          color: var(--brand-primary);
-        }
-        .brand-border {
-          border-color: var(--brand-primary);
-        }
-      `}</style>
+      <Navbar
+        tenant={{
+          name: client?.metadata?.agency_name || "Portal do Cliente",
+          logo: client?.metadata?.agency_logo || null,
+          primary: primaryColor,
+          accent: accentColor,
+        }}
+        clientName={client?.name}
+        onLogout={() => {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem("kondor_client_auth");
+            window.localStorage.removeItem("kondor_client_token");
+          }
+          navigate("/clientlogin");
+        }}
+      />
 
-      {/* Header simples com nome do cliente */}
-      <header className="brand-bg text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white rounded-lg flex items-center justify-center">
-                <span
-                  className="text-2xl font-bold"
-                  style={{ color: primaryColor }}
-                >
-                  {client?.name?.[0] || "C"}
-                </span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">
-                  {client?.metadata?.agency_name || "Portal do Cliente"}
-                </h1>
-                <p className="text-white/80 text-sm">
-                  Acompanhe suas aprovações, posts e relatórios
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="font-semibold">{client?.name || "Cliente"}</p>
-              <p className="text-white/80 text-sm">
-                {client?.email || ""}
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Loading geral */}
-        {loadingAny && (
-          <div className="mb-6 text-sm text-gray-600">
-            Carregando informações do portal...
-          </div>
-        )}
-
-        {/* Stats rápidos */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-t-4" style={{ borderTopColor: primaryColor }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">
-                Posts Pendentes
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Posts pendentes
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold brand-text">
+            <CardContent className="pt-0">
+              <p className="text-3xl font-bold text-gray-900">
                 {pendingPosts.length}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-t-4" style={{ borderTopColor: primaryColor }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">
-                Impressões (7d)
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Posts aprovados
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold brand-text">
-                {totalMetrics.impressions.toLocaleString("pt-BR")}
+            <CardContent className="pt-0">
+              <p className="text-3xl font-bold text-gray-900">
+                {approvedPosts.length}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-t-4" style={{ borderTopColor: primaryColor }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">
-                Cliques (7d)
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Métricas recentes
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold brand-text">
-                {totalMetrics.clicks.toLocaleString("pt-BR")}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-t-4" style={{ borderTopColor: primaryColor }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">
-                Relatórios
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold brand-text">
-                {reports.length}
-              </p>
+            <CardContent className="pt-0">
+              <div className="text-sm text-gray-700 space-y-1">
+                <p>Impressões: {totalMetrics.impressions}</p>
+                <p>Cliques: {totalMetrics.clicks}</p>
+                <p>Investimento: R$ {totalMetrics.spend.toFixed(2)}</p>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="approval" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <Tabs defaultValue="approval" className="w-full">
+          <TabsList className="mb-4">
             <TabsTrigger value="approval">
               <FileText className="w-4 h-4 mr-2" />
               Aprovações
@@ -334,7 +320,6 @@ export default function Clientportal() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Aprovações */}
           <TabsContent value="approval" className="space-y-6">
             {pendingPosts.length === 0 ? (
               <Card>
@@ -352,13 +337,14 @@ export default function Clientportal() {
               <div className="space-y-4">
                 {pendingPosts.map((post) => {
                   const approval = approvalsByPostId.get(post.id) || null;
-
                   return (
                     <Postapprovalcard
                       key={post.id}
                       post={post}
                       approval={approval}
                       primaryColor={primaryColor}
+                      accentColor={accentColor}
+                      token={clientToken}
                     />
                   );
                 })}
@@ -366,47 +352,45 @@ export default function Clientportal() {
             )}
           </TabsContent>
 
-          {/* Biblioteca */}
-          <TabsContent value="library">
+          <TabsContent value="library" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Posts Aprovados e Publicados</CardTitle>
+                <CardTitle>Biblioteca de Posts</CardTitle>
               </CardHeader>
               <CardContent>
                 {approvedPosts.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">
-                    Nenhum post na biblioteca ainda
+                  <p className="text-sm text-gray-600">
+                    Ainda não há posts aprovados ou publicados.
                   </p>
                 ) : (
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-3">
                     {approvedPosts.map((post) => (
-                      <Card key={post.id} className="overflow-hidden">
+                      <div
+                        key={post.id}
+                        className="flex items-center justify-between border rounded-lg px-3 py-2 bg-white"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {post.title || post.caption || "Post sem título"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Status:{" "}
+                            <span className="font-semibold">
+                              {post.status}
+                            </span>
+                          </p>
+                        </div>
+
                         {post.mediaUrl && (
-                          <img
-                            src={post.mediaUrl}
-                            alt={post.title}
-                            className="w-full h-48 object-cover"
-                          />
-                        )}
-                        <CardContent className="pt-4">
-                          <h4 className="font-semibold mb-2">
-                            {post.title}
-                          </h4>
-                          <Badge
-                            className={
-                              post.status === "PUBLISHED"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-blue-100 text-blue-700"
-                            }
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(post.mediaUrl, "_blank")}
                           >
-                            {post.status === "PUBLISHED"
-                              ? "Publicado"
-                              : post.status === "SCHEDULED"
-                              ? "Agendado"
-                              : "Aprovado"}
-                          </Badge>
-                        </CardContent>
-                      </Card>
+                            Ver mídia
+                          </Button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -414,11 +398,10 @@ export default function Clientportal() {
             </Card>
           </TabsContent>
 
-          {/* Relatórios */}
-          <TabsContent value="reports">
+          <TabsContent value="reports" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Relatórios de Performance</CardTitle>
+                <CardTitle>Relatórios</CardTitle>
               </CardHeader>
               <CardContent>
                 {reports.length === 0 ? (
@@ -433,30 +416,27 @@ export default function Clientportal() {
                     {reports.map((report) => (
                       <div
                         key={report.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                        className="flex items-center justify-between border rounded-lg px-3 py-2 bg-white"
                       >
                         <div>
-                          <h4 className="font-semibold">
-                            {report.name || "Relatório"}
-                          </h4>
-                          <p className="text-sm text-gray-500">
-                            {report.generatedAt
-                              ? new Date(report.generatedAt).toLocaleDateString(
-                                  "pt-BR"
-                                )
-                              : new Date(report.createdAt).toLocaleDateString(
-                                  "pt-BR"
-                                )}
+                          <p className="font-medium text-gray-900">
+                            {report.title || "Relatório"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Gerado em{" "}
+                            {new Date(report.createdAt).toLocaleString("pt-BR")}
                           </p>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!report.fileId}
-                        >
-                          <FileDown className="w-4 h-4 mr-2" />
-                          {report.fileId ? "Baixar PDF" : "Em processamento"}
-                        </Button>
+
+                        {report.pdfUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(report.pdfUrl, "_blank")}
+                          >
+                            Baixar PDF
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -465,7 +445,7 @@ export default function Clientportal() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
     </div>
   );
 }

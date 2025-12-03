@@ -1,25 +1,16 @@
-// api/src/routes/metrics.js
 const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/auth");
 const tenantMiddleware = require("../middleware/tenant");
 const metricsService = require("../services/metricsService");
+const { prisma } = require("../prisma");
 
-// Rotas protegidas
 router.use(authMiddleware);
 router.use(tenantMiddleware);
 
 /**
  * GET /metrics
- * Lista métricas com filtros e paginação
- * Query:
- *  ?metricType=
- *  ?clientId=
- *  ?startDate=
- *  ?endDate=
- *  ?page=
- *  ?perPage=
  */
 router.get("/", async (req, res) => {
   try {
@@ -52,7 +43,6 @@ router.get("/", async (req, res) => {
 
 /**
  * POST /metrics
- * Ingesta uma métrica (criação)
  */
 router.post("/", async (req, res) => {
   try {
@@ -66,7 +56,6 @@ router.post("/", async (req, res) => {
 
 /**
  * GET /metrics/:id
- * Retorna métrica por ID
  */
 router.get("/:id", async (req, res) => {
   try {
@@ -81,7 +70,6 @@ router.get("/:id", async (req, res) => {
 
 /**
  * PUT /metrics/:id
- * Atualiza métrica
  */
 router.put("/:id", async (req, res) => {
   try {
@@ -100,7 +88,6 @@ router.put("/:id", async (req, res) => {
 
 /**
  * DELETE /metrics/:id
- * Remove métrica
  */
 router.delete("/:id", async (req, res) => {
   try {
@@ -115,15 +102,6 @@ router.delete("/:id", async (req, res) => {
 
 /**
  * POST /metrics/aggregate
- * Agregações (dashboards, relatórios)
- * Body:
- * {
- *   groupBy: 'day'|'hour'|'week'|'month',
- *   metricTypes: [],
- *   clientId,
- *   startDate,
- *   endDate
- * }
  */
 router.post("/aggregate", async (req, res) => {
   try {
@@ -136,8 +114,7 @@ router.post("/aggregate", async (req, res) => {
 });
 
 /**
- * GET /metrics/summary?days=7&metricTypes=impression,click,...
- * Resumo rápido (dashboard)
+ * GET /metrics/summary/quick
  */
 router.get("/summary/quick", async (req, res) => {
   try {
@@ -154,6 +131,68 @@ router.get("/summary/quick", async (req, res) => {
   } catch (err) {
     console.error("GET /metrics/summary/quick error:", err);
     return res.status(500).json({ error: "Erro ao gerar resumo" });
+  }
+});
+
+/**
+ * GET /metrics/overview
+ * Exibe dados agregados para dashboard da agência
+ */
+router.get("/overview", async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+
+    const totalPosts = await prisma.post.count({
+      where: { tenantId },
+    });
+
+    const totalClients = await prisma.client.count({
+      where: { tenantId },
+    });
+
+    const recentMetrics = await prisma.metric.findMany({
+      where: { tenantId },
+      orderBy: { collectedAt: 'desc' },
+      take: 10,
+    });
+
+    return res.json({
+      totalPosts,
+      totalClients,
+      recentMetrics,
+    });
+  } catch (err) {
+    console.error("GET /metrics/overview error:", err);
+    return res.status(500).json({ error: "Erro ao gerar overview" });
+  }
+});
+
+/**
+ * GET /metrics/campaigns
+ * Exibe lista de campanhas com métrica básica
+ */
+router.get("/campaigns", async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+
+    const campaigns = await prisma.metric.groupBy({
+      by: ["campaignName"],
+      where: { tenantId },
+      _sum: {
+        impressions: true,
+        clicks: true,
+        spend: true,
+      },
+      orderBy: {
+        _sum: { spend: 'desc' },
+      },
+      take: 10,
+    });
+
+    return res.json({ items: campaigns });
+  } catch (err) {
+    console.error("GET /metrics/campaigns error:", err);
+    return res.status(500).json({ error: "Erro ao listar campanhas" });
   }
 });
 

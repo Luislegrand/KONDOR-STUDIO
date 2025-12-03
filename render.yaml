@@ -71,6 +71,10 @@ services:
         sync: false
       - key: WHATSAPP_TIMEOUT_MS
         sync: false
+      - key: WHATSAPP_PROVIDER
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
 
       # ==== MÉTRICAS ====
       - key: META_GRAPH_BASE_URL
@@ -160,6 +164,30 @@ services:
       - key: WHATSAPP_BACKOFF_MS
         sync: false
 
+      # ==== WHATSAPP ====
+      - key: WHATSAPP_API_URL
+        sync: false
+      - key: WHATSAPP_API_KEY
+        sync: false
+      - key: WHATSAPP_FROM_NUMBER
+        sync: false
+      - key: WHATSAPP_TIMEOUT_MS
+        sync: false
+      - key: WHATSAPP_PROVIDER
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+
+      # ==== MÉTRICAS ====
+      - key: META_GRAPH_BASE_URL
+        sync: false
+      - key: META_DEFAULT_FIELDS
+        sync: false
+      - key: GOOGLE_ADS_API_BASE_URL
+        sync: false
+      - key: GOOGLE_ADS_DEFAULT_FIELDS
+        sync: false
+
   # -----------------------------
   # 🟩 SPA FRONTEND (VITE)
   # -----------------------------
@@ -185,6 +213,9 @@ services:
       # força instalar devDependencies (onde está o vite) caso Render respeite esse env no runtime
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
+      # URL da API usada pelo frontend (Vite)
+      - key: VITE_API_URL
+        sync: false
 
   # -----------------------------
   # 🔥 REDIS (BULLMQ)

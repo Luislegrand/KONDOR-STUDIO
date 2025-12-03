@@ -60,6 +60,46 @@ function getTokenId() {
 }
 
 // --------------------
+// AUTO-REFRESH TOKEN (FASE 5)
+// --------------------
+
+let isRefreshing = false;
+let refreshQueue = [];
+
+async function autoRefreshWrapper(fetchFn, path, options = {}) {
+  try {
+    return await fetchFn(path, options);
+  } catch (err) {
+    if (err.status === 401) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        const ok = await tryRefreshToken();
+        isRefreshing = false;
+
+        refreshQueue.forEach((cb) => cb(ok));
+        refreshQueue = [];
+
+        if (!ok) {
+          clearAuthFromStorage();
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          throw err;
+        }
+      }
+
+      return new Promise((resolve, reject) => {
+        refreshQueue.push((ok) => {
+          if (!ok) return reject(err);
+          resolve(fetchFn(path, options));
+        });
+      });
+    }
+    throw err;
+  }
+}
+
+// --------------------
 // Helpers de HTTP
 // --------------------
 
@@ -67,6 +107,7 @@ async function rawFetch(path, options = {}) {
   const base = API_BASE_URL.replace(/\/+$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${base}/api${normalizedPath}`;
+
   const defaultHeaders = {
     "Content-Type": "application/json",
   };
@@ -114,25 +155,39 @@ async function authedFetch(path, options = {}) {
     headers,
   });
 
-  // Se deu 401/403, podemos tratar depois (ex: logo out automático)
   return res;
 }
 
 // --------------------
-// Wrapper com tratamento de JSON + erro
+// Wrapper com JSON + erro + auto-refresh
 // --------------------
 
 async function jsonFetch(path, options = {}) {
+  return autoRefreshWrapper(_jsonFetchInternal, path, options);
+}
+
+async function _jsonFetchInternal(path, options = {}) {
   const res = await authedFetch(path, options);
 
   let data = null;
   try {
     data = await res.json();
-  } catch (err) {
-    // se não deu pra parsear JSON, mantém null
-  }
+  } catch (err) {}
 
   if (!res.ok) {
+    if (
+      typeof window !== "undefined" &&
+      (res.status === 402 || res.status === 403)
+    ) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("subscription_expired", {
+            detail: { status: res.status, data },
+          })
+        );
+      } catch (e) {}
+    }
+
     const error = new Error(data?.error || "Request failed");
     error.status = res.status;
     error.data = data;
@@ -161,7 +216,6 @@ async function login({ email, password }) {
     throw error;
   }
 
-  // Esperado: { accessToken, refreshToken, tokenId?, user, tenant }
   saveAuthToStorage(data);
   return data;
 }
@@ -170,13 +224,9 @@ async function logout() {
   try {
     await rawFetch("/auth/logout", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      headers: { Authorization: `Bearer ${getAccessToken()}` },
     });
-  } catch (err) {
-    console.error("logout error", err);
-  }
+  } catch (err) {}
   clearAuthFromStorage();
 }
 
@@ -193,7 +243,6 @@ async function tryRefreshToken() {
 
     const data = await res.json();
     if (!res.ok) {
-      console.error("refresh token failed", data);
       clearAuthFromStorage();
       return false;
     }
@@ -205,7 +254,6 @@ async function tryRefreshToken() {
 
     return true;
   } catch (err) {
-    console.error("refresh token error", err);
     clearAuthFromStorage();
     return false;
   }
@@ -219,15 +267,11 @@ function createEntityClient(basePath) {
   return {
     async list(params) {
       const qs = buildQuery(params);
-      return jsonFetch(`${basePath}${qs}`, {
-        method: "GET",
-      });
+      return jsonFetch(`${basePath}${qs}`, { method: "GET" });
     },
 
     async get(id) {
-      return jsonFetch(`${basePath}/${id}`, {
-        method: "GET",
-      });
+      return jsonFetch(`${basePath}/${id}`, { method: "GET" });
     },
 
     async create(payload) {
@@ -245,9 +289,7 @@ function createEntityClient(basePath) {
     },
 
     async delete(id) {
-      return jsonFetch(`${basePath}/${id}`, {
-        method: "DELETE",
-      });
+      return jsonFetch(`${basePath}/${id}`, { method: "DELETE" });
     },
   };
 }
@@ -266,9 +308,7 @@ const Posts = {
   ...createEntityClient("/posts"),
 
   async sendToApproval(id) {
-    return jsonFetch(`/posts/${id}/send-to-approval`, {
-      method: "POST",
-    });
+    return jsonFetch(`/posts/${id}/send-to-approval`, { method: "POST" });
   },
 };
 
@@ -279,15 +319,11 @@ const Posts = {
 const Approvals = {
   async list(params) {
     const qs = buildQuery(params);
-    return jsonFetch(`/approvals${qs}`, {
-      method: "GET",
-    });
+    return jsonFetch(`/approvals${qs}`, { method: "GET" });
   },
 
   async get(id) {
-    return jsonFetch(`/approvals/${id}`, {
-      method: "GET",
-    });
+    return jsonFetch(`/approvals/${id}`, { method: "GET" });
   },
 
   async approve(id, payload) {
@@ -312,16 +348,12 @@ const Approvals = {
 const Metrics = {
   async overview(params) {
     const qs = buildQuery(params);
-    return jsonFetch(`/metrics/overview${qs}`, {
-      method: "GET",
-    });
+    return jsonFetch(`/metrics/overview${qs}`, { method: "GET" });
   },
 
   async campaigns(params) {
     const qs = buildQuery(params);
-    return jsonFetch(`/metrics/campaigns${qs}`, {
-      method: "GET",
-    });
+    return jsonFetch(`/metrics/campaigns${qs}`, { method: "GET" });
   },
 };
 
@@ -332,14 +364,12 @@ const Metrics = {
 const Tasks = createEntityClient("/tasks");
 
 // --------------------
-// Tenants (config / tema)
+// Tenant (tema / branding)
 // --------------------
 
 const Tenant = {
   async getCurrent() {
-    return jsonFetch("/dashboard/tenant", {
-      method: "GET",
-    });
+    return jsonFetch("/dashboard/tenant", { method: "GET" });
   },
 
   async update(payload) {
@@ -356,21 +386,17 @@ const Tenant = {
 
 const Dashboard = {
   async overview() {
-    return jsonFetch("/dashboard/overview", {
-      method: "GET",
-    });
+    return jsonFetch("/dashboard/overview", { method: "GET" });
   },
 };
 
 // --------------------
-// Aprovação pública (portal cliente via link)
+// Aprovação pública
 // --------------------
 
 const PublicApprovals = {
   async getPublicApproval(token) {
-    return jsonFetch(`/public/approvals/${token}`, {
-      method: "GET",
-    });
+    return jsonFetch(`/public/approvals/${token}`, { method: "GET" });
   },
 
   async publicApprove(token, payload) {
@@ -433,9 +459,7 @@ const TeamMember = {
   },
 
   async remove(id) {
-    return jsonFetch(`/team/${id}`, {
-      method: "DELETE",
-    });
+    return jsonFetch(`/team/${id}`, { method: "DELETE" });
   },
 };
 
