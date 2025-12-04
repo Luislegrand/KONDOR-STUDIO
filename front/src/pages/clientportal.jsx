@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/tabs.jsx";
 import { FileText, CheckCircle, FileDown, Eye } from "lucide-react";
 
-import Navbar from "../components/Navbar.jsx";
++ import Navbar from "@/components/navbar.jsx";
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 import { base44 } from "../base44Client";
 
