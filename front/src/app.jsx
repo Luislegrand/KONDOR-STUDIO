@@ -10,7 +10,6 @@ import Clients from "./pages/clients.jsx";
 import Posts from "./pages/posts.jsx";
 import Tasks from "./pages/tasks.jsx";
 import Finance from "./pages/financeiro.jsx";
-import Library from "./pages/library.jsx";
 import Team from "./pages/team.jsx";
 
 import Login from "./pages/login.jsx";
@@ -41,7 +40,6 @@ export default function App() {
           <Route path="/posts" element={<Posts />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/finance" element={<Finance />} />
-          <Route path="/library" element={<Library />} />
           <Route path="/team" element={<Team />} />
           <Route path="/onboarding" element={<Onboarding />} />
         </Route>
