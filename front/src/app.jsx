@@ -9,7 +9,7 @@ import Dashboard from "./pages/dashboard.jsx";
 import Clients from "./pages/clients.jsx";
 import Posts from "./pages/posts.jsx";
 import Tasks from "./pages/tasks.jsx";
-import Finance from "./pages/finance.jsx";
+import Finance from "./pages/financeiro.jsx";
 import Library from "./pages/library.jsx";
 import Team from "./pages/team.jsx";
 
