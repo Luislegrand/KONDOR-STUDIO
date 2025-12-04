@@ -16,11 +16,16 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs.jsx";
-import { FileText, CheckCircle, FileDown, Eye } from "lucide-react";
+import {
+  FileText,
+  CheckCircle,
+  FileDown,
+  Eye,
+} from "lucide-react";
 
-+ import Navbar from "@/components/navbar.jsx";
+import Navbar from "@/components/navbar.jsx";
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
-import { base44 } from "../base44Client";
+import { base44 } from "@/apiClient/base44Client";
 
 async function fetchClient(path, token, options = {}) {
   const res = await base44.rawFetch(path, {
