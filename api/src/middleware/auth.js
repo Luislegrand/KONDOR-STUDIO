@@ -6,6 +6,16 @@ const { prisma } = require('../prisma');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_local_secret';
 
+// Rotas que NÃO exigem autenticação mesmo que o middleware seja aplicado
+const PUBLIC_PATHS = [
+  '/api/auth/login',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+  '/api/health',
+  '/api/healthz',
+  '/api/tenants/register', // <- registro de tenant + admin deve ser público
+];
+
 // Suporte simples a token em header "Authorization: Bearer <token>"
 // ou ?token=... (útil para testes)
 function extractToken(req) {
@@ -27,6 +37,13 @@ function extractToken(req) {
  */
 async function authMiddleware(req, res, next) {
   try {
+    const path = req.originalUrl || req.path || '';
+
+    // Se a rota estiver na lista de públicas, não exige token
+    if (PUBLIC_PATHS.some((p) => path.startsWith(p))) {
+      return next();
+    }
+
     const token = extractToken(req);
     if (!token) {
       return res.status(401).json({ error: 'Token não fornecido' });
