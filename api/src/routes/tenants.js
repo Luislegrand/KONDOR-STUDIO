@@ -19,7 +19,8 @@ router.post('/register', async (req, res) => {
   try {
     const [existingTenant, existingUser] = await Promise.all([
       prisma.tenant.findUnique({ where: { slug: tenantSlug } }),
-      prisma.user.findUnique({ where: { email: userEmail } }),
+      // email não é unique no schema → usar findFirst
+      prisma.user.findFirst({ where: { email: userEmail } }),
     ]);
 
     if (existingTenant || existingUser) {
