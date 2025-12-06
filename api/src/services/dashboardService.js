@@ -1,4 +1,4 @@
-const { prisma } = require('../utils/prisma');
+const { prisma } = require('../prisma');
 
 /**
  * Converte "7d", "30d" para quantidade de dias.

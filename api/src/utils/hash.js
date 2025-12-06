@@ -19,6 +19,13 @@ async function hashPassword(password) {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
+async function hashToken(rawToken) {
+  if (!rawToken || typeof rawToken !== 'string') {
+    throw new Error('Token inválido para hash');
+  }
+  return bcrypt.hash(rawToken, SALT_ROUNDS);
+}
+
 /**
  * Compara senha pura com hash armazenado.
  *
@@ -44,6 +51,7 @@ function comparePasswordSync(password, hash) {
 
 module.exports = {
   hashPassword,
+  hashToken,
   comparePassword,
   comparePasswordSync,
   SALT_ROUNDS,

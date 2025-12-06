@@ -13,6 +13,7 @@ import Finance from "./pages/financeiro.jsx";
 import Team from "./pages/team.jsx";
 
 import Login from "./pages/login.jsx";
+import Register from "./pages/register.jsx";
 import Onboarding from "./pages/onboarding.jsx";
 
 import ClientLogin from "./pages/clientlogin.jsx";
@@ -26,6 +27,7 @@ export default function App() {
       {/* Rotas públicas */}
       <Route path="/login" element={<Login />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/register" element={<Register />} />
 
       {/* Login / portal do cliente (white-label) */}
       <Route path="/clientlogin" element={<ClientLogin />} />

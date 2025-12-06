@@ -230,6 +230,33 @@ async function logout() {
   clearAuthFromStorage();
 }
 
+async function registerTenant(payload) {
+  const res = await rawFetch("/tenants/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    const error = new Error(data?.error || "Falha ao registrar tenant");
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+
+  saveAuthToStorage({
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    tokenId: data.tokenId || null,
+    user: data.user,
+    tenant: data.tenant,
+    subscription: data.subscription || null,
+  });
+
+  return data;
+}
+
 async function tryRefreshToken() {
   const refreshToken = getRefreshToken();
   const tokenId = getTokenId();
@@ -474,6 +501,7 @@ export const base44 = {
   authedFetch,
   auth: {
     login,
+    registerTenant,
     logout,
     tryRefreshToken,
   },

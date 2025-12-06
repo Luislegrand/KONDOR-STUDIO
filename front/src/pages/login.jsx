@@ -104,10 +104,10 @@ export default function Login() {
             Ainda não tem conta?
           </p>
           <Link
-            to="/pricing"
+            to="/register"
             className="text-xs font-medium text-purple-600 hover:text-purple-700 underline"
           >
-            Ver planos e começar teste grátis
+            Iniciar teste grátis agora
           </Link>
         </div>
 

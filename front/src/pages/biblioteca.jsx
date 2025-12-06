@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-"@/apiClient/base44Client"
+import { base44 } from "@/apiClient/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";

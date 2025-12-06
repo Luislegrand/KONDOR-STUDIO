@@ -79,17 +79,17 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
     const { email, password, deviceName } = parseResult.data;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        passwordHash: true,
-        role: true,
-        tenantId: true,
-      },
-    });
+    const user = await prisma.user.findFirst({
+  where: { email },
+  select: {
+    id: true,
+    email: true,
+    name: true,
+    passwordHash: true,
+    role: true,
+    tenantId: true,
+  },
+});
 
     if (!user) return res.status(401).json({ error: 'Credenciais inválidas' });
 

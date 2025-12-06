@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { prisma } = require('../prisma');
 const { hashPassword, hashToken } = require('../utils/hash');
-const { signAccessToken, signRefreshToken } = require('../utils/jwt');
+const { createAccessToken, createRefreshToken } = require('../utils/jwt');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -81,8 +81,8 @@ router.post('/register', async (req, res) => {
     }
 
     const payload = { sub: user.id, tenantId: tenant.id };
-    const accessToken = signAccessToken(payload);
-    const refreshToken = signRefreshToken(payload);
+    const accessToken = createAccessToken(payload);
+    const refreshToken = createRefreshToken(payload);
 
     const decodedRefresh = jwt.decode(refreshToken);
     const expiresAt = decodedRefresh?.exp
@@ -90,7 +90,7 @@ router.post('/register', async (req, res) => {
       : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const refreshHash = await hashToken(refreshToken);
-    await prisma.refreshToken.create({
+    const refreshRecord = await prisma.refreshToken.create({
       data: {
         tokenHash: refreshHash,
         userId: user.id,
@@ -101,6 +101,7 @@ router.post('/register', async (req, res) => {
     return res.json({
       accessToken,
       refreshToken,
+      tokenId: refreshRecord.id,
       tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
       user: { id: user.id, email: user.email, name: user.name },
       subscription: subscription

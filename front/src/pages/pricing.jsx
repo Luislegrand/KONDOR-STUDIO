@@ -19,7 +19,6 @@ import {
   DollarSign,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 
 const plans = [
   {
@@ -152,7 +151,7 @@ export default function Pricing() {
           </div>
           <Button
             variant="outline"
-            onClick={() => navigate(createPageUrl("Dashboard"))}
+            onClick={() => navigate("/login")}
             className="border-purple-400 text-purple-600 hover:bg-purple-50"
             aria-label="Fazer login na plataforma"
           >
@@ -195,7 +194,7 @@ export default function Pricing() {
         <div className="flex gap-4 justify-center mb-16">
           <Button
             size="lg"
-            onClick={() => navigate(createPageUrl("Dashboard"))}
+            onClick={() => navigate("/register")}
             className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
             aria-label="Iniciar teste gratuito de 3 dias"
           >
@@ -530,7 +529,7 @@ export default function Pricing() {
                         : "bg-purple-400 hover:bg-purple-500"
                     }`}
                     size="lg"
-                    onClick={() => navigate(createPageUrl("Dashboard"))}
+                    onClick={() => navigate("/register")}
                     aria-label={`Iniciar teste grátis do plano ${plan.name}`}
                   >
                     Começar teste grátis

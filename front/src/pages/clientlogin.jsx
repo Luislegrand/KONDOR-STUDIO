@@ -22,7 +22,7 @@ export default function ClientLogin() {
         method: "POST",
         body: JSON.stringify({
           email,
-          portalPassword,
+          password: portalPassword,
         }),
       });
 
