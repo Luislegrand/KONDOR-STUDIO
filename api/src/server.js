@@ -5,6 +5,8 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
+const fs = require("fs");
 const { prisma } = require("./prisma");
 
 const authMiddleware = require("./middleware/auth");
@@ -132,6 +134,15 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Static uploads (fallback local storage)
+const localUploadsDir =
+  process.env.LOCAL_UPLOADS_DIR ||
+  path.join(__dirname, "../storage/uploads");
+if (!fs.existsSync(localUploadsDir)) {
+  fs.mkdirSync(localUploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(localUploadsDir));
 
 // Healthcheck
 app.get("/health", (req, res) => res.json({ status: "ok" }));
