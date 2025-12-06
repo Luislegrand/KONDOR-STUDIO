@@ -300,11 +300,19 @@ async function tryRefreshToken() {
 // Helpers gerais de CRUD
 // --------------------
 
+function normalizeListResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.items)) return payload.items;
+  if (payload && Array.isArray(payload.data)) return payload.data;
+  return payload || [];
+}
+
 function createEntityClient(basePath) {
   const client = {
     async list(params) {
       const qs = buildQuery(params);
-      return jsonFetch(`${basePath}${qs}`, { method: "GET" });
+      const data = await jsonFetch(`${basePath}${qs}`, { method: "GET" });
+      return normalizeListResponse(data);
     },
 
     async get(id) {
