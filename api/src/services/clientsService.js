@@ -217,13 +217,17 @@ async function resolvePortalCredentials({
 
 async function recordMonthlyRevenue(tenantId, clientId, amountCents, renewalDate, note) {
   if (!amountCents || amountCents <= 0) return;
-  await financialRecordsService.create(tenantId, {
-    clientId,
-    type: 'CLIENT_RECURRING',
-    amountCents,
-    note: note || 'Receita recorrente automática',
-    occurredAt: renewalDate || new Date(),
-  });
+  try {
+    await financialRecordsService.create(tenantId, {
+      clientId,
+      type: 'CLIENT_RECURRING',
+      amountCents,
+      note: note || 'Receita recorrente automática',
+      occurredAt: renewalDate || new Date(),
+    });
+  } catch (err) {
+    console.error('recordMonthlyRevenue error:', err?.message || err);
+  }
 }
 
 async function getRawClient(tenantId, id) {

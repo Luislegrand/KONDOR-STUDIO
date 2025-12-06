@@ -42,7 +42,50 @@ async function ensureRefreshTokenColumns() {
   }
 }
 
+async function ensureClientOnboardingColumns() {
+  const statements = [
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "company" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "sector" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "briefing" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "monthlyFeeCents" INTEGER;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "renewalDate" TIMESTAMP(3);`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "website" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "instagram" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "facebook" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "tiktok" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "tags" TEXT[] DEFAULT ARRAY[]::TEXT[];`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "notes" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "billingContactName" TEXT;`,
+    `ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "billingContactEmail" TEXT;`,
+  ];
+  try {
+    for (const sql of statements) {
+      await prisma.$executeRawUnsafe(sql);
+    }
+  } catch (err) {
+    console.warn("Não foi possível verificar colunas de clients:", err?.message || err);
+  }
+}
+
+async function ensureFinancialRecordColumns() {
+  const statements = [
+    `ALTER TABLE "financial_records" ADD COLUMN IF NOT EXISTS "clientId" TEXT;`,
+    `ALTER TABLE "financial_records" ADD COLUMN IF NOT EXISTS "note" TEXT;`,
+    `ALTER TABLE "financial_records" ADD COLUMN IF NOT EXISTS "occurredAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP;`,
+  ];
+  try {
+    for (const sql of statements) {
+      await prisma.$executeRawUnsafe(sql);
+    }
+  } catch (err) {
+    console.warn("Não foi possível verificar colunas de financial_records:", err?.message || err);
+  }
+}
+
 ensureRefreshTokenColumns();
+ensureClientOnboardingColumns();
+ensureFinancialRecordColumns();
 
 // Helpers
 function safeMount(path, router) {
