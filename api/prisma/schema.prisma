@@ -252,6 +252,7 @@ model Client {
 
   projects           Project[]
   posts              Post[]
+  financialRecords   FinancialRecord[]
 
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
