@@ -1,6 +1,6 @@
 // front/src/app.jsx
 import React, { Suspense, lazy } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
 import Layout from "./layout.jsx";
 import PrivateRoute from "./components/privateRoute.jsx";
@@ -16,6 +16,8 @@ const Metrics = lazy(() => import("./pages/metrics.jsx"));
 const Integrations = lazy(() => import("./pages/integrations.jsx"));
 const Settings = lazy(() => import("./pages/settings.jsx"));
 
+const Home = lazy(() => import("./pages/home.jsx"));
+const Checkout = lazy(() => import("./pages/checkout.jsx"));
 const Login = lazy(() => import("./pages/login.jsx"));
 const Register = lazy(() => import("./pages/register.jsx"));
 const Onboarding = lazy(() => import("./pages/onboarding.jsx"));
@@ -36,9 +38,11 @@ export default function App() {
     >
       <Routes>
         {/* Rotas públicas */}
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/checkout" element={<Checkout />} />
 
         {/* Login / portal do cliente (white-label) */}
         <Route path="/clientlogin" element={<ClientLogin />} />
@@ -47,7 +51,6 @@ export default function App() {
         {/* Área autenticada da agência */}
         <Route element={<PrivateRoute />}>
           <Route element={<Layout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/posts" element={<Posts />} />

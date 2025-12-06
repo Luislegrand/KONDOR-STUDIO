@@ -19,63 +19,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const plans = [
-  {
-    name: "Starter",
-    price: 97,
-    icon: Sparkles,
-    description: "Para freelancers",
-    features: [
-      "Até 15 clientes",
-      "1 usuário interno",
-      "Aprovação de posts",
-      "1 integração (Meta Ads)",
-      "Relatórios básicos",
-      "Biblioteca de posts",
-      "Dashboard simples",
-      "Tema visual do cliente",
-    ],
-    color: "from-purple-400 to-purple-500",
-  },
-  {
-    name: "Pro",
-    price: 147,
-    icon: Zap,
-    description: "Para social media profissional",
-    features: [
-      "Até 40 clientes",
-      "3 usuários internos",
-      "Todas as integrações",
-      "Relatórios automáticos semanais",
-      "Biblioteca completa",
-      "Automações WhatsApp",
-      "Kanban avançado",
-      "Tarefas e pipeline",
-      "Tema visual avançado",
-    ],
-    popular: true,
-    color: "from-purple-500 to-purple-600",
-  },
-  {
-    name: "Agency",
-    price: 247,
-    icon: Crown,
-    description: "Agências profissionais",
-    features: [
-      "Até 100 clientes",
-      "Equipe ilimitada",
-      "Relatórios personalizados",
-      "Dashboards avançados",
-      "Automações completas",
-      "Multi-equipe",
-      "Subdomínio customizado",
-      "Módulo financeiro",
-      "Prioridade no suporte",
-    ],
-    color: "from-purple-600 to-purple-700",
-  },
-];
+import { pricingPlans } from "@/data/pricingPlans.js";
 
 const features = [
   {
@@ -115,6 +59,12 @@ const features = [
       "Gerencie receitas e despesas por cliente. Visualize margem de lucro e saúde financeira da agência.",
   },
 ];
+
+const iconMap = {
+  sparkles: Sparkles,
+  zap: Zap,
+  crown: Crown,
+};
 
 const formatCurrency = (value, locale = "pt-BR", currency = "BRL") => {
   return new Intl.NumberFormat(locale, {
@@ -461,8 +411,8 @@ export default function Pricing() {
           role="list"
           aria-label="Planos disponíveis"
         >
-          {plans.map((plan) => {
-            const Icon = plan.icon;
+          {pricingPlans.map((plan) => {
+            const Icon = (plan.icon && iconMap[plan.icon]) || Sparkles;
             return (
               <Card
                 key={plan.name}
