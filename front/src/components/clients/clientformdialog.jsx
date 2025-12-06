@@ -32,6 +32,7 @@ const defaultForm = {
   billingContactName: "",
   billingContactEmail: "",
   whatsappOptIn: false,
+  portalPassword: "",
 };
 
 function formatDateInput(value) {
@@ -76,6 +77,7 @@ export default function ClientFormDialog({
         billingContactName: client.billingContactName || "",
         billingContactEmail: client.billingContactEmail || "",
         whatsappOptIn: Boolean(client.whatsappOptIn),
+        portalPassword: "",
       });
     } else {
       setFormData(defaultForm);
@@ -133,6 +135,7 @@ export default function ClientFormDialog({
       logoUrl: formData.logoUrl || null,
       portalEmail:
         formData.portalEmail.trim() || formData.email.trim() || null,
+      portalPassword: formData.portalPassword.trim() || undefined,
       billingContactName: formData.billingContactName.trim() || null,
       billingContactEmail: formData.billingContactEmail.trim() || null,
       whatsappOptIn: Boolean(formData.whatsappOptIn),
@@ -310,7 +313,20 @@ export default function ClientFormDialog({
                 placeholder="cliente@empresa.com"
               />
               <p className="text-xs text-gray-500">
-                Geraremos uma senha temporária automaticamente e exibiremos após o cadastro.
+                Informe um e-mail que o cliente usará para acessar o portal.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Senha do portal</Label>
+              <Input
+                type="text"
+                value={formData.portalPassword}
+                onChange={handleChange("portalPassword")}
+                placeholder="Defina a senha de acesso"
+              />
+              <p className="text-xs text-gray-500">
+                Se vazio, geramos automaticamente e exibimos após o cadastro.
               </p>
             </div>
 

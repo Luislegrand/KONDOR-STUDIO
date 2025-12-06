@@ -10,20 +10,8 @@ import {
 } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs.jsx";
-import {
-  FileText,
-  CheckCircle,
-  FileDown,
-  Eye,
-} from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
-import Navbar from "@/components/navbar.jsx";
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 import { base44 } from "@/apiClient/base44Client";
 
@@ -157,17 +145,6 @@ export default function ClientPortal() {
   const metrics = metricsData?.items || [];
 
   const {
-    data: reportsData,
-    isLoading: loadingReports,
-  } = useQuery({
-    queryKey: ["client-portal", "reports"],
-    enabled: queriesEnabled,
-    queryFn: () => fetchClient("/client-portal/reports", clientToken),
-  });
-
-  const reports = reportsData?.items || [];
-
-  const {
     data: approvalsData,
     isLoading: loadingApprovals,
   } = useQuery({
@@ -248,24 +225,51 @@ export default function ClientPortal() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar
-        tenant={{
-          name: client?.metadata?.agency_name || "Portal do Cliente",
-          logo: client?.metadata?.agency_logo || null,
-          primary: primaryColor,
-          accent: accentColor,
-        }}
-        clientName={client?.name}
-        onLogout={() => {
-          if (typeof window !== "undefined") {
-            window.localStorage.removeItem("kondor_client_auth");
-            window.localStorage.removeItem("kondor_client_token");
-          }
-          navigate("/clientlogin");
-        }}
-      />
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            {client?.metadata?.agency_logo ? (
+              <img
+                src={client.metadata.agency_logo}
+                alt={client.metadata.agency_name || "Agência"}
+                className="w-12 h-12 rounded-xl object-cover border"
+              />
+            ) : (
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center font-semibold text-white"
+                style={{ background: primaryColor }}
+              >
+                {(client?.metadata?.agency_name || "KS")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-xs uppercase text-gray-500">Portal do cliente</p>
+              <h1 className="text-lg font-semibold text-gray-900">
+                {client?.metadata?.agency_name || "Kondor Studio"}
+              </h1>
+              {client?.name && (
+                <p className="text-xs text-gray-500">Conta: {client.name}</p>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.localStorage.removeItem("kondor_client_auth");
+                window.localStorage.removeItem("kondor_client_token");
+              }
+              navigate("/clientlogin");
+            }}
+          >
+            Sair
+          </Button>
+        </div>
+      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
@@ -308,149 +312,192 @@ export default function ClientPortal() {
             </CardContent>
           </Card>
         </div>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Aprovações pendentes
+            </h2>
+            <span className="text-sm text-gray-500">
+              {pendingPosts.length} posts aguardando sua revisão
+            </span>
+          </div>
+          {pendingPosts.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Tudo aprovado!
+                </h3>
+                <p className="text-gray-600">
+                  Não há posts aguardando sua aprovação no momento.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {pendingPosts.map((post) => {
+                const approval = approvalsByPostId.get(post.id) || null;
+                return (
+                  <Postapprovalcard
+                    key={post.id}
+                    post={post}
+                    approval={approval}
+                    primaryColor={primaryColor}
+                    accentColor={accentColor}
+                    token={clientToken}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-        <Tabs defaultValue="approval" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="approval">
-              <FileText className="w-4 h-4 mr-2" />
-              Aprovações
-            </TabsTrigger>
-            <TabsTrigger value="library">
-              <Eye className="w-4 h-4 mr-2" />
-              Biblioteca
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              <FileDown className="w-4 h-4 mr-2" />
-              Relatórios
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="approval" className="space-y-6">
-            {pendingPosts.length === 0 ? (
-              <Card>
-                <CardContent className="py-16 text-center">
-                  <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Tudo aprovado!
-                  </h3>
-                  <p className="text-gray-600">
-                    Não há posts aguardando sua aprovação no momento
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {pendingPosts.map((post) => {
-                  const approval = approvalsByPostId.get(post.id) || null;
-                  return (
-                    <Postapprovalcard
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Conteúdos aprovados
+            </h2>
+            <span className="text-sm text-gray-500">
+              Histórico recente de posts liberados
+            </span>
+          </div>
+          <Card>
+            <CardContent>
+              {approvedPosts.length === 0 ? (
+                <p className="text-sm text-gray-600">
+                  Assim que posts forem aprovados eles aparecerão aqui.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {approvedPosts.map((post) => (
+                    <div
                       key={post.id}
-                      post={post}
-                      approval={approval}
-                      primaryColor={primaryColor}
-                      accentColor={accentColor}
-                      token={clientToken}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="library" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Biblioteca de Posts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {approvedPosts.length === 0 ? (
-                  <p className="text-sm text-gray-600">
-                    Ainda não há posts aprovados ou publicados.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {approvedPosts.map((post) => (
-                      <div
-                        key={post.id}
-                        className="flex items-center justify-between border rounded-lg px-3 py-2 bg-white"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {post.title || post.caption || "Post sem título"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Status:{" "}
-                            <span className="font-semibold">
-                              {post.status}
-                            </span>
-                          </p>
-                        </div>
-
-                        {post.mediaUrl && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(post.mediaUrl, "_blank")}
-                          >
-                            Ver mídia
-                          </Button>
-                        )}
+                      className="flex items-center justify-between border rounded-lg px-4 py-3 bg-white"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {post.title || post.caption || "Post sem título"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Status:{" "}
+                          <span className="font-semibold">
+                            {post.status}
+                          </span>
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                      {post.mediaUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(post.mediaUrl, "_blank")}
+                        >
+                          Ver mídia
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
-          <TabsContent value="reports" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Relatórios</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {reports.length === 0 ? (
-                  <div className="text-center py-16">
-                    <FileDown className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-600">
-                      Nenhum relatório disponível ainda
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {reports.map((report) => (
-                      <div
-                        key={report.id}
-                        className="flex items-center justify-between border rounded-lg px-3 py-2 bg-white"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {report.title || "Relatório"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Gerado em{" "}
-                            {new Date(report.createdAt).toLocaleString("pt-BR")}
-                          </p>
-                        </div>
-
-                        {report.pdfUrl && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(report.pdfUrl, "_blank")}
-                          >
-                            Baixar PDF
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Métricas por plataforma
+            </h2>
+            <span className="text-sm text-gray-500">
+              Atualizado em tempo quase real
+            </span>
+          </div>
+          <MetricsPanel metrics={metrics} />
+        </section>
       </main>
+    </div>
+  );
+}
+
+function MetricsPanel({ metrics }) {
+  const grouped = useMemo(() => {
+    const map = new Map();
+    (metrics || []).forEach((metric) => {
+      const key =
+        metric.source ||
+        metric.platform ||
+        metric.campaignName ||
+        "Campanhas";
+      const bucket =
+        map.get(key) || {
+          impressions: 0,
+          clicks: 0,
+          conversions: 0,
+          spend: 0,
+        };
+
+      const name = (metric.name || "").toLowerCase();
+      const value = typeof metric.value === "number" ? metric.value : 0;
+
+      if (name.includes("impression")) bucket.impressions += value;
+      else if (name.includes("click")) bucket.clicks += value;
+      else if (name.includes("conversion")) bucket.conversions += value;
+      else if (name.includes("spend") || name.includes("cost")) bucket.spend += value;
+
+      map.set(key, bucket);
+    });
+    return Array.from(map.entries()).map(([source, stats]) => ({
+      source,
+      ...stats,
+    }));
+  }, [metrics]);
+
+  if (!metrics || metrics.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-gray-600">
+          Nenhuma métrica disponível ainda para esse cliente.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {grouped.map((group) => (
+        <Card key={group.source}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold text-gray-800">
+              {group.source}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>
+              Impressões:{" "}
+              <span className="font-semibold text-gray-900">
+                {group.impressions.toLocaleString("pt-BR")}
+              </span>
+            </p>
+            <p>
+              Cliques:{" "}
+              <span className="font-semibold text-gray-900">
+                {group.clicks.toLocaleString("pt-BR")}
+              </span>
+            </p>
+            <p>
+              Conversões:{" "}
+              <span className="font-semibold text-gray-900">
+                {group.conversions.toLocaleString("pt-BR")}
+              </span>
+            </p>
+            <p>
+              Investimento:{" "}
+              <span className="font-semibold text-gray-900">
+                R$ {group.spend.toFixed(2)}
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import ClientCard from "../components/clients/clientcard.jsx";
 export default function Clients() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [lastPortalPassword, setLastPortalPassword] = useState("");
   const queryClient = useQueryClient();
 
   const { data: clients = [], isLoading } = useQuery({
@@ -31,12 +32,13 @@ export default function Clients() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      if (result?.portalCredentials?.password) {
+      if (!lastPortalPassword && result?.portalCredentials?.password) {
         const { email, password } = result.portalCredentials;
         alert(
           `Acesso do cliente gerado:\nEmail: ${email}\nSenha provisória: ${password}`
         );
       }
+      setLastPortalPassword("");
       handleDialogClose();
     },
   });
@@ -62,10 +64,12 @@ export default function Clients() {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingClient(null);
+    setLastPortalPassword("");
   };
 
   const handleFormSubmit = async (data) => {
     try {
+      setLastPortalPassword(data.portalPassword || "");
       await saveMutation.mutateAsync({
         id: editingClient?.id ?? null,
         data,
