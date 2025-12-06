@@ -15,6 +15,35 @@ const auditLog = require("./middleware/auditLog");
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 
+async function ensureRefreshTokenColumns() {
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "refresh_tokens"
+      ADD COLUMN IF NOT EXISTS "revoked" BOOLEAN NOT NULL DEFAULT false;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "refresh_tokens"
+      ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "refresh_tokens"
+      ADD COLUMN IF NOT EXISTS "deviceName" TEXT;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "refresh_tokens"
+      ADD COLUMN IF NOT EXISTS "ip" TEXT;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "refresh_tokens"
+      ADD COLUMN IF NOT EXISTS "userAgent" TEXT;
+    `);
+  } catch (err) {
+    console.warn("Não foi possível verificar colunas de refresh_tokens:", err?.message || err);
+  }
+}
+
+ensureRefreshTokenColumns();
+
 // Helpers
 function safeMount(path, router) {
   if (router && typeof router === "function") {
