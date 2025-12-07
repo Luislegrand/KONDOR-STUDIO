@@ -213,11 +213,11 @@ module.exports = {
 
       const signedUrl = await getSignedUrl(
         s3Client,
-        new PutObjectCommand({
+        new GetObjectCommand({
           Bucket: S3_BUCKET,
           Key: key,
         }),
-        { expiresIn: 60 * 60 }
+        { expiresIn: 60 * 60 * 24 * 30 }
       );
 
       return { key, url: signedUrl };
