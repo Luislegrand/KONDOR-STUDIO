@@ -78,9 +78,11 @@ export default function Postformdialog({
       setIsUploading(true);
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-      const { url } = await base44.uploads.uploadFile(file, { folder: "posts" });
+      const { url } = await base44.uploads.uploadFile(file, {
+        folder: "posts",
+      });
       setFormData((prev) => ({ ...prev, media_url: url }));
-      setPreviewUrl(url || objectUrl);
+      // Mantém o preview local até o usuário reabrir o modal (evita flicker)
     } catch (error) {
       console.error("Upload error:", error);
       alert("Falha ao enviar arquivo. Tente novamente.");
