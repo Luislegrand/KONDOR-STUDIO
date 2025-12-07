@@ -11,6 +11,11 @@ export default function Posts() {
   const [editingPost, setEditingPost] = useState(null);
   const queryClient = useQueryClient();
 
+  const handleDialogClose = React.useCallback(() => {
+    setDialogOpen(false);
+    setEditingPost(null);
+  }, []);
+
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ["posts"],
     queryFn: () => base44.entities.Post.list(),
@@ -21,10 +26,22 @@ export default function Posts() {
     queryFn: () => base44.entities.Client.list(),
   });
 
+  const invalidatePosts = () =>
+    queryClient.invalidateQueries({ queryKey: ["posts"] });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.Post.create(data),
+    onSuccess: () => {
+      invalidatePosts();
+      handleDialogClose();
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Post.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      invalidatePosts();
+      handleDialogClose();
     },
   });
 
@@ -40,10 +57,15 @@ export default function Posts() {
     });
   };
 
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-    setEditingPost(null);
+  const handleSubmit = (data) => {
+    if (editingPost) {
+      updateMutation.mutate({ id: editingPost.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="p-6 md:p-8">
@@ -77,6 +99,8 @@ export default function Posts() {
           onClose={handleDialogClose}
           post={editingPost}
           clients={clients}
+          onSubmit={handleSubmit}
+          isSaving={isSaving}
         />
       </div>
     </div>
