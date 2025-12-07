@@ -74,7 +74,7 @@ module.exports = {
  			mediaType: data.mediaType || data.media_type || 'image',
  			cta: data.cta || null,
  			tags: Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []),
- 			status: data.status || 'IDEA',
+			status: data.status || 'DRAFT',
  			scheduledDate: toDateOrNull(scheduledDate),
  			publishedDate: toDateOrNull(publishedDate),
  			clientFeedback: data.clientFeedback || data.client_feedback || null,

@@ -28,6 +28,8 @@ enum Role {
 
 enum PostStatus {
   DRAFT
+  PENDING_APPROVAL
+  ARCHIVED
   SCHEDULED
   PUBLISHED
   FAILED
@@ -309,7 +311,7 @@ model Post {
   scheduledDate  DateTime?
   publishedDate  DateTime?
 
-  status         PostStatus   @default(IDEA)
+  status         PostStatus   @default(DRAFT)
   platform       String?      // e.g., "instagram", "facebook"
   externalId     String?      @unique // id on platform, unique when present
 
