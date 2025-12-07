@@ -67,10 +67,10 @@ export default function Postkanban({
           return (
             <div
               key={col.status}
-              className="min-w-[320px] flex-1"
+              className="min-w-[360px] flex-shrink-0"
             >
               <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-100 backdrop-blur-md">
-                <div className="mb-4 flex items-start justify-between gap-3 sticky top-0 bg-white/90 pb-2 z-10">
+                <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 bg-white/90 pb-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
                       {col.title}
@@ -84,7 +84,10 @@ export default function Postkanban({
                   </span>
                 </div>
 
-                <div className="flex-1 space-y-4 overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 220px)" }}>
+                <div
+                  className="flex-1 space-y-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+                  style={{ maxHeight: "calc(100vh - 220px)" }}
+                >
                   {isLoading
                     ? renderSkeletonColumn()
                     : columnPosts.length === 0

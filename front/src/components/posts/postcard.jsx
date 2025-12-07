@@ -75,7 +75,7 @@ export default function Postcard({ post, client, onEdit, onStatusChange }) {
 
   return (
     <Card
-      className="group relative overflow-hidden border border-transparent bg-white/90 shadow-lg shadow-purple-100 transition-transform hover:-translate-y-1 hover:shadow-xl cursor-pointer rounded-2xl"
+      className="group relative w-full max-w-none overflow-visible border border-transparent bg-white/90 shadow-lg shadow-purple-100 transition-transform hover:-translate-y-1 hover:shadow-xl cursor-pointer rounded-2xl"
       onClick={() => onEdit && onEdit(post)}
       role="button"
       tabIndex={0}
