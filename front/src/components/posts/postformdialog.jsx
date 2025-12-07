@@ -12,6 +12,16 @@ import { Textarea } from "@/components/ui/textarea.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import { Upload, Image as ImageIcon, Video } from "lucide-react";
 
+function normalizeMediaUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  const base = (base44.API_BASE_URL || "").replace(/\/$/, "");
+  const suffix = url.startsWith("/") ? url : `/${url}`;
+  return base ? `${base}${suffix}` : suffix;
+}
+
 export default function Postformdialog({
   open,
   onClose,
@@ -55,8 +65,11 @@ export default function Postformdialog({
           media_type: "image",
         };
 
-    const initialMedia = payload.media_url || "";
-    setFormData(payload);
+    const initialMedia = normalizeMediaUrl(payload.media_url || "");
+    setFormData((prev) => ({
+      ...payload,
+      media_url: initialMedia || payload.media_url,
+    }));
     setStoredMediaUrl(initialMedia);
     setPreviewUrl(initialMedia);
   }, [post, open]);
@@ -88,8 +101,9 @@ export default function Postformdialog({
       const { url } = await base44.uploads.uploadFile(file, {
         folder: "posts",
       });
-      setFormData((prev) => ({ ...prev, media_url: url }));
-      setStoredMediaUrl(url);
+      const normalized = normalizeMediaUrl(url);
+      setFormData((prev) => ({ ...prev, media_url: normalized }));
+      setStoredMediaUrl(normalized);
       // Mantém o preview local até o usuário reabrir o modal (evita flicker)
     } catch (error) {
       console.error("Upload error:", error);
@@ -118,7 +132,7 @@ export default function Postformdialog({
     }
   };
 
-  const effectivePreview = previewUrl || storedMediaUrl;
+  const effectivePreview = normalizeMediaUrl(previewUrl || storedMediaUrl);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
