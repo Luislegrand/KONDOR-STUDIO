@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -9,13 +9,6 @@ import {
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Pencil, Trash2, CalendarDays } from "lucide-react";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectValue,
-  SelectItem,
-} from "@/components/ui/select.jsx";
 
 const STATUS_OPTIONS = [
   { value: "TODO", label: "A fazer" },
@@ -47,10 +40,26 @@ export default function Taskcard({
   onDelete,
   onStatusChange,
 }) {
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef(null);
+
   const handleStatusChange = (newStatus) => {
     if (!onStatusChange) return;
     onStatusChange(task.id, newStatus);
+    setStatusMenuOpen(false);
   };
+
+  useEffect(() => {
+    function handleOutside(event) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target)) {
+        setStatusMenuOpen(false);
+      }
+    }
+    if (statusMenuOpen) {
+      document.addEventListener("mousedown", handleOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [statusMenuOpen]);
 
   const dueLabel = formatDate(task.dueDate);
 
@@ -89,36 +98,52 @@ export default function Taskcard({
         )}
       </CardContent>
 
-      <CardFooter className="pt-4 flex items-center justify-between gap-3">
-        <Select value={task.status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="h-8 text-xs w-[160px] border-purple-200">
-            <SelectValue placeholder="Mudar status" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <CardFooter className="pt-4 flex flex-col gap-3">
+        <div className="relative" ref={statusMenuRef}>
+          <button
+            type="button"
+            className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-medium text-purple-700 shadow-sm hover:border-purple-300 flex items-center justify-between"
+            onClick={() => setStatusMenuOpen((prev) => !prev)}
+          >
+            <span>{formatStatusLabel(task.status)}</span>
+            <span className="text-[10px] text-gray-400">Alterar</span>
+          </button>
+          {statusMenuOpen && (
+            <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-100 bg-white shadow-2xl">
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 ${
+                    task.status === opt.value
+                      ? "bg-purple-50 text-purple-700"
+                      : "text-gray-700"
+                  }`}
+                  onClick={() => handleStatusChange(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 justify-between w-full">
           <Button
             variant="outline"
-            size="icon"
-            className="h-8 w-8 border-purple-200 hover:bg-purple-50"
+            className="flex-1 border-purple-200 hover:bg-purple-50 text-sm"
             onClick={() => onEdit && onEdit(task)}
           >
-            <Pencil className="w-4 h-4" />
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
           </Button>
           <Button
             variant="outline"
-            size="icon"
-            className="h-8 w-8 border-red-200 text-red-600 hover:bg-red-50"
+            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 text-sm"
             onClick={() => onDelete && onDelete(task.id)}
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 mr-2" />
+            Excluir
           </Button>
         </div>
       </CardFooter>
