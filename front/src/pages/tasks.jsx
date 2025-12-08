@@ -87,7 +87,6 @@ export default function Tasks() {
     const payload = {
       title: data.title,
       description: data.description || "",
-      clientId: data.clientId || null,
       status: data.status || "TODO",
       dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
     };

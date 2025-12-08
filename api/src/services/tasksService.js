@@ -37,7 +37,7 @@ module.exports = {
     const where = { tenantId };
 
     if (status) where.status = status;
-    if (assignedTo) where.assignedTo = assignedTo;
+    if (assignedTo) where.assigneeId = assignedTo;
     if (priority) where.priority = priority;
 
     if (q) {
@@ -72,19 +72,21 @@ module.exports = {
    * Cria uma tarefa
    */
   async create(tenantId, userId, data = {}) {
-    const payload = {
-      tenantId,
-      title: data.title,
-      description: data.description || null,
-      status: data.status || 'TODO',
-      priority: data.priority || 'MEDIUM',
-      assignedTo: data.assignedTo || null,
-      dueDate: toDateOrNull(data.dueDate || data.due_date),
-      createdBy: userId || null,
-      comments: data.comments || null,
-    };
-
-    return prisma.task.create({ data: payload });
+    return prisma.task.create({
+      data: {
+        tenantId,
+        title: data.title,
+        description: data.description || null,
+        status: data.status || 'TODO',
+        priority: data.priority || 'MEDIUM',
+        projectId: data.projectId || null,
+        postId: data.postId || null,
+        teamId: data.teamId || null,
+        assigneeId: data.assigneeId || null,
+        dueDate: toDateOrNull(data.dueDate || data.due_date),
+        createdById: userId || null,
+      },
+    });
   },
 
   /**
@@ -110,10 +112,10 @@ module.exports = {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.priority !== undefined) updateData.priority = data.priority;
-
-    if (data.assignedTo !== undefined) updateData.assignedTo = data.assignedTo;
-
-    if (data.comments !== undefined) updateData.comments = data.comments;
+    if (data.projectId !== undefined) updateData.projectId = data.projectId || null;
+    if (data.postId !== undefined) updateData.postId = data.postId || null;
+    if (data.teamId !== undefined) updateData.teamId = data.teamId || null;
+    if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId || null;
 
     if (data.dueDate !== undefined || data.due_date !== undefined) {
       const value = data.dueDate || data.due_date;
