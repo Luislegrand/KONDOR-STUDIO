@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { base44 } from "@/apiClient/base44Client";
 import { useSubscription } from "./SubscriptionContext.jsx";
 import SubscriptionExpiredModal from "./SubscriptionExpiredModal.jsx";
-import logoFull from "@/assets/logo-full.svg";
+import logoHeader from "@/assets/logoheader.png";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function Navbar() {
           {/* Logo + nome */}
           <div className="flex items-center gap-2">
             <img
-              src={logoFull}
+              src={logoHeader}
               alt="Kondor Studio"
               className="h-9 w-auto"
             />

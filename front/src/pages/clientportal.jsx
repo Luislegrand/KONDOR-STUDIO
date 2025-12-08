@@ -14,7 +14,7 @@ import { CheckCircle } from "lucide-react";
 
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 import { base44 } from "@/apiClient/base44Client";
-import logoFull from "@/assets/logo-full.svg";
+import logoHeader from "@/assets/logoheader.png";
 
 async function fetchClient(path, token, options = {}) {
   const res = await base44.rawFetch(path, {
@@ -231,7 +231,7 @@ export default function ClientPortal() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4 flex-wrap">
               <img
-                src={logoFull}
+                src={logoHeader}
                 alt="Kondor Studio"
                 className="h-10 w-auto"
               />

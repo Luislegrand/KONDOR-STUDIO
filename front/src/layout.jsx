@@ -4,7 +4,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { base44 } from "@/apiClient/base44Client";
-import logoFull from "@/assets/logo-full.svg";
+import logoHeader from "@/assets/logoheader.png";
 
 const navItems = [
   {
@@ -101,7 +101,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-200">
           <img
-            src={logoFull}
+            src={logoHeader}
             alt="Kondor Studio"
             className="h-10 w-auto"
           />
@@ -169,7 +169,7 @@ export default function Layout() {
             </button>
             <div className="flex items-center gap-2">
               <img
-                src={logoFull}
+                src={logoHeader}
                 alt="Kondor Studio"
                 className="h-9 w-auto"
               />
