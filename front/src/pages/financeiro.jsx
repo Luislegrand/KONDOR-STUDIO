@@ -63,19 +63,34 @@ export default function Financeiro() {
     setEditingRecord(null);
   };
 
-  // Resumo simples: soma income vs outros
+  // Resumo simples: soma income vs custos vs outros
   let totalIncome = 0;
+  let totalCosts = 0;
   let totalOthers = 0;
 
   records.forEach((r) => {
     const amount = (r.amountCents || 0) / 100;
-    const isIncome = (r.type || "").toLowerCase().includes("income");
+    const normalizedType = (r.type || "").toLowerCase();
+    const isIncome =
+      normalizedType.includes("income") ||
+      normalizedType.includes("revenue") ||
+      normalizedType.includes("recurring");
+    const isExpense =
+      normalizedType.includes("expense") ||
+      normalizedType.includes("cost") ||
+      normalizedType.includes("subscription") ||
+      normalizedType.includes("desp");
+
     if (isIncome) {
       totalIncome += amount;
+    } else if (isExpense) {
+      totalCosts += amount;
     } else {
       totalOthers += amount;
     }
   });
+
+  const balance = totalIncome - totalCosts;
 
   return (
     <div className="p-6 md:p-8">
@@ -99,7 +114,7 @@ export default function Financeiro() {
         </div>
 
         {/* Cards de resumo */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <Card className="border border-purple-100">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
@@ -113,6 +128,18 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
+          <Card className="border border-purple-100">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Custos (expense)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-rose-600">
+                {formatCurrencyBRL(totalCosts)}
+              </div>
+            </CardContent>
+          </Card>
           <Card className="border border-purple-100">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
@@ -135,6 +162,23 @@ export default function Financeiro() {
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
                 {records.length}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-purple-100">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Saldo (receitas - custos)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`text-2xl font-bold ${
+                  balance >= 0 ? "text-emerald-600" : "text-rose-600"
+                }`}
+              >
+                {formatCurrencyBRL(balance)}
               </div>
             </CardContent>
           </Card>

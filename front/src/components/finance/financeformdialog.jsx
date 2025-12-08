@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import {
@@ -11,13 +11,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectValue,
-  SelectItem,
-} from "@/components/ui/select.jsx";
+import { ChevronDown } from "lucide-react";
 
 const TYPE_OPTIONS = [
   { value: "income", label: "Receita (income)" },
@@ -26,7 +20,71 @@ const TYPE_OPTIONS = [
   { value: "other", label: "Outro" },
 ];
 
-export default function Financeformdialog({ open, onClose, record, clients = [] }) {
+function MiniSelect({ value, onChange, options = [], placeholder }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const current =
+    options.find((option) => option.value === value)?.label || placeholder;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={`w-full h-11 px-4 rounded-2xl border text-left text-sm font-medium flex items-center justify-between transition ${
+          open
+            ? "border-purple-300 bg-purple-50 text-purple-700"
+            : "border-gray-200 bg-white text-gray-700 hover:border-purple-200"
+        }`}
+      >
+        <span>{current}</span>
+        <ChevronDown className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <div className="absolute z-40 mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl py-2">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`w-full text-left px-4 py-2 text-sm transition ${
+                option.value === value
+                  ? "text-purple-700 bg-purple-50"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Financeformdialog({
+  open,
+  onClose,
+  record,
+  clients = [],
+}) {
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -36,6 +94,7 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
     currency: "BRL",
     occurredAt: "",
     note: "",
+    costName: "",
   });
 
   useEffect(() => {
@@ -52,6 +111,7 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
           ? record.occurredAt.slice(0, 10)
           : "",
         note: record.note || "",
+        costName: record.metadata?.costName || "",
       });
     } else {
       setFormData({
@@ -61,6 +121,7 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
         currency: "BRL",
         occurredAt: "",
         note: "",
+        costName: "",
       });
     }
   }, [record]);
@@ -74,6 +135,13 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
         ? 0
         : Math.round(amountNumber * 100);
 
+      const metadata = { ...(record?.metadata || {}) };
+      if (data.costName?.trim()) {
+        metadata.costName = data.costName.trim();
+      } else {
+        delete metadata.costName;
+      }
+
       const payload = {
         clientId: data.clientId || null,
         type: data.type,
@@ -83,6 +151,7 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
         occurredAt: data.occurredAt
           ? new Date(data.occurredAt).toISOString()
           : new Date().toISOString(),
+        metadata: Object.keys(metadata).length ? metadata : null,
       };
 
       if (record) {
@@ -124,42 +193,35 @@ export default function Financeformdialog({ open, onClose, record, clients = [] 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select
+              <MiniSelect
                 value={formData.clientId}
-                onValueChange={handleChange("clientId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={handleChange("clientId")}
+                options={clients.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="Selecione um cliente"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Tipo de lançamento</Label>
-              <Select
+              <MiniSelect
                 value={formData.type}
-                onValueChange={handleChange("type")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TYPE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={handleChange("type")}
+                options={TYPE_OPTIONS}
+                placeholder="Selecione o tipo"
+              />
             </div>
           </div>
+
+          {formData.type !== "income" && (
+            <div className="space-y-2">
+              <Label>Nome do custo</Label>
+              <Input
+                value={formData.costName}
+                onChange={handleChange("costName")}
+                placeholder="Ex: Assinatura Canva"
+              />
+            </div>
+          )}
 
           {/* Valor + Data */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

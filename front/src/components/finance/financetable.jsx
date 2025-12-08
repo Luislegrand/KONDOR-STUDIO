@@ -1,5 +1,10 @@
 import React from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Pencil, Trash2 } from "lucide-react";
@@ -12,9 +17,12 @@ function formatCurrencyBRL(value) {
   });
 }
 
-function getClientName(clients, id) {
-  if (!id) return "-";
-  const c = clients.find((cl) => cl.id === id);
+function resolveReference(record, clients) {
+  if (record?.metadata?.costName) {
+    return record.metadata.costName;
+  }
+  if (!record?.clientId) return "-";
+  const c = clients.find((cl) => cl.id === record.clientId);
   return c ? c.name : "-";
 }
 
@@ -99,7 +107,7 @@ export default function Financetable({
                         {formatDate(r.occurredAt)}
                       </td>
                       <td className="py-2 pr-4 text-gray-700">
-                        {getClientName(clients, r.clientId)}
+                        {resolveReference(r, clients)}
                       </td>
                       <td className="py-2 pr-4">
                         <Badge
@@ -130,20 +138,20 @@ export default function Financetable({
                       <td className="py-2 pr-4">
                         <div className="flex justify-end gap-1">
                           <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8 border-purple-200"
+                            size="sm"
+                            className="h-8 px-4 rounded-full bg-purple-600 text-white text-xs font-semibold"
                             onClick={() => onEdit && onEdit(r)}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Editar
                           </Button>
                           <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8 border-red-200 text-red-600 hover:bg-red-50"
+                            size="sm"
+                            className="h-8 px-4 rounded-full bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600"
                             onClick={() => onDelete && onDelete(r.id)}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Excluir
                           </Button>
                         </div>
                       </td>
