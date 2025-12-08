@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import {
   Card,
   CardHeader,
@@ -8,25 +8,40 @@ import {
 } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
-import { Pencil, Trash2, CalendarDays } from "lucide-react";
+import { Pencil, CalendarDays } from "lucide-react";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select.jsx";
 
 const STATUS_OPTIONS = [
-  { value: "TODO", label: "A fazer" },
+  { value: "TODO", label: "Rascunho" },
   { value: "IN_PROGRESS", label: "Em andamento" },
   { value: "REVIEW", label: "Revisão" },
   { value: "DONE", label: "Concluída" },
   { value: "BLOCKED", label: "Bloqueada" },
 ];
 
+const STATUS_STYLES = {
+  TODO: { bar: "#c4b5fd", badge: "bg-purple-50 text-purple-700" },
+  IN_PROGRESS: { bar: "#a78bfa", badge: "bg-indigo-50 text-indigo-700" },
+  REVIEW: { bar: "#fcd34d", badge: "bg-amber-50 text-amber-700" },
+  DONE: { bar: "#34d399", badge: "bg-emerald-50 text-emerald-700" },
+  BLOCKED: { bar: "#fb7185", badge: "bg-rose-50 text-rose-700" },
+};
+
 function formatStatusLabel(value) {
-  const found = STATUS_OPTIONS.find((s) => s.value === value);
+  const found = STATUS_OPTIONS.find((opt) => opt.value === value);
   return found ? found.label : value;
 }
 
 function formatDate(dt) {
   if (!dt) return null;
   const d = new Date(dt);
-  if (isNaN(d.getTime())) return null;
+  if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -37,45 +52,36 @@ export default function Taskcard({
   task,
   client,
   onEdit,
-  onDelete,
   onStatusChange,
 }) {
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const statusMenuRef = useRef(null);
+  const dueLabel = formatDate(task.dueDate);
+  const statusStyle = STATUS_STYLES[task.status] || STATUS_STYLES.TODO;
 
-  const handleStatusChange = (newStatus) => {
+  const handleStatusChange = (value) => {
     if (!onStatusChange) return;
-    onStatusChange(task.id, newStatus);
-    setStatusMenuOpen(false);
+    onStatusChange(task.id, value);
   };
 
-  useEffect(() => {
-    function handleOutside(event) {
-      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target)) {
-        setStatusMenuOpen(false);
-      }
-    }
-    if (statusMenuOpen) {
-      document.addEventListener("mousedown", handleOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [statusMenuOpen]);
-
-  const dueLabel = formatDate(task.dueDate);
-
   return (
-    <Card className="border border-transparent bg-white/95 shadow-lg shadow-purple-50 rounded-2xl hover:-translate-y-0.5 transition transform">
+    <Card className="relative overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_10px_30px_-22px_rgba(109,40,217,0.8)]">
+      <span
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ background: statusStyle.bar }}
+      />
+
       <CardHeader className="pb-3">
-        <div className="flex justify-between items-start gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-sm font-semibold text-gray-900 line-clamp-2">
+            <CardTitle className="text-base font-semibold text-gray-900 line-clamp-2">
               {task.title || "Tarefa sem título"}
             </CardTitle>
             {client && (
-              <p className="text-[11px] text-gray-500 mt-1">{client.name}</p>
+              <p className="text-xs text-gray-500 mt-1">{client.name}</p>
             )}
           </div>
-          <Badge className="text-[10px] bg-purple-50 text-purple-700 border border-purple-100">
+          <Badge
+            className={`text-[10px] border border-transparent ${statusStyle.badge}`}
+          >
             {formatStatusLabel(task.status)}
           </Badge>
         </div>
@@ -83,7 +89,7 @@ export default function Taskcard({
 
       <CardContent className="pb-0">
         {task.description ? (
-          <p className="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">
+          <p className="text-xs text-gray-600 whitespace-pre-line line-clamp-3">
             {task.description}
           </p>
         ) : (
@@ -91,61 +97,34 @@ export default function Taskcard({
         )}
 
         {dueLabel && (
-          <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-3 bg-gray-50 rounded-lg px-2 py-1 w-fit">
-            <CalendarDays className="w-3 h-3" />
-            <span>Prazo {dueLabel}</span>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1 text-[11px] text-gray-500">
+            <CalendarDays className="w-3.5 h-3.5" />
+            Prazo {dueLabel}
           </div>
         )}
       </CardContent>
 
       <CardFooter className="pt-4 flex flex-col gap-3">
-        <div className="relative" ref={statusMenuRef}>
-          <button
-            type="button"
-            className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-medium text-purple-700 shadow-sm hover:border-purple-300 flex items-center justify-between"
-            onClick={() => setStatusMenuOpen((prev) => !prev)}
-          >
-            <span>{formatStatusLabel(task.status)}</span>
-            <span className="text-[10px] text-gray-400">Alterar</span>
-          </button>
-          {statusMenuOpen && (
-            <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-100 bg-white shadow-2xl">
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`w-full text-left px-3 py-2 text-xs hover:bg-purple-50 ${
-                    task.status === opt.value
-                      ? "bg-purple-50 text-purple-700"
-                      : "text-gray-700"
-                  }`}
-                  onClick={() => handleStatusChange(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Select value={task.status} onValueChange={handleStatusChange}>
+          <SelectTrigger className="h-9 text-xs font-semibold border border-purple-200 text-purple-700">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div className="flex items-center gap-2 justify-between w-full">
-          <Button
-            variant="outline"
-            className="flex-1 border-purple-200 hover:bg-purple-50 text-sm"
-            onClick={() => onEdit && onEdit(task)}
-          >
-            <Pencil className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 text-sm"
-            onClick={() => onDelete && onDelete(task.id)}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Excluir
-          </Button>
-        </div>
+        <Button
+          className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-xs font-semibold"
+          onClick={() => onEdit && onEdit(task)}
+        >
+          <Pencil className="w-4 h-4 mr-2" />
+          Editar
+        </Button>
       </CardFooter>
     </Card>
   );
