@@ -220,7 +220,7 @@ model TeamMember {
   permissions Json?    // permissões específicas por membro
   salaryCents Int?
   salaryRecordId String?
-  salaryRecord FinancialRecord? @relation(fields: [salaryRecordId], references: [id], onDelete: SetNull)
+  salaryRecord FinancialRecord? @relation("TeamMemberSalaryRecord", fields: [salaryRecordId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
 
   @@map("team_members")
@@ -594,6 +594,7 @@ model FinancialRecord {
   metadata    Json?
   clientId    String?
   client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  teamMemberSalary TeamMember? @relation("TeamMemberSalaryRecord")
   note        String?
   occurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
