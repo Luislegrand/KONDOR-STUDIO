@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import logoFull from "@/assets/logo-full.svg";
+import logoDark from "@/assets/logo-dark.svg";
 
 const footerColumns = [
   {
@@ -35,7 +35,7 @@ export default function SiteFooter() {
     <footer className="bg-slate-950 text-slate-300 mt-20">
       <div className="max-w-6xl mx-auto px-6 py-12 grid gap-8 md:grid-cols-4">
         <div className="space-y-3">
-          <img src={logoFull} alt="Kondor Studio" className="h-10 w-auto" />
+          <img src={logoDark} alt="Kondor Studio" className="h-10 w-auto" />
           <p className="text-sm text-slate-400">
             Plataforma de gestão para agências modernas. Organização, automação
             e inteligência em um único lugar.

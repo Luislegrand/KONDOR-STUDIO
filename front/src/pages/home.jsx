@@ -355,8 +355,6 @@ export default function Home() {
         </div>
       </section>
 
-*** End Patch
-
       <section className="bg-slate-900 text-white text-center py-16 px-6">
         <p className="text-sm uppercase tracking-[0.4em] text-white/60 mb-3">
           Pronto para avançar?
