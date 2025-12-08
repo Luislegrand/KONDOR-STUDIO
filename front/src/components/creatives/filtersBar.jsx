@@ -1,5 +1,5 @@
-import React from "react";
-import { Search } from "lucide-react";
+import React, { useState } from "react";
+import { Filter, Search } from "lucide-react";
 import { Input } from "@/components/ui/input.jsx";
 import {
   Select,
@@ -35,6 +35,8 @@ export default function FiltersBar({
   onStatusChange,
   total,
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-4 lg:p-6 space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
@@ -48,52 +50,64 @@ export default function FiltersBar({
           />
         </div>
 
-        <div className="text-sm text-slate-500 font-medium lg:w-auto">
-          {total} criativo{total === 1 ? "" : "s"} encontrados
+        <div className="flex items-center gap-3 lg:w-auto">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 bg-slate-100 px-4 py-2 rounded-2xl hover:bg-slate-200 transition"
+          >
+            <Filter className="w-4 h-4" />
+            {expanded ? "Ocultar filtros" : "Mostrar filtros"}
+          </button>
+          <div className="text-sm text-slate-500 font-medium">
+            {total} criativo{total === 1 ? "" : "s"} encontrados
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Select value={filterClient} onValueChange={onClientChange}>
-          <SelectTrigger className="flex-1 min-w-[180px] h-11 rounded-2xl border-slate-200">
-            <SelectValue placeholder="Todos os clientes" />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            <SelectItem value="all">Todos os clientes</SelectItem>
-            {clients.map((client) => (
-              <SelectItem key={client.id} value={client.id}>
-                {client.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {expanded && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={filterClient} onValueChange={onClientChange}>
+            <SelectTrigger className="flex-1 min-w-[180px] h-11 rounded-2xl border-slate-200">
+              <SelectValue placeholder="Todos os clientes" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={filterType} onValueChange={onTypeChange}>
-          <SelectTrigger className="flex-1 min-w-[150px] h-11 rounded-2xl border-slate-200">
-            <SelectValue placeholder="Todos os tipos" />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            {TYPE_OPTIONS.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={filterType} onValueChange={onTypeChange}>
+            <SelectTrigger className="flex-1 min-w-[150px] h-11 rounded-2xl border-slate-200">
+              <SelectValue placeholder="Todos os tipos" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              {TYPE_OPTIONS.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={filterStatus} onValueChange={onStatusChange}>
-          <SelectTrigger className="flex-1 min-w-[150px] h-11 rounded-2xl border-slate-200">
-            <SelectValue placeholder="Todos os status" />
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            {STATUS_FILTERS.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <Select value={filterStatus} onValueChange={onStatusChange}>
+            <SelectTrigger className="flex-1 min-w-[150px] h-11 rounded-2xl border-slate-200">
+              <SelectValue placeholder="Todos os status" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              {STATUS_FILTERS.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 }
