@@ -228,11 +228,11 @@ export default function Taskformdialog({
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-6 sm:flex-row sm:justify-between sm:items-center">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
             {task && onDelete && (
               <Button
                 type="button"
-                className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+                className="bg-red-600 hover:bg-red-700"
                 disabled={isSaving || isDeleting}
                 onClick={() => {
                   if (
@@ -247,26 +247,26 @@ export default function Taskformdialog({
               </Button>
             )}
 
-            <div className="flex gap-3 justify-end w-full sm:w-auto">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSaving || isDeleting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="bg-purple-600 hover:bg-purple-700"
-              disabled={isSaving || isDeleting}
-            >
-              {isSaving
-                ? "Salvando..."
-                : task
-                ? "Atualizar Tarefa"
-                : "Criar Tarefa"}
-            </Button>
+            <div className="flex gap-3 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSaving || isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700"
+                disabled={isSaving || isDeleting}
+              >
+                {isSaving
+                  ? "Salvando..."
+                  : task
+                  ? "Atualizar Tarefa"
+                  : "Criar Tarefa"}
+              </Button>
             </div>
           </div>
         </form>
