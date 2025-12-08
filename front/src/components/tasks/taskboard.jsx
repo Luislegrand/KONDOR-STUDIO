@@ -4,33 +4,28 @@ import Taskcard from "./taskcard.jsx";
 const BASE_COLUMNS = [
   {
     status: "TODO",
-    title: "A fazer",
-    description: "Ideias e cards recém criados.",
-    accent: "from-blue-50 to-white",
+    title: "Rascunho",
+    description: "Ideias e tarefas ainda não iniciadas.",
   },
   {
     status: "IN_PROGRESS",
     title: "Em andamento",
     description: "Equipe atuando agora.",
-    accent: "from-purple-50 to-white",
   },
   {
     status: "REVIEW",
     title: "Revisão",
-    description: "Esperando revisão/cliente.",
-    accent: "from-amber-50 to-white",
+    description: "Esperando validação ou aprovação.",
   },
   {
     status: "DONE",
     title: "Concluída",
-    description: "Prontas e entregues.",
-    accent: "from-emerald-50 to-white",
+    description: "Finalizadas e entregues.",
   },
   {
     status: "BLOCKED",
     title: "Bloqueada",
-    description: "Aguardando dependências.",
-    accent: "from-rose-50 to-white",
+    description: "Aguardando dependências ou impedimento.",
   },
 ];
 
@@ -74,7 +69,6 @@ export default function Taskboard({
       status: s,
       title: s,
       description: "Status personalizado",
-      accent: "from-gray-50 to-white",
     }));
 
   const columns = [...BASE_COLUMNS, ...dynamicColumns];
@@ -84,63 +78,64 @@ export default function Taskboard({
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="h-20 rounded-2xl bg-slate-200/60 animate-pulse"
+          className="h-24 rounded-2xl bg-slate-100/80 animate-pulse"
         />
       ))}
     </div>
   );
 
+  const renderEmpty = () => (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-xs text-slate-400">
+      Nenhuma tarefa nesta coluna.
+    </div>
+  );
+
   return (
-    <div className="flex gap-5 overflow-x-auto pb-2">
-      {columns.map((col) => {
-        const columnTasks = tasksByStatus.get(col.status) || [];
+    <div className="pb-8">
+      <div className="flex w-full gap-5 overflow-x-auto pb-2">
+        {columns.map((col) => {
+          const columnTasks = tasksByStatus.get(col.status) || [];
 
-        return (
-          <div key={col.status} className="min-w-[280px] flex-shrink-0">
-            <div
-              className={`flex h-full flex-col rounded-3xl border border-slate-200 bg-gradient-to-b ${col.accent} p-5 shadow-sm shadow-slate-100 backdrop-blur`}
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {col.title}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {col.description}
-                  </p>
+          return (
+            <div key={col.status} className="min-w-[360px] flex-shrink-0">
+              <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-100 backdrop-blur-md">
+                <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 bg-white/90 pb-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {col.title}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {col.description}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                    {columnTasks.length}
+                  </span>
                 </div>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow">
-                  {columnTasks.length}
-                </span>
-              </div>
 
-              <div
-                className="flex-1 space-y-4 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
-                style={{ maxHeight: "calc(100vh - 260px)" }}
-              >
-                {isLoading
-                  ? renderSkeleton()
-                  : columnTasks.length === 0
-                  ? (
-                    <div className="rounded-2xl border border-dashed border-white/70 bg-white/60 px-4 py-6 text-center text-xs text-slate-400">
-                      Nenhuma tarefa nesta coluna.
-                    </div>
-                    )
-                  : columnTasks.map((task) => (
-                      <Taskcard
-                        key={task.id}
-                        task={task}
-                        client={getClient(task.clientId)}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onStatusChange={onStatusChange}
-                      />
-                    ))}
+                <div
+                  className="flex-1 space-y-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+                  style={{ maxHeight: "calc(100vh - 220px)" }}
+                >
+                  {isLoading
+                    ? renderSkeleton()
+                    : columnTasks.length === 0
+                    ? renderEmpty()
+                    : columnTasks.map((task) => (
+                        <Taskcard
+                          key={task.id}
+                          task={task}
+                          client={getClient(task.clientId)}
+                          onEdit={onEdit}
+                          onStatusChange={onStatusChange}
+                        />
+                      ))}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
