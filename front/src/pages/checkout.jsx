@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { pricingPlans } from "@/data/pricingPlans.js";
 import { Check, Lock, Shield } from "lucide-react";
+import logoFull from "@/assets/logo-full.svg";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("pt-BR", {
@@ -67,14 +68,17 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-purple-50 to-white">
       <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            className="text-sm text-gray-500 hover:text-gray-800"
-            onClick={() => navigate(-1)}
-          >
-            ← Voltar
-          </button>
+        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <img src={logoFull} alt="Kondor Studio" className="h-10 w-auto" />
+            <button
+              type="button"
+              className="text-sm text-gray-500 hover:text-gray-800"
+              onClick={() => navigate(-1)}
+            >
+              ← Voltar
+            </button>
+          </div>
           <div className="text-sm text-gray-500 flex items-center gap-2">
             <Shield className="w-4 h-4 text-green-500" />
             Checkout seguro

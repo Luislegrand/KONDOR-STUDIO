@@ -14,6 +14,7 @@ import { CheckCircle } from "lucide-react";
 
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 import { base44 } from "@/apiClient/base44Client";
+import logoFull from "@/assets/logo-full.svg";
 
 async function fetchClient(path, token, options = {}) {
   const res = await base44.rawFetch(path, {
@@ -227,31 +228,42 @@ export default function ClientPortal() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            {client?.metadata?.agency_logo ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-4 flex-wrap">
               <img
-                src={client.metadata.agency_logo}
-                alt={client.metadata.agency_name || "Agência"}
-                className="w-12 h-12 rounded-xl object-cover border"
+                src={logoFull}
+                alt="Kondor Studio"
+                className="h-10 w-auto"
               />
-            ) : (
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center font-semibold text-white"
-                style={{ background: primaryColor }}
-              >
-                {(client?.metadata?.agency_name || "KS")
-                  .slice(0, 2)
-                  .toUpperCase()}
+              <div className="flex items-center gap-3">
+                {client?.metadata?.agency_logo ? (
+                  <img
+                    src={client.metadata.agency_logo}
+                    alt={client.metadata.agency_name || "Agência"}
+                    className="w-12 h-12 rounded-xl object-cover border"
+                  />
+                ) : (
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center font-semibold text-white"
+                    style={{ background: primaryColor }}
+                  >
+                    {(client?.metadata?.agency_name || "KS")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs uppercase text-gray-500">
+                    Portal do cliente
+                  </p>
+                  <h1 className="text-lg font-semibold text-gray-900">
+                    {client?.metadata?.agency_name || "Kondor Studio"}
+                  </h1>
+                  {client?.name && (
+                    <p className="text-xs text-gray-500">Conta: {client.name}</p>
+                  )}
+                </div>
               </div>
-            )}
-            <div>
-              <p className="text-xs uppercase text-gray-500">Portal do cliente</p>
-              <h1 className="text-lg font-semibold text-gray-900">
-                {client?.metadata?.agency_name || "Kondor Studio"}
-              </h1>
-              {client?.name && (
-                <p className="text-xs text-gray-500">Conta: {client.name}</p>
-              )}
             </div>
           </div>
           <Button

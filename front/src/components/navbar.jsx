@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { base44 } from "@/apiClient/base44Client";
 import { useSubscription } from "./SubscriptionContext.jsx";
 import SubscriptionExpiredModal from "./SubscriptionExpiredModal.jsx";
+import logoFull from "@/assets/logo-full.svg";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -32,17 +33,14 @@ export default function Navbar() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           {/* Logo + nome */}
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-md bg-gradient-to-br from-purple-500 to-violet-400 flex items-center justify-center text-xs font-bold text-white">
-              KS
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-gray-900">
-                KONDOR STUDIO
-              </span>
-              <span className="text-[11px] text-gray-500">
-                Painel da agência
-              </span>
-            </div>
+            <img
+              src={logoFull}
+              alt="Kondor Studio"
+              className="h-9 w-auto"
+            />
+            <span className="text-[11px] text-gray-500 hidden sm:inline">
+              Painel da agência
+            </span>
           </div>
 
           {/* Navegação principal (desktop simples) */}

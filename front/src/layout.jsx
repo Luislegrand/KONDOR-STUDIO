@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { base44 } from "@/apiClient/base44Client";
+import logoFull from "@/assets/logo-full.svg";
 
 const navItems = [
   {
@@ -99,18 +100,11 @@ export default function Layout() {
       <aside className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-gray-200">
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-200">
-          <div
-            className="h-8 w-8 rounded-xl flex items-center justify-center text-white font-bold"
-            style={{ background: "var(--primary)" }}
-          >
-            K
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-sm" style={{ color: "var(--primary)" }}>
-              KONDOR
-            </span>
-            <span className="text-xs text-gray-500">STUDIO</span>
-          </div>
+          <img
+            src={logoFull}
+            alt="Kondor Studio"
+            className="h-10 w-auto"
+          />
         </div>
 
         {/* Menu */}
@@ -174,18 +168,11 @@ export default function Layout() {
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div className="flex items-center gap-2">
-              <div
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-white font-bold"
-                style={{ background: "var(--primary)" }}
-              >
-                K
-              </div>
-              <div className="flex flex-col leading-tight">
-                <span className="font-semibold text-sm" style={{ color: "var(--primary)" }}>
-                  KONDOR
-                </span>
-                <span className="text-xs text-gray-500">STUDIO</span>
-              </div>
+              <img
+                src={logoFull}
+                alt="Kondor Studio"
+                className="h-9 w-auto"
+              />
             </div>
           </div>
         </header>
