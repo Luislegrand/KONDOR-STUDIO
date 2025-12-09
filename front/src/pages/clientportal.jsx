@@ -233,7 +233,7 @@ export default function ClientPortal() {
               <img
                 src={logoHeader}
                 alt="Kondor Studio"
-                className="h-16 w-auto"
+                className="h-10 w-auto"
               />
               <div className="flex items-center gap-3">
                 {client?.metadata?.agency_logo ? (
