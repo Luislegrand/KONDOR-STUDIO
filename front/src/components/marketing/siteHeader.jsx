@@ -58,34 +58,31 @@ export default function SiteHeader({ variant = "solid" }) {
       </div>
 
       {open && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setOpen(false)}>
-          <div
-            className="ml-auto h-full w-72 bg-white shadow-xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <img
-                src={logoHeader}
-                alt="Kondor Studio"
-                className="h-9 w-auto drop-shadow-sm"
-              />
-              <button onClick={() => setOpen(false)}>
-                <X className="w-5 h-5 text-slate-600" />
-              </button>
-            </div>
-            <div className="flex-1 px-5 py-6 space-y-4 text-sm">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setOpen(false)}
-                  className="block text-slate-700 font-medium"
-                >
-                  {link.label}
-                </Link>
-              ))}
+        <div className="md:hidden fixed inset-0 z-40 bg-white shadow-xl flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <img
+              src={logoHeader}
+              alt="Kondor Studio"
+              className="h-9 w-auto drop-shadow-sm"
+            />
+            <button onClick={() => setOpen(false)} className="p-2">
+              <X className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 text-base">
+            {navLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setOpen(false)}
+                className="block text-slate-800 font-medium"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="pt-4 space-y-3">
               <button
-                className="w-full rounded-full border border-slate-200 py-2 font-medium"
+                className="w-full rounded-full border border-slate-200 py-2 font-medium text-slate-700"
                 onClick={() => {
                   navigate("/login");
                   setOpen(false);
