@@ -68,16 +68,16 @@ export default function SiteHeader({ variant = "solid" }) {
         <button
           className="md:hidden text-slate-700 p-2"
           type="button"
-          aria-label="Abrir menu"
+          aria-label={open ? "Fechar menu" : "Abrir menu"}
           aria-expanded={open}
-          onClick={() => setOpen(true)}
+          onClick={() => setOpen((prev) => !prev)}
         >
-          <Menu className="w-6 h-6" />
+          {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
       {open && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div className="md:hidden fixed inset-0 z-[9999]">
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
