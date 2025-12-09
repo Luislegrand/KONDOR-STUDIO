@@ -10,6 +10,18 @@ export function useSubscription() {
   return useContext(SubscriptionContext);
 }
 
+function isSubscriptionError(reason) {
+  if (!reason) return false;
+  const status = reason.status || reason?.response?.status;
+  if (status === 402 || status === 403) return true;
+  const code =
+    reason?.data?.code ||
+    reason?.code ||
+    reason?.response?.data?.code ||
+    reason?.response?.code;
+  return code === "SUBSCRIPTION_REQUIRED" || code === "SUBSCRIPTION_EXPIRED";
+}
+
 export function SubscriptionProvider({ children }) {
   const [expired, setExpired] = useState(false);
   const [isClientPortal, setIsClientPortal] = useState(false);
@@ -27,10 +39,21 @@ export function SubscriptionProvider({ children }) {
       }
     }
 
+    function handleUnhandledRejection(event) {
+      if (!isClientPortal && isSubscriptionError(event.reason)) {
+        setExpired(true);
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+      }
+    }
+
     window.addEventListener("subscription_expired", handleExpired);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
 
     return () => {
       window.removeEventListener("subscription_expired", handleExpired);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
     };
   }, [isClientPortal]);
 
