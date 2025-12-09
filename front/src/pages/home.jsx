@@ -6,13 +6,6 @@ import { modulesData } from "@/data/modules.js";
 import SiteHeader from "@/components/marketing/siteHeader.jsx";
 import SiteFooter from "@/components/marketing/siteFooter.jsx";
 
-const quickBenefits = [
-  "Até 40% menos tempo coordenando entregas e aprovações",
-  "Clientes, conteúdo e equipe organizados em um só lugar",
-  "Alertas inteligentes evitam atrasos e retrabalho",
-  "Economia de horas e orçamento com fluxos automatizados",
-];
-
 const functionalityBlocks = [
   {
     title: "Relatórios Inteligentes",
@@ -179,7 +172,7 @@ export default function Home() {
                 <p className="text-xs uppercase text-white/60">
                   Aprovações pendentes
                 </p>
-                <p className="text-2xl font-bold">12</p>
+                <p className="text-2xl font-bold text-white">12</p>
                 <p className="text-sm text-white/70 mt-1">
                   8 posts e 4 peças de mídia
                 </p>
@@ -195,27 +188,13 @@ export default function Home() {
               </div>
               <div className="bg-slate-900/70 rounded-2xl p-4">
                 <p className="text-xs uppercase text-white/60">Equipe online</p>
-                <p className="text-2xl font-bold">18</p>
+                <p className="text-2xl font-bold text-white">18</p>
                 <p className="text-sm text-emerald-400 mt-1">
                   Designers, redatores e mídia
                 </p>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Quick benefits */}
-      <section className="max-w-6xl mx-auto px-6 mt-0">
-        <div className="grid md:grid-cols-4 gap-4">
-          {quickBenefits.map((benefit) => (
-            <div
-              key={benefit}
-              className="rounded-2xl bg-white border border-slate-100 p-5 text-sm font-semibold text-slate-700 shadow-sm"
-            >
-              {benefit}
-            </div>
-          ))}
         </div>
       </section>
 
