@@ -10,11 +10,17 @@ const AdminRoute = () => {
   const role = auth?.user?.role;
 
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/admin/login" replace state={{ from: location }} />;
   }
 
   if (role !== "SUPER_ADMIN") {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to="/admin/login"
+        replace
+        state={{ from: location, reason: "forbidden" }}
+      />
+    );
   }
 
   return <Outlet />;

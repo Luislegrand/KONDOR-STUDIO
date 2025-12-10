@@ -30,6 +30,7 @@ const Pricing = lazy(() => import("./pages/pricing.jsx"));
 const ModulesPage = lazy(() => import("./pages/modules.jsx"));
 const DemoPage = lazy(() => import("./pages/demo.jsx"));
 
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin.jsx"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout.jsx"));
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview.jsx"));
 const AdminTenants = lazy(() => import("./pages/admin/AdminTenants.jsx"));
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/demo" element={<DemoPage />} />
         <Route path="/register" element={<Register />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* Login / portal do cliente (white-label) */}
         <Route path="/clientlogin" element={<ClientLogin />} />
