@@ -242,7 +242,7 @@ export default function Integrations() {
 
         {/* Dialog de nova integração */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nova integração</DialogTitle>
             </DialogHeader>
