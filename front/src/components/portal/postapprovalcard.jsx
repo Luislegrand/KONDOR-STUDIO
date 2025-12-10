@@ -12,6 +12,7 @@ import {
   Video,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { resolveMediaUrl } from "@/lib/media.js";
 
 /**
  * FASE 3 — APROVAÇÕES
@@ -30,6 +31,11 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState("");
   const queryClient = useQueryClient();
+  const rawMedia = post?.media_url || post?.mediaUrl || "";
+  const mediaUrl = useMemo(
+    () => (rawMedia ? resolveMediaUrl(rawMedia) : ""),
+    [rawMedia]
+  );
 
   const currentStatus = useMemo(() => {
     if (approval?.status) return approval.status;
@@ -123,7 +129,7 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
       <div className="grid md:grid-cols-2 gap-6 p-6">
 
         <div>
-          {post.media_url ? (
+          {mediaUrl ? (
             <div className="relative rounded-lg overflow-hidden bg-gray-100">
               {post.media_type === "video" ? (
                 <div className="aspect-square flex items-center justify-center">
@@ -131,7 +137,7 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
                 </div>
               ) : (
                 <img
-                  src={post.media_url}
+                  src={mediaUrl}
                   alt={post.title}
                   className="w-full aspect-square object-cover"
                 />

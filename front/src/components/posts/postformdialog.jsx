@@ -11,24 +11,7 @@ import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import { Video } from "lucide-react";
-
-function resolvePreview(raw) {
-  if (!raw) return "";
-  if (raw.startsWith("blob:") || /^https?:\/\//i.test(raw)) {
-    return raw;
-  }
-
-  const envBase =
-    (typeof import.meta !== "undefined" &&
-      import.meta.env &&
-      import.meta.env.VITE_API_URL) ||
-    (base44.API_BASE_URL || "");
-
-  const normalizedBase = envBase.replace(/\/$/, "");
-  const suffix = raw.startsWith("/") ? raw : `/${raw}`;
-
-  return normalizedBase ? `${normalizedBase}${suffix}` : raw;
-}
+import { resolveMediaUrl } from "@/lib/media.js";
 
 export default function Postformdialog({
   open,
@@ -74,7 +57,7 @@ export default function Postformdialog({
     setFormData(payload);
     setFile(null);
     const initialMedia = payload.media_url
-      ? resolvePreview(payload.media_url)
+      ? resolveMediaUrl(payload.media_url)
       : null;
     setPreviewUrl(initialMedia);
   };

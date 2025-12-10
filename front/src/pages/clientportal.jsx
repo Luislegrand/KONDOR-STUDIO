@@ -15,6 +15,7 @@ import { CheckCircle } from "lucide-react";
 import Postapprovalcard from "../components/portal/postapprovalcard.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import logoHeader from "@/assets/logoheader.png";
+import { resolveMediaUrl } from "@/lib/media.js";
 
 async function fetchClient(path, token, options = {}) {
   const res = await base44.rawFetch(path, {
@@ -381,33 +382,38 @@ export default function ClientPortal() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {approvedPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="flex items-center justify-between border rounded-lg px-4 py-3 bg-white"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {post.title || post.caption || "Post sem título"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Status:{" "}
-                          <span className="font-semibold">
-                            {post.status}
-                          </span>
-                        </p>
+                  {approvedPosts.map((post) => {
+                    const mediaUrl = resolveMediaUrl(
+                      post.media_url || post.mediaUrl || ""
+                    );
+                    return (
+                      <div
+                        key={post.id}
+                        className="flex items-center justify-between border rounded-lg px-4 py-3 bg-white"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {post.title || post.caption || "Post sem título"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Status:{" "}
+                            <span className="font-semibold">
+                              {post.status}
+                            </span>
+                          </p>
+                        </div>
+                        {mediaUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(mediaUrl, "_blank")}
+                          >
+                            Ver mídia
+                          </Button>
+                        )}
                       </div>
-                      {post.mediaUrl && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(post.mediaUrl, "_blank")}
-                        >
-                          Ver mídia
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
