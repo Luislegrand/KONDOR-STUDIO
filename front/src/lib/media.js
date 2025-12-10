@@ -1,6 +1,10 @@
 import { base44 } from "@/apiClient/base44Client";
 
 function getPreferredProtocol() {
+  if (typeof window !== "undefined" && window.location?.protocol) {
+    return window.location.protocol;
+  }
+
   const envBase =
     (typeof import.meta !== "undefined" &&
       import.meta.env &&
@@ -15,10 +19,6 @@ function getPreferredProtocol() {
         return parsed.protocol;
       }
     } catch (_) {}
-  }
-
-  if (typeof window !== "undefined" && window.location?.protocol) {
-    return window.location.protocol;
   }
 
   return null;

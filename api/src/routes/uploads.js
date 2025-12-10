@@ -19,6 +19,30 @@ const upload = multer({
 router.use(authMiddleware);
 router.use(tenantMiddleware);
 
+function detectRequestProtocol(req) {
+  const header = (req.headers["x-forwarded-proto"] || "")
+    .toString()
+    .split(",")[0]
+    .trim();
+  return header || req.protocol || "http";
+}
+
+function forceProtocol(urlString, protocol) {
+  if (!urlString || !protocol) return urlString;
+  try {
+    const parsed = new URL(urlString);
+    const normalizedProtocol = protocol.endsWith(":")
+      ? protocol
+      : `${protocol}:`;
+    if (parsed.protocol !== normalizedProtocol) {
+      parsed.protocol = normalizedProtocol;
+    }
+    return parsed.toString();
+  } catch (err) {
+    return urlString;
+  }
+}
+
 /**
  * POST /uploads
  * multipart form upload: field name = "file"
@@ -50,13 +74,9 @@ router.post('/', upload.single('file'), async (req, res) => {
       metadata: { uploadedBy: req.user?.id || null },
     });
 
-    const forwardedProtoHeader = (req.headers["x-forwarded-proto"] || "")
-      .toString()
-      .split(",")[0]
-      .trim();
-    const fallbackProto = forwardedProtoHeader || req.protocol || "http";
+    const requestProtocol = detectRequestProtocol(req);
     const host = req.get("host") || "localhost";
-    const fallbackBase = `${fallbackProto}://${host}`;
+    const fallbackBase = `${requestProtocol}://${host}`;
 
     const baseUrl =
       process.env.UPLOADS_BASE_URL ||
@@ -64,7 +84,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       process.env.API_BASE_URL ||
       process.env.RENDER_EXTERNAL_URL ||
       fallbackBase;
-    const normalizedBase = baseUrl.replace(/\/$/, '');
+    const normalizedBase = forceProtocol(baseUrl, requestProtocol).replace(/\/$/, '');
     const finalUrl = `${normalizedBase}/uploads/public/${encodeURIComponent(result.key)}`;
 
     // You may want to persist the key/url into DB (e.g. media table) — not done here
