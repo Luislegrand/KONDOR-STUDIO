@@ -13,6 +13,7 @@ const authMiddleware = require("./middleware/auth");
 const tenantMiddleware = require("./middleware/tenant");
 const { checkSubscription } = require("./middleware/checkSubscription");
 const auditLog = require("./middleware/auditLog");
+const errorLogger = require("./middleware/errorLogger");
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -234,6 +235,7 @@ safeMount("/api/uploads", require("./routes/uploads"));
 safeMount("/api/reports", require("./routes/reports"));
 safeMount("/api/billing", require("./routes/billing"));
 safeMount("/api/team", require("./routes/team"));
+safeMount("/api/admin", require("./routes/admin"));
 try {
   safeMount("/api/automation", require("./routes/automation"));
 } catch {
@@ -246,11 +248,7 @@ app.use((req, res, next) => {
   return res.status(404).json({ error: "Rota não encontrada" });
 });
 
-app.use((err, req, res, next) => {
-  console.error("❌ Erro não tratado:", err.stack || err);
-  if (res.headersSent) return next(err);
-  return res.status(err.status || 500).json({ error: err.message || "Erro interno do servidor" });
-});
+app.use(errorLogger());
 
 // Start
 const PORT = process.env.PORT || 4000;

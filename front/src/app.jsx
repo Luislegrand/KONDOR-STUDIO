@@ -4,6 +4,7 @@ import { Routes, Route } from "react-router-dom";
 
 import Layout from "./layout.jsx";
 import PrivateRoute from "./components/privateRoute.jsx";
+const AdminRoute = lazy(() => import("./components/adminRoute.jsx"));
 
 const Dashboard = lazy(() => import("./pages/dashboard.jsx"));
 const Clients = lazy(() => import("./pages/clients.jsx"));
@@ -28,6 +29,13 @@ const ClientPortal = lazy(() => import("./pages/clientportal.jsx"));
 const Pricing = lazy(() => import("./pages/pricing.jsx"));
 const ModulesPage = lazy(() => import("./pages/modules.jsx"));
 const DemoPage = lazy(() => import("./pages/demo.jsx"));
+
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout.jsx"));
+const AdminOverview = lazy(() => import("./pages/admin/AdminOverview.jsx"));
+const AdminTenants = lazy(() => import("./pages/admin/AdminTenants.jsx"));
+const AdminTenantDetails = lazy(() => import("./pages/admin/AdminTenantDetails.jsx"));
+const AdminLogs = lazy(() => import("./pages/admin/AdminLogs.jsx"));
+const AdminJobs = lazy(() => import("./pages/admin/AdminJobs.jsx"));
 
 export default function App() {
   return (
@@ -66,6 +74,17 @@ export default function App() {
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/onboarding" element={<Onboarding />} />
+          </Route>
+        </Route>
+
+        {/* Painel mestre */}
+        <Route element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminOverview />} />
+            <Route path="/admin/tenants" element={<AdminTenants />} />
+            <Route path="/admin/tenants/:tenantId" element={<AdminTenantDetails />} />
+            <Route path="/admin/logs" element={<AdminLogs />} />
+            <Route path="/admin/jobs" element={<AdminJobs />} />
           </Route>
         </Route>
 

@@ -7,6 +7,7 @@ const {
   reportsQueue,
   whatsappQueue,
 } = require('./queues');
+const { prisma } = require('./prisma');
 
 const updateMetricsJob = require('./jobs/updateMetricsJob');
 const reportGenerationJob = require('./jobs/reportGenerationJob');
@@ -118,19 +119,36 @@ whatsappWorker.on('completed', (job) => {
   console.log('[whatsapp] job completed', job.id);
 });
 
-// ------------------------------------------------------
-// Logs de erro
-// ------------------------------------------------------
-metricsWorker.on('failed', (job, err) => {
+async function logJobFailure(queueName, job, err) {
+  try {
+    await prisma.jobLog.create({
+      data: {
+        queue: queueName,
+        jobId: job?.id ? String(job.id) : null,
+        status: 'FAILED',
+        attempts: job?.attemptsMade || job?.attempts || null,
+        tenantId: job?.data?.tenantId || null,
+        error: err && err.stack ? err.stack.slice(0, 2000) : (err && err.message) || 'Erro desconhecido',
+      },
+    });
+  } catch (logErr) {
+    console.error('[worker] Falha ao registrar JobLog', logErr);
+  }
+}
+
+metricsWorker.on('failed', async (job, err) => {
   console.error('[metricsSync] job failed', job?.id, err);
+  await logJobFailure(metricsSyncQueue.name, job, err);
 });
 
-reportsWorker.on('failed', (job, err) => {
+reportsWorker.on('failed', async (job, err) => {
   console.error('[reports] job failed', job?.id, err);
+  await logJobFailure(reportsQueue.name, job, err);
 });
 
-whatsappWorker.on('failed', (job, err) => {
+whatsappWorker.on('failed', async (job, err) => {
   console.error('[whatsapp] job failed', job?.id, err);
+  await logJobFailure(whatsappQueue.name, job, err);
 });
 
 // ------------------------------------------------------

@@ -604,6 +604,72 @@ const TeamMember = {
 };
 
 // --------------------
+// Admin Control Center
+// --------------------
+
+const Admin = {
+  async overview() {
+    return jsonFetch("/admin/overview", { method: "GET" });
+  },
+
+  async tenants(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/admin/tenants${qs}`, { method: "GET" });
+  },
+
+  async tenant(id) {
+    if (!id) throw new Error("tenantId é obrigatório");
+    return jsonFetch(`/admin/tenants/${id}`, { method: "GET" });
+  },
+
+  async updateTenant(id, payload) {
+    if (!id) throw new Error("tenantId é obrigatório");
+    return jsonFetch(`/admin/tenants/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async logs(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/admin/logs${qs}`, { method: "GET" });
+  },
+
+  async jobs(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/admin/jobs${qs}`, { method: "GET" });
+  },
+
+  async impersonate(userId) {
+    if (!userId) throw new Error("userId é obrigatório");
+    return jsonFetch(`/admin/impersonate`, {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    });
+  },
+
+  async stopImpersonation(payload = {}) {
+    return jsonFetch(`/admin/impersonate/stop`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async tenantNotes(tenantId) {
+    if (!tenantId) throw new Error("tenantId é obrigatório");
+    return jsonFetch(`/admin/tenants/${tenantId}/notes`, { method: "GET" });
+  },
+
+  async createTenantNote(tenantId, payload) {
+    if (!tenantId) throw new Error("tenantId é obrigatório");
+    return jsonFetch(`/admin/tenants/${tenantId}/notes`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+};
+
+// --------------------
 // Export principal
 // --------------------
 
@@ -648,4 +714,5 @@ export const base44 = {
     getAccessToken,
     getRefreshToken,
   },
+  admin: Admin,
 };

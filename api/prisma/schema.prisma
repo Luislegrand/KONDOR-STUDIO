@@ -23,6 +23,7 @@ enum Role {
   ADMIN
   MEMBER
   CLIENT
+  SUPER_ADMIN
   GUEST
 }
 
@@ -85,6 +86,19 @@ enum TaskPriority {
   CRITICAL
 }
 
+enum SupportSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
 // ===== MODELS =====
 
 model Tenant {
@@ -97,6 +111,7 @@ model Tenant {
   planId            String?        // default plan reference (optional)
   plan              Plan?          @relation(fields: [planId], references: [id], onDelete: SetNull)
   billingCustomerId String?        // external billing customer id (Stripe/others)
+  status            TenantStatus   @default(TRIAL)
 
   // Relações 1:N
   users             User[]         @relation("TenantUsers")
@@ -120,6 +135,9 @@ model Tenant {
   payments          Payment[]
   jobHistory        JobHistory[]
   refreshTokens     RefreshToken[]
+  systemLogs        SystemLog[]
+  jobLogs           JobLog[]
+  supportNotes      TenantNote[]
 
   createdAtIndex    DateTime?      @ignore
 
@@ -150,6 +168,7 @@ model User {
   approvalsToReview  Approval[]     @relation("ApprovalApprover")
   uploads            Upload[]
   auditLogs          AuditLog[]
+  supportNotes       TenantNote[]   @relation("TenantNoteAuthor")
 
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
@@ -185,6 +204,7 @@ model SessionToken {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String
+  meta       Json?
   createdAt  DateTime @default(now())
   expiresAt  DateTime
   @@map("session_tokens")
@@ -662,6 +682,42 @@ model JobQueue {
   @@index([status])
 }
 
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  source    String
+  message   String
+  stack     String?
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("system_logs")
+  @@index([tenantId])
+  @@index([level])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model JobLog {
+  id        String   @id @default(cuid())
+  queue     String
+  jobId     String?
+  status    String
+  attempts  Int?
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@map("job_logs")
+  @@index([tenantId])
+  @@index([queue])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   tenantId   String
@@ -677,6 +733,24 @@ model AuditLog {
   @@map("audit_logs")
   @@index([tenantId])
   @@index([userId])
+}
+
+model TenantNote {
+  id        String           @id @default(uuid())
+  tenantId  String
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?            @relation("TenantNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  title     String
+  body      String
+  severity  SupportSeverity  @default(MEDIUM)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@map("tenant_notes")
+  @@index([tenantId])
+  @@index([authorId])
+  @@index([severity])
 }
 
 model JobHistory {

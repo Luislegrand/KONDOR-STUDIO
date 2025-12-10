@@ -14,6 +14,7 @@ const TENANT_OPTIONAL_PATHS = [
   '/api/health',
   '/api/healthz',
   '/api/public', // prefixo para rotas públicas (se existirem)
+  '/api/admin', // painel mestre não exige tenantId fixo
 ];
 
 // Extrai tenant de:
