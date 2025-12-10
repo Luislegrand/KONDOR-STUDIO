@@ -72,6 +72,7 @@ const navItems = [
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState("");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -106,6 +107,33 @@ export default function Layout() {
     },
     [queryClient],
   );
+
+  useEffect(() => {
+    const updateUserName = () => {
+      const authData = base44?.storage?.loadAuthFromStorage?.();
+      const name =
+        authData?.user?.name ||
+        authData?.user?.fullName ||
+        authData?.user?.userName ||
+        authData?.user?.username ||
+        authData?.user?.email ||
+        "Usuário";
+      setCurrentUserName(name);
+    };
+
+    updateUserName();
+
+    const handleStorage = () => updateUserName();
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorage);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleStorage);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
@@ -157,7 +185,9 @@ export default function Layout() {
 
         {/* Footer / usuário */}
         <div className="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
-          <span className="block mb-2 text-gray-500">Usuário</span>
+          <span className="block mb-2 text-gray-500">
+            {currentUserName || "Usuário"}
+          </span>
           <button
             type="button"
             onClick={handleLogout}
@@ -242,6 +272,9 @@ export default function Layout() {
                       </NavLink>
                     ))}
                   </div>
+                  <p className="text-xs text-gray-500 px-1 mt-4">
+                    {currentUserName || "Usuário"}
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
