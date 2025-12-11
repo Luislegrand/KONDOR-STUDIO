@@ -410,6 +410,8 @@ module.exports = {
     } else if (prepared.explicitPortalEmail && !prepared.portalEmail) {
       updateData.portalEmail = null;
       updateData.portalPasswordHash = null;
+    } else if (portalCreds.hash && portalCreds.changed) {
+      updateData.portalPasswordHash = portalCreds.hash;
     }
 
     const updated = await prisma.client.update({
