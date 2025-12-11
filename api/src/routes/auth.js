@@ -159,8 +159,18 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
     const client = await prisma.client.findFirst({
       where: {
         OR: [
-          { email: normalizedEmail },
-          { portalEmail: normalizedEmail },
+          {
+            email: {
+              equals: normalizedEmail,
+              mode: 'insensitive',
+            },
+          },
+          {
+            portalEmail: {
+              equals: normalizedEmail,
+              mode: 'insensitive',
+            },
+          },
         ],
       },
       select: {
