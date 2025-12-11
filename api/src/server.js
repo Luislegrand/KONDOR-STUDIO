@@ -44,7 +44,10 @@ async function ensureRefreshTokenColumns() {
       ADD COLUMN IF NOT EXISTS "userAgent" TEXT;
     `);
   } catch (err) {
-    console.warn("Não foi possível verificar colunas de refresh_tokens:", err?.message || err);
+    console.warn(
+      "Não foi possível verificar colunas de refresh_tokens:",
+      err?.message || err
+    );
   }
 }
 
@@ -57,7 +60,10 @@ async function ensureUserColumns() {
       await prisma.$executeRawUnsafe(sql);
     }
   } catch (err) {
-    console.warn("Não foi possível verificar colunas de users:", err?.message || err);
+    console.warn(
+      "Não foi possível verificar colunas de users:",
+      err?.message || err
+    );
   }
 }
 
@@ -83,7 +89,10 @@ async function ensureClientOnboardingColumns() {
       await prisma.$executeRawUnsafe(sql);
     }
   } catch (err) {
-    console.warn("Não foi possível verificar colunas de clients:", err?.message || err);
+    console.warn(
+      "Não foi possível verificar colunas de clients:",
+      err?.message || err
+    );
   }
 }
 
@@ -98,7 +107,10 @@ async function ensureFinancialRecordColumns() {
       await prisma.$executeRawUnsafe(sql);
     }
   } catch (err) {
-    console.warn("Não foi possível verificar colunas de financial_records:", err?.message || err);
+    console.warn(
+      "Não foi possível verificar colunas de financial_records:",
+      err?.message || err
+    );
   }
 }
 
@@ -112,7 +124,10 @@ async function ensureTeamMemberColumns() {
       await prisma.$executeRawUnsafe(sql);
     }
   } catch (err) {
-    console.warn("Não foi possível verificar colunas de team_members:", err?.message || err);
+    console.warn(
+      "Não foi possível verificar colunas de team_members:",
+      err?.message || err
+    );
   }
 }
 
@@ -134,7 +149,23 @@ function safeMount(path, router) {
 // Básico
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
-app.use(helmet());
+
+// 🔧 Helmet configurado para permitir recursos cross-origin (imagens, etc.)
+app.use(
+  helmet({
+    // Permite que recursos (ex.: imagens) sejam carregados de outros origins
+    // como kondor-api.onrender.com -> kondor-front.onrender.com
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+
+    // Evita problemas com COEP/COOP em front/back separados
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+
+    // Se você tiver um contentSecurityPolicy custom, configure aqui em vez de desativar.
+    // contentSecurityPolicy: false,
+  })
+);
+
 app.use(morgan(isProduction ? "combined" : "dev"));
 
 // CORS
@@ -170,8 +201,7 @@ app.use(cors(corsOptions));
 
 // Static uploads (fallback local storage)
 const localUploadsDir =
-  process.env.LOCAL_UPLOADS_DIR ||
-  path.join(__dirname, "../storage/uploads");
+  process.env.LOCAL_UPLOADS_DIR || path.join(__dirname, "../storage/uploads");
 if (!fs.existsSync(localUploadsDir)) {
   fs.mkdirSync(localUploadsDir, { recursive: true });
 }
@@ -218,7 +248,9 @@ app.use("/api", authMiddleware, tenantMiddleware, checkSubscription);
 // AuditLog (opcional)
 const auditLogEnabled = process.env.AUDIT_LOG_ENABLED === "true";
 if (auditLogEnabled) {
-  const skip = process.env.AUDITLOG_SKIP_REGEX || "^/health(z)?$|^/health$|^/api/auth";
+  const skip =
+    process.env.AUDITLOG_SKIP_REGEX ||
+    "^/health(z)?$|^/health$|^/api/auth";
   const bodyMax = Number(process.env.AUDITLOG_BODY_MAX || 2000);
   app.use("/api", auditLog({ skip, bodyMax }));
 } else {
