@@ -136,7 +136,11 @@ export default function Postformdialog({
       }
     } catch (error) {
       console.error("Erro ao salvar post:", error);
-      alert("Erro ao salvar post. Tente novamente.");
+      const message =
+        error?.data?.error ||
+        error?.message ||
+        "Erro ao salvar post. Tente novamente.";
+      alert(message);
     } finally {
       setIsUploading(false);
     }

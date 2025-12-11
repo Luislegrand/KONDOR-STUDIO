@@ -7,11 +7,14 @@ const authMiddleware = require('../middleware/auth');
 const tenantMiddleware = require('../middleware/tenant');
 const uploadsService = require('../services/uploadsService');
 
+const MAX_FILE_SIZE_MB = Number(process.env.UPLOADS_MAX_FILE_SIZE_MB || 150);
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 // memória storage (usamos buffer para enviar ao S3 via service)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB default limit (ajuste se necessário)
+    fileSize: MAX_FILE_SIZE_BYTES, // limite configurável para vídeos/imagens
   },
 });
 
@@ -145,6 +148,29 @@ router.delete('/:key', async (req, res) => {
     console.error('DELETE /uploads/:key error:', err);
     return res.status(500).json({ error: 'Erro ao remover arquivo', detail: err.message });
   }
+});
+
+// Tratamento de erros do Multer (tamanho excedido, etc.)
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        error: `Arquivo excede o limite de ${MAX_FILE_SIZE_MB}MB.`,
+        code: 'FILE_TOO_LARGE',
+      });
+    }
+    return res.status(400).json({
+      error: `Erro no upload: ${err.message}`,
+      code: err.code,
+    });
+  }
+  if (err) {
+    console.error('[uploads] erro inesperado no middleware:', err);
+    return res
+      .status(500)
+      .json({ error: 'Erro ao processar upload', detail: err.message });
+  }
+  return next();
 });
 
 module.exports = router;
