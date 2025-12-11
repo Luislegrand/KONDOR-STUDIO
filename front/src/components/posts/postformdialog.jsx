@@ -90,6 +90,13 @@ export default function Postformdialog({
     setFile(selected);
     const objectUrl = URL.createObjectURL(selected);
     setPreviewUrl(objectUrl);
+
+    // 🔥 aqui detectamos automaticamente se é vídeo ou imagem
+    const isVideo = selected.type?.startsWith("video/");
+    setFormData((prev) => ({
+      ...prev,
+      media_type: isVideo ? "video" : "image",
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -114,6 +121,7 @@ export default function Postformdialog({
       if (file) {
         const { url } = await base44.uploads.uploadFile(file, {
           folder: "posts",
+          isPublic: true, // garante que vídeo/imagem fique público
         });
         mediaUrlToSave = url;
       }
@@ -140,13 +148,10 @@ export default function Postformdialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {post ? "Editar Post" : "Novo Post"}
-          </DialogTitle>
+          <DialogTitle>{post ? "Editar Post" : "Novo Post"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-
           {/* Título */}
           <div className="space-y-2">
             <Label>Título</Label>
@@ -211,7 +216,13 @@ export default function Postformdialog({
             {effectivePreview ? (
               <div className="w-full aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
                 {formData.media_type === "video" ? (
-                  <Video className="w-16 h-16 text-gray-400" />
+                  <video
+                    src={effectivePreview}
+                    className="w-full h-full object-cover"
+                    controls
+                  >
+                    Seu navegador não suporta a reprodução de vídeo.
+                  </video>
                 ) : (
                   <img
                     src={effectivePreview}
@@ -267,28 +278,27 @@ export default function Postformdialog({
             )}
 
             <div className="flex gap-3 ml-auto">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSaving || isDeleting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="bg-purple-600 hover:bg-purple-700"
-              disabled={isSaving || isUploading || isDeleting}
-            >
-              {isSaving
-                ? "Salvando..."
-                : post
-                ? "Atualizar Post"
-                : "Criar Post"}
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSaving || isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700"
+                disabled={isSaving || isUploading || isDeleting}
+              >
+                {isSaving
+                  ? "Salvando..."
+                  : post
+                  ? "Atualizar Post"
+                  : "Criar Post"}
+              </Button>
             </div>
           </div>
-
         </form>
       </DialogContent>
     </Dialog>
