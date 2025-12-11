@@ -1,7 +1,7 @@
 // front/src/pages/login.jsx
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock } from "lucide-react";
 import { base44 } from "@/apiClient/base44Client";
 
 export default function Login() {
@@ -43,69 +43,83 @@ export default function Login() {
     }
   }
 
+  const inputClass =
+    "w-full rounded-[14px] border-[1.5px] border-[#C4B5FD]/90 bg-white/80 px-4 py-3 text-[15px] text-slate-900 placeholder:text-slate-400 shadow-[0_15px_45px_rgba(124,58,237,0.08)] focus:outline-none focus:ring-2 focus:ring-[#A78BFA] focus:border-[#A78BFA] transition-all duration-150";
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 px-4 py-10 flex items-center justify-center">
-      <div className="w-full max-w-lg grid gap-8">
-        <div className="text-center space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-500">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.2),_transparent_60%)] from-slate-900/5 via-white to-white px-4 py-16 flex items-center justify-center">
+      <div className="w-full max-w-xl space-y-10">
+        <div className="text-center space-y-3">
+          <p className="tracking-widest text-xs font-semibold text-[#A78BFA] uppercase">
             Bem-vindo de volta
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">Acesse o painel</h1>
-          <p className="text-sm text-slate-600">
-            Gerencie clientes, criação, finanças e automações pelo celular ou desktop.
+          <h1 className="text-3xl font-bold text-gray-900">Acesse o painel</h1>
+          <p className="text-base text-gray-500 max-w-md mx-auto">
+            Entre no ambiente premium da Kondor para acompanhar operações, aprovações e finanças em tempo real.
           </p>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <fieldset className="space-y-4" disabled={loading}>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="email">
+        <div className="relative group animate-fade-in-up">
+          <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-white/70 via-white/10 to-white/70 blur-3xl" aria-hidden />
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="relative rounded-[24px] border border-[#C4B5FD]/20 bg-white/75 backdrop-blur-xl shadow-2xl px-8 py-10 md:px-10 md:py-12 transition-all duration-500 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_30px_80px_rgba(79,70,229,0.18)]"
+          >
+            <fieldset className="space-y-6" disabled={loading}>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-500" htmlFor="email">
                   E-mail corporativo
                 </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  inputMode="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="voce@agencia.com"
-                />
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="voce@agencia.com"
+                    className={`${inputClass} pl-12`}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="password">
-                  Senha
-                </label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-500" htmlFor="password">
+                    Senha
+                  </label>
+                  <span className="text-[11px] text-gray-400">Use a senha enviada no onboarding</span>
+                </div>
                 <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
                   <input
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    required
                     autoComplete="current-password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    className={`${inputClass} pl-12 pr-12`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                     aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                </div>
-                <div className="flex justify-between text-[11px] text-slate-500 mt-1">
-                  <span>Use a senha enviada no onboarding</span>
                   <button
                     type="button"
-                    className="font-medium text-purple-600 hover:text-purple-700"
                     onClick={() => navigate("/clientlogin")}
+                    className="absolute -top-3 right-3 text-[11px] font-semibold text-purple-600 bg-white/80 border border-purple-100 rounded-full px-3 py-1 shadow-sm hover:bg-purple-50 transition-all"
                   >
                     Sou cliente
                   </button>
@@ -113,9 +127,9 @@ export default function Login() {
               </div>
             </fieldset>
 
-            <div aria-live="assertive" className="min-h-[1.5rem]">
+            <div aria-live="assertive" className="min-h-[1.5rem] mt-6">
               {error && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                <div className="text-xs text-red-600 bg-red-50/80 border border-red-100 rounded-2xl px-4 py-2">
                   {error}
                 </div>
               )}
@@ -124,7 +138,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center rounded-full bg-purple-600 text-white text-sm font-semibold px-4 py-3 shadow-lg shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              className="mt-2 w-full inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#7C3AED] to-[#A78BFA] text-sm font-semibold tracking-wide text-white px-6 py-4 shadow-lg shadow-[#7C3AED]/30 hover:scale-[1.02] transition-all duration-150 disabled:opacity-70 disabled:hover:scale-100"
             >
               {loading ? (
                 <>
@@ -138,16 +152,19 @@ export default function Login() {
           </form>
         </div>
 
-        <div className="text-center space-y-1 text-sm text-slate-600">
-          <p>
+        <div className="text-center space-y-2 text-sm text-gray-600">
+          <p className="text-gray-500">
             Ainda não tem conta?{" "}
-            <Link to="/register" className="text-purple-600 font-semibold hover:underline">
+            <Link
+              to="/register"
+              className="font-semibold text-purple-600 underline decoration-purple-300/60 underline-offset-4 hover:decoration-purple-600 transition"
+            >
               Iniciar teste grátis
             </Link>
           </p>
           <Link
             to="/clientlogin"
-            className="text-xs text-slate-500 hover:text-slate-700 underline"
+            className="inline-flex items-center justify-center text-xs text-gray-500 underline decoration-gray-300/60 underline-offset-4 hover:text-gray-700 hover:decoration-purple-200 transition-opacity duration-200"
           >
             Acessar como cliente do portal
           </Link>
