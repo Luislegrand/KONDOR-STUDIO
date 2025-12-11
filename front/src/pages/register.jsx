@@ -73,141 +73,164 @@ export default function Register() {
     }
   }
 
+  const inputBaseClass =
+    "w-full rounded-2xl border-[1.5px] border-[#C4B5FD] bg-white/70 px-4 py-3 text-[15px] text-slate-900 placeholder:text-gray-400 shadow-[0_5px_25px_rgba(124,58,237,0.08)] focus:outline-none focus:ring-2 focus:ring-[#A78BFA] focus:border-[#A78BFA] transition-all duration-150";
+  const labelClass = "block text-sm font-medium text-gray-500 mb-2";
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-white px-4 py-10 flex items-center justify-center">
-      <div className="w-full max-w-3xl space-y-8">
-        <div className="text-center space-y-3">
-          <span className="text-xs font-semibold text-purple-600 tracking-[0.3em] uppercase">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.25),_transparent_55%)] from-slate-900/5 via-white to-white px-4 py-16 flex items-center justify-center">
+      <div className="w-full max-w-5xl space-y-10">
+        <div className="text-center space-y-2">
+          <p className="text-xs font-semibold text-purple-600 tracking-[0.3em] uppercase">
             Teste gratuito de 3 dias
-          </span>
-          <h1 className="text-4xl font-bold text-slate-900">
-            Crie sua conta no KONDOR STUDIO
+          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Comece sua nova operação com a Kondor
           </h1>
-          <p className="text-sm text-slate-600 max-w-2xl mx-auto">
-            Configure sua agência, convide o time e use todos os módulos durante o período de teste. Todo o fluxo foi pensado para funcionar perfeitamente em telas menores.
+          <p className="text-sm text-slate-500 max-w-2xl mx-auto">
+            Libere o acesso completo em minutos, personalize seu endereço e convide seu time para um ambiente
+            premium com automações, biblioteca criativa e métricas em tempo real.
           </p>
         </div>
 
-        <div className="card">
-          <form className="grid gap-5" onSubmit={handleSubmit} noValidate>
-            <fieldset className="grid gap-5" disabled={loading}>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="agencyName">
-                    Nome da agência *
-                  </label>
-                  <input
-                    id="agencyName"
-                    name="agencyName"
-                    value={form.agencyName}
-                    onChange={handleChange("agencyName")}
-                    placeholder="Ex.: Alfa Social"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="tenantSlug">
-                    Slug / subdomínio *
-                  </label>
-                  <input
-                    id="tenantSlug"
-                    name="tenantSlug"
-                    pattern="[a-z0-9-]+"
-                    value={form.tenantSlug}
-                    onChange={handleChange("tenantSlug")}
-                    placeholder="ex: alfa-social"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Endereço sugerido: <span className="font-medium">{suggestedSlug || "seu-slug"}</span>
-                  </p>
-                </div>
-              </div>
+        <div className="relative">
+          <div className="absolute inset-0 rounded-[28px] bg-gradient-to-br from-white/60 via-white/20 to-white/60 blur-3xl" aria-hidden />
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="relative rounded-[28px] border border-white/50 bg-white/70 backdrop-blur-xl shadow-[0_20px_70px_rgba(79,70,229,0.12)] p-8 md:p-12"
+          >
+            <fieldset className="grid gap-8" disabled={loading}>
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div>
+                    <label className={labelClass} htmlFor="agencyName">
+                      Nome da agência *
+                    </label>
+                    <input
+                      id="agencyName"
+                      name="agencyName"
+                      value={form.agencyName}
+                      onChange={handleChange("agencyName")}
+                      placeholder="Ex.: Orion Collective"
+                      className={inputBaseClass}
+                      required
+                    />
+                  </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="adminName">
-                    Nome do administrador *
-                  </label>
-                  <input
-                    id="adminName"
-                    name="adminName"
-                    value={form.adminName}
-                    onChange={handleChange("adminName")}
-                    placeholder="Seu nome"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="email">
-                    E-mail corporativo *
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    inputMode="email"
-                    value={form.email}
-                    onChange={handleChange("email")}
-                    placeholder="voce@agencia.com"
-                    required
-                  />
-                </div>
-              </div>
+                  <div>
+                    <label className={labelClass} htmlFor="adminName">
+                      Nome do administrador *
+                    </label>
+                    <input
+                      id="adminName"
+                      name="adminName"
+                      value={form.adminName}
+                      onChange={handleChange("adminName")}
+                      placeholder="Seu nome completo"
+                      className={inputBaseClass}
+                      required
+                    />
+                  </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="password">
-                    Senha *
-                  </label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={handleChange("password")}
-                    placeholder="mínimo 6 caracteres"
-                    required
-                  />
+                  <div>
+                    <label className={labelClass} htmlFor="password">
+                      Senha *
+                    </label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      value={form.password}
+                      onChange={handleChange("password")}
+                      placeholder="Mínimo 6 caracteres"
+                      className={inputBaseClass}
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1" htmlFor="confirmPassword">
-                    Confirmar senha *
-                  </label>
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={form.confirmPassword}
-                    onChange={handleChange("confirmPassword")}
-                    placeholder="repita sua senha"
-                    required
-                  />
+
+                <div className="space-y-6">
+                  <div className="md:max-w-xs">
+                    <label className={labelClass} htmlFor="tenantSlug">
+                      Slug / subdomínio *
+                    </label>
+                    <input
+                      id="tenantSlug"
+                      name="tenantSlug"
+                      pattern="[a-z0-9-]+"
+                      value={form.tenantSlug}
+                      onChange={handleChange("tenantSlug")}
+                      placeholder="ex: orion"
+                      className={`${inputBaseClass} md:text-[14px]`}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                      Endereço sugerido:{" "}
+                      <span className="font-semibold text-gray-700">{suggestedSlug || "sua-agencia"}</span>. Você pode
+                      ajustar quando quiser para refletir melhor o nome da agência.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className={labelClass} htmlFor="email">
+                      E-mail corporativo *
+                    </label>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      inputMode="email"
+                      value={form.email}
+                      onChange={handleChange("email")}
+                      placeholder="voce@agencia.com"
+                      className={inputBaseClass}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass} htmlFor="confirmPassword">
+                      Confirmar senha *
+                    </label>
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      value={form.confirmPassword}
+                      onChange={handleChange("confirmPassword")}
+                      placeholder="Repita sua senha"
+                      className={inputBaseClass}
+                      required
+                    />
+                  </div>
                 </div>
               </div>
             </fieldset>
 
-            <div aria-live="assertive" className="min-h-[1.5rem]">
+            <div aria-live="assertive" className="min-h-[1.5rem] mt-6">
               {error && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                <div className="text-xs text-red-600 bg-red-50/80 border border-red-100 rounded-2xl px-4 py-2">
                   {error}
                 </div>
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center rounded-full bg-purple-600 text-white text-sm font-semibold px-4 py-3 shadow-lg shadow-purple-500/20 hover:bg-purple-700 transition disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Criando conta...
-                </>
-              ) : (
-                "Começar meu teste grátis"
-              )}
-            </button>
+            <div className="mt-8 pt-6 border-t border-white/60">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#7C3AED] to-[#A78BFA] text-sm font-semibold tracking-wide text-white px-6 py-4 shadow-xl shadow-[#7C3AED]/30 hover:scale-[1.02] transition-all duration-150 disabled:opacity-70 disabled:hover:scale-100"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Criando conta...
+                  </>
+                ) : (
+                  "Começar meu teste grátis"
+                )}
+              </button>
+            </div>
           </form>
         </div>
 
