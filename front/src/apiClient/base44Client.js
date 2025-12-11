@@ -10,13 +10,43 @@ function detectRenderApiUrl() {
   return null;
 }
 
-const API_BASE_URL =
+function detectWindowOrigin() {
+  if (typeof window === "undefined") return null;
+  const { origin } = window.location || {};
+  if (origin && origin.startsWith("http")) {
+    return origin;
+  }
+  return null;
+}
+
+function preferPageProtocol(url) {
+  if (!url) return url;
+  if (typeof window === "undefined") return url;
+  const pageProtocol = window.location?.protocol;
+  if (!pageProtocol || pageProtocol === "http:") return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== pageProtocol) {
+      parsed.protocol = pageProtocol;
+      return parsed.toString();
+    }
+  } catch (err) {
+    if (/^http:\/\//i.test(url)) {
+      return url.replace(/^http:/i, pageProtocol);
+    }
+  }
+  return url;
+}
+
+const API_BASE_URL = preferPageProtocol(
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
     (import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL)) ||
-  (typeof window !== "undefined" && window.__KONDOR_API_URL) ||
-  detectRenderApiUrl() ||
-  "http://localhost:4000";
+    (typeof window !== "undefined" && window.__KONDOR_API_URL) ||
+    detectRenderApiUrl() ||
+    detectWindowOrigin() ||
+    "http://localhost:4000"
+);
 
 // --------------------
 // Helpers de storage
