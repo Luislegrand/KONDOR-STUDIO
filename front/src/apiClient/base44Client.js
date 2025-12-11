@@ -247,8 +247,83 @@ async function _jsonFetchInternal(path, options = {}) {
 // Uploads
 // --------------------
 
+async function requestPresignedUpload(file, { folder, isPublic } = {}) {
+  if (!file) return null;
+  const payload = {
+    originalName: file.name || "file",
+    contentType: file.type || "application/octet-stream",
+    folder,
+    public: isPublic ? "true" : "false",
+    size: typeof file.size === "number" ? file.size : undefined,
+  };
+  try {
+    return await jsonFetch("/uploads/presign", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if (
+      err?.status === 400 &&
+      err?.data?.code === "DIRECT_UPLOAD_UNAVAILABLE"
+    ) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function directUploadWithPresign(file, presign) {
+  if (!presign?.uploadUrl) {
+    throw new Error("Upload direto inválido");
+  }
+  const method = presign.method || "PUT";
+  const headers = {
+    ...(presign.headers || {}),
+  };
+  if (!headers["Content-Type"]) {
+    headers["Content-Type"] =
+      file?.type || "application/octet-stream";
+  }
+  const res = await fetch(presign.uploadUrl, {
+    method,
+    headers,
+    body: file,
+  });
+  if (!res.ok) {
+    const error = new Error("Falha ao enviar arquivo direto ao storage");
+    error.status = res.status;
+    try {
+      error.data = await res.text();
+    } catch (_) {}
+    throw error;
+  }
+  return presign;
+}
+
 async function uploadFile(file, { folder, isPublic } = {}) {
   if (!file) throw new Error("Arquivo obrigatório para upload");
+
+  // Upload direto (S3 presign) se disponível
+  let presign;
+  try {
+    presign = await requestPresignedUpload(file, { folder, isPublic });
+  } catch (err) {
+    // Se a falha não for por indisponibilidade, propaga
+    if (err?.status !== 400 || err?.data?.code !== "DIRECT_UPLOAD_UNAVAILABLE") {
+      throw err;
+    }
+  }
+
+  if (presign && presign.uploadUrl) {
+    await directUploadWithPresign(file, presign);
+    return {
+      ok: true,
+      key: presign.key,
+      url: presign.finalUrl || presign.key,
+      direct: true,
+    };
+  }
+
   if (typeof FormData === "undefined") {
     throw new Error("FormData não disponível neste ambiente");
   }

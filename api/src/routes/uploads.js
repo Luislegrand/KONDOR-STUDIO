@@ -106,11 +106,55 @@ router.post('/', upload.single('file'), async (req, res) => {
  */
 router.post('/presign', async (req, res) => {
   try {
-    const { originalName = 'file', contentType = 'application/octet-stream', expiresIn = 900, folder } = req.body || {};
+    if (!uploadsService.supportsDirectUpload()) {
+      return res.status(400).json({
+        error: 'Upload direto indisponível para o provedor atual',
+        code: 'DIRECT_UPLOAD_UNAVAILABLE',
+      });
+    }
+
+    const {
+      originalName = 'file',
+      contentType = 'application/octet-stream',
+      expiresIn = 900,
+      folder,
+    } = req.body || {};
+
     const prefix = folder ? `${folder.replace(/\/+$/,'')}/` : '';
-    const fullName = `${req.tenantId}/${prefix}${originalName}`;
-    const result = await uploadsService.createPresignedUpload(fullName, contentType, Number(expiresIn));
-    return res.json({ ok: true, key: result.key, url: result.url, expiresIn: result.expiresIn });
+    const safeName = sanitizeFileName(originalName);
+    const uniqueName = `${Date.now()}-${safeName}`;
+    const key = `${req.tenantId}/${prefix}${uniqueName}`;
+
+    const presign = await uploadsService.createPresignedUpload({
+      key,
+      originalName: uniqueName,
+      contentType,
+      expiresIn: Number(expiresIn) || 900,
+      acl: req.body?.public === 'true' ? 'public-read' : undefined,
+    });
+
+    const requestProtocol = detectRequestProtocol(req);
+    const host = req.get('host') || 'localhost';
+    const fallbackBase = `${requestProtocol}://${host}`;
+
+    const baseUrl =
+      process.env.UPLOADS_BASE_URL ||
+      process.env.API_PUBLIC_URL ||
+      process.env.API_BASE_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      fallbackBase;
+    const normalizedBase = forceProtocol(baseUrl, requestProtocol).replace(/\/$/, '');
+    const finalUrl = `${normalizedBase}/uploads/public/${encodeURIComponent(presign.key)}`;
+
+    return res.json({
+      ok: true,
+      uploadUrl: presign.url,
+      method: 'PUT',
+      headers: presign.headers || { 'Content-Type': contentType },
+      key: presign.key,
+      expiresIn: presign.expiresIn,
+      finalUrl,
+    });
   } catch (err) {
     console.error('POST /uploads/presign error:', err);
     return res.status(500).json({ error: 'Erro ao gerar presigned url', detail: err.message });

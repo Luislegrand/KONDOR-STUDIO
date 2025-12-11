@@ -80,6 +80,8 @@ if (provider === "s3") {
   }
 }
 
+const DIRECT_UPLOAD_SUPPORTED = provider === "s3";
+
 function randomFileName(originalName) {
   const ext = path.extname(originalName || "") || "";
   const id = crypto.randomBytes(10).toString("hex");
@@ -226,24 +228,35 @@ module.exports = {
     return localUpload(body, originalName, contentType, opts);
   },
 
-  async createPresignedUpload(
-    originalName = "file",
-    contentType = "application/octet-stream",
-    expiresIn = 60 * 15
-  ) {
-    if (provider === "s3") {
-      const key = randomFileName(originalName);
-      const command = new PutObjectCommand({
-        Bucket: S3_BUCKET,
-        Key: key,
-        ContentType: contentType,
-        ACL: UPLOADS_PUBLIC ? "public-read" : undefined,
-      });
-      const url = await getSignedUrl(s3Client, command, { expiresIn });
-      return { key, url, expiresIn };
+  async createPresignedUpload(opts = {}) {
+    const {
+      key: providedKey,
+      originalName = "file",
+      contentType = "application/octet-stream",
+      expiresIn = 60 * 15,
+      acl,
+    } = opts || {};
+
+    if (!DIRECT_UPLOAD_SUPPORTED) {
+      throw new Error("Direct uploads are not supported for the current provider");
     }
 
-    return localPresign(originalName);
+    const key = sanitizeKey(providedKey || randomFileName(originalName));
+    const command = new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: key,
+      ContentType: contentType,
+      ACL: acl === "public-read" || UPLOADS_PUBLIC ? "public-read" : undefined,
+    });
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    return {
+      key,
+      url,
+      expiresIn,
+      headers: {
+        "Content-Type": contentType || "application/octet-stream",
+      },
+    };
   },
 
   async deleteObject(key) {
@@ -293,5 +306,9 @@ module.exports = {
       }));
     }
     return localListObjects(prefix, limit);
+  },
+
+  supportsDirectUpload() {
+    return DIRECT_UPLOAD_SUPPORTED;
   },
 };
