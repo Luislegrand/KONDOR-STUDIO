@@ -224,6 +224,9 @@ const authRoutes = require("./routes/auth");
 const clientPortalRoutes = require("./routes/clientPortal");
 const uploadsPublicRoutes = require("./routes/uploadsPublic");
 
+// ✅ WHATSAPP WEBHOOK (rota pública - Meta não envia seu JWT)
+const whatsappWebhookRoutes = require("./routes/webhooks/whatsapp");
+
 let publicRoutes;
 try {
   publicRoutes = require("./routes/public");
@@ -240,6 +243,9 @@ safeMount("/api/auth", authRoutes);
 safeMount("/api/client-portal", clientPortalRoutes);
 safeMount("/uploads/public", uploadsPublicRoutes);
 if (publicRoutes) safeMount("/api/public", publicRoutes);
+
+// ✅ Monta o webhook ANTES de proteger /api com auth/tenant/subscription
+safeMount("/api/webhooks/whatsapp", whatsappWebhookRoutes);
 
 // === ROTAS INTERNAS ===
 // Protegidas: auth → tenant → assinatura válida

@@ -249,40 +249,41 @@ model TeamMember {
 }
 
 model Client {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name               String
-  company            String?
-  email              String?
-  phone              String?
-  sector             String?
-  briefing           String?
-  metadata           Json?
-  contacts           Json?
-  monthlyFeeCents    Int?
-  renewalDate        DateTime?
-  website            String?
-  instagram          String?
-  facebook           String?
-  tiktok             String?
-  tags               String[]  @default([])
-  notes              String?
-  logoUrl            String?
+  id                  String             @id @default(uuid())
+  tenantId            String
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                String
+  company             String?
+  email               String?
+  phone               String?
+  sector              String?
+  briefing            String?
+  metadata            Json?
+  contacts            Json?
+  monthlyFeeCents     Int?
+  renewalDate         DateTime?
+  website             String?
+  instagram           String?
+  facebook            String?
+  tiktok              String?
+  tags                String[]           @default([])
+  notes               String?
+  logoUrl             String?
   billingContactName  String?
   billingContactEmail String?
-  whatsappOptIn      Boolean   @default(false) // Cliente autorizou receber mensagens via WhatsApp
+  whatsappOptIn       Boolean            @default(false) // Cliente autorizou receber mensagens via WhatsApp
 
   // Login específico do portal do cliente
-  portalEmail        String?
-  portalPasswordHash String?
+  portalEmail         String?
+  portalPasswordHash  String?
 
-  projects           Project[]
-  posts              Post[]
-  financialRecords   FinancialRecord[]
+  projects            Project[]
+  posts               Post[]
+  metrics             Metric[]
+  financialRecords    FinancialRecord[]
 
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@map("clients")
   @@index([tenantId])
@@ -427,16 +428,23 @@ model Metric {
   id          String   @id @default(uuid())
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  postId      String
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
   name        String
+  type        String?  @default("generic")
+  source      String?
   value       Float
   meta        Json?
   collectedAt DateTime @default(now())
 
   @@map("metrics")
   @@index([tenantId])
+  @@index([clientId])
   @@index([postId])
+  @@index([type])
+  @@index([collectedAt])
 }
 
 model Creative {
