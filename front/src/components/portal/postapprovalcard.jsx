@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from "react";
-import { base44 } from "@/apiClient/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,13 @@ import { resolveMediaUrl } from "@/lib/media.js";
  *  - approval: objeto da approval associada a este post (id, status, notes, etc.)
  *  - primaryColor: (mantido para compatibilidade, caso usado em temas)
  */
-export default function Postapprovalcard({ post, approval, primaryColor }) {
+export default function Postapprovalcard({
+  post,
+  approval,
+  primaryColor,
+  onApprove,
+  onReject,
+}) {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState("");
   const queryClient = useQueryClient();
@@ -51,7 +56,10 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
       if (!approval?.id) {
         throw new Error("Approval não encontrada para este post.");
       }
-      return base44.entities.Approval.approve(approval.id, {
+      if (typeof onApprove !== "function") {
+        throw new Error("Ação de aprovação indisponível.");
+      }
+      return onApprove(approval.id, {
         clientFeedback:
           feedback && feedback.trim().length > 0
             ? feedback
@@ -59,7 +67,8 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-portal", "posts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-portal", "approvals", "PENDING"] });
       setShowFeedback(false);
       setFeedback("");
     },
@@ -70,7 +79,10 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
       if (!approval?.id) {
         throw new Error("Approval não encontrada para este post.");
       }
-      return base44.entities.Approval.reject(approval.id, {
+      if (typeof onReject !== "function") {
+        throw new Error("Ação de reprovação indisponível.");
+      }
+      return onReject(approval.id, {
         clientFeedback:
           feedback && feedback.trim().length > 0
             ? feedback
@@ -78,7 +90,8 @@ export default function Postapprovalcard({ post, approval, primaryColor }) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-portal", "posts"] });
+      queryClient.invalidateQueries({ queryKey: ["client-portal", "approvals", "PENDING"] });
       setShowFeedback(false);
       setFeedback("");
     },

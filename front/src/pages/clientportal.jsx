@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -145,6 +145,7 @@ export default function ClientPortal() {
   });
 
   const metrics = metricsData?.items || [];
+
 
   const {
     data: approvalsData,
@@ -356,8 +357,8 @@ export default function ClientPortal() {
                     post={post}
                     approval={approval}
                     primaryColor={primaryColor}
-                    accentColor={accentColor}
-                    token={clientToken}
+                    onApprove={approveClientApproval}
+                    onReject={rejectClientApproval}
                   />
                 );
               })}
@@ -519,3 +520,20 @@ function MetricsPanel({ metrics }) {
     </div>
   );
 }
+  const approveClientApproval = useCallback(
+    (approvalId, payload) =>
+      fetchClient(`/client-portal/approvals/${approvalId}/approve`, clientToken, {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }),
+    [clientToken],
+  );
+
+  const rejectClientApproval = useCallback(
+    (approvalId, payload) =>
+      fetchClient(`/client-portal/approvals/${approvalId}/reject`, clientToken, {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }),
+    [clientToken],
+  );

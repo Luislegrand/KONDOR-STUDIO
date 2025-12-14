@@ -2,16 +2,58 @@
 // Service para CRUD e operações úteis sobre posts (escopado por tenant)
 
 const { prisma } = require('../prisma');
+const approvalsService = require('./approvalsService');
 
 /**
  * Converte valores de data flexíveis em Date ou null
  * Aceita: ISO string, timestamp number, ou null/undefined
  */
 function toDateOrNull(value) {
- 	if (!value && value !== 0) return null;
- 	const d = new Date(value);
- 	if (isNaN(d.getTime())) return null;
- 	return d;
+	if (!value && value !== 0) return null;
+	const d = new Date(value);
+	if (isNaN(d.getTime())) return null;
+	return d;
+}
+
+async function ensureApprovalRequest(tenantId, post, userId) {
+	if (!post || !post.clientId) return null;
+
+	const existing = await prisma.approval.findFirst({
+		where: { tenantId, postId: post.id, status: 'PENDING' },
+		orderBy: { createdAt: 'desc' },
+	});
+	if (existing) return existing;
+
+	return approvalsService.create(tenantId, userId, {
+		postId: post.id,
+		clientId: post.clientId,
+		status: 'PENDING',
+		title: post.title,
+		description: post.caption,
+	});
+}
+
+async function syncApprovalWithPostStatus(tenantId, post, status, userId) {
+	if (!post || !status) return;
+
+	if (status === 'PENDING_APPROVAL') {
+		await ensureApprovalRequest(tenantId, post, userId);
+		return;
+	}
+
+	if (!['APPROVED', 'REJECTED'].includes(status)) return;
+
+	const latest = await prisma.approval.findFirst({
+		where: { tenantId, postId: post.id },
+		orderBy: { createdAt: 'desc' },
+	});
+
+	if (!latest || latest.status === status) return;
+
+	await approvalsService.changeStatus(tenantId, latest.id, status, {
+		by: userId || null,
+		note: `Status sincronizado com o post (${status})`,
+	});
 }
 
 module.exports = {
@@ -83,7 +125,9 @@ module.exports = {
  			createdBy: userId || null,
  		};
 
- 		return prisma.post.create({ data: payload });
+ 		const created = await prisma.post.create({ data: payload });
+ 		await syncApprovalWithPostStatus(tenantId, created, created.status, userId);
+ 		return created;
  	},
 
  	/**
@@ -91,12 +135,13 @@ module.exports = {
  	 * @param {String} tenantId
  	 * @param {String} id
  	 */
- 	async getById(tenantId, id) {
- 		if (!id) return null;
- 		return prisma.post.findFirst({
- 			where: { id, tenantId },
- 		});
- 	},
+	async getById(tenantId, id, options = {}) {
+		if (!id) return null;
+		return prisma.post.findFirst({
+			where: { id, tenantId },
+			...options,
+		});
+	},
 
  	/**
  	 * Atualiza post
@@ -104,7 +149,7 @@ module.exports = {
  	 * @param {String} id
  	 * @param {Object} data
  	 */
- 	async update(tenantId, id, data = {}) {
+ 	async update(tenantId, id, data = {}, options = {}) {
  		const existing = await this.getById(tenantId, id);
  		if (!existing) return null;
 
@@ -144,12 +189,16 @@ module.exports = {
  		if (data.version !== undefined) updateData.version = data.version;
  		if (data.history !== undefined) updateData.history = data.history;
 
- 		await prisma.post.update({
+ 		const updated = await prisma.post.update({
  			where: { id },
  			data: updateData,
  		});
 
- 		return this.getById(tenantId, id);
+		if (updateData.status && updateData.status !== existing.status) {
+			await syncApprovalWithPostStatus(tenantId, updated, updateData.status, options.userId || null);
+		}
+
+ 		return updated;
  	},
 
  	/**
@@ -186,4 +235,23 @@ module.exports = {
  			select: { id: true, title: true, caption: true },
  		});
  	},
+
+	/**
+	 * Atualiza apenas o status do post (atalho para automações)
+	 */
+	async updateStatus(tenantId, id, status, userId = null) {
+		if (!status) return null;
+		const existing = await this.getById(tenantId, id);
+		if (!existing) return null;
+
+		if (existing.status === status) return existing;
+
+		const updated = await prisma.post.update({
+			where: { id },
+			data: { status },
+		});
+
+		await syncApprovalWithPostStatus(tenantId, updated, status, userId);
+		return updated;
+	},
 };

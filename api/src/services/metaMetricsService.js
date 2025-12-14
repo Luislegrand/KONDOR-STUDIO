@@ -163,8 +163,12 @@ async function fetchAccountMetrics(integration, range) {
         if (Number.isNaN(numVal)) continue;
 
         metrics.push({
-          name: `meta.${field}`,
+          name: field,
           value: numVal,
+          meta: {
+            provider: 'meta',
+            rawField: field,
+          },
         });
       }
     }

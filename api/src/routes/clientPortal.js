@@ -1,6 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../prisma');
+const approvalsService = require('../services/approvalsService');
+const postsService = require('../services/postsService');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_local_secret';
@@ -96,7 +98,10 @@ router.get('/metrics', clientAuth, async (req, res) => {
       where: {
         tenantId: req.tenantId,
         ...(Object.keys(dateFilter).length ? { collectedAt: dateFilter } : {}),
-        post: { clientId: req.client.id },
+        OR: [
+          { clientId: req.client.id },
+          { post: { clientId: req.client.id } },
+        ],
       },
       orderBy: { collectedAt: 'desc' },
       include: {
@@ -162,21 +167,12 @@ router.post('/approvals/:id/approve', clientAuth, async (req, res) => {
       return res.status(404).json({ error: 'Approval não encontrada' });
     }
 
-    await prisma.approval.update({
-      where: { id: approval.id },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        clientFeedback: req.body.comment || null,
-      },
+    await approvalsService.changeStatus(req.tenantId, approval.id, 'APPROVED', {
+      note: req.body.comment || null,
+      by: req.client.id,
     });
 
-    await prisma.post.update({
-      where: { id: approval.post.id },
-      data: {
-        status: 'APPROVED',
-      },
-    });
+    await postsService.updateStatus(req.tenantId, approval.post.id, 'APPROVED', req.client.id);
 
     return res.json({ ok: true });
   } catch (err) {
@@ -200,21 +196,12 @@ router.post('/approvals/:id/reject', clientAuth, async (req, res) => {
       return res.status(404).json({ error: 'Approval não encontrada' });
     }
 
-    await prisma.approval.update({
-      where: { id: approval.id },
-      data: {
-        status: 'REJECTED',
-        rejectedAt: new Date(),
-        clientFeedback: req.body.comment || null,
-      },
+    await approvalsService.changeStatus(req.tenantId, approval.id, 'REJECTED', {
+      note: req.body.comment || null,
+      by: req.client.id,
     });
 
-    await prisma.post.update({
-      where: { id: approval.post.id },
-      data: {
-        status: 'REJECTED',
-      },
-    });
+    await postsService.updateStatus(req.tenantId, approval.post.id, 'REJECTED', req.client.id);
 
     return res.json({ ok: true });
   } catch (err) {

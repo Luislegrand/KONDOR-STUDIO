@@ -89,33 +89,60 @@ function DropdownChip({ value, onChange, options, placeholder, className = "" })
 export default function Metrics() {
   const [selectedClient, setSelectedClient] = useState("all");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
+  const METRIC_KEYS = ["impressions", "clicks", "conversions", "spend", "revenue"];
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
     queryFn: () => base44.entities.Client.list(),
   });
 
-  const { data: metrics = [] } = useQuery({
-    queryKey: ["metrics", selectedClient, selectedPlatform],
+  const filters = React.useMemo(
+    () => ({
+      clientId: selectedClient !== "all" ? selectedClient : undefined,
+      source:
+        selectedPlatform !== "all"
+          ? selectedPlatform.toLowerCase()
+          : undefined,
+    }),
+    [selectedClient, selectedPlatform],
+  );
+
+  const { data: aggregateData = { buckets: [] }, isLoading: loadingAggregate } = useQuery({
+    queryKey: ["metrics-aggregate", filters],
     queryFn: () => {
-      let query = {};
-      if (selectedClient !== "all") query.client_id = selectedClient;
-      if (selectedPlatform !== "all") query.platform = selectedPlatform;
-      return base44.entities.Metric.filter(query, "-date", 30);
+      const body = {
+        groupBy: "day",
+        metricTypes: METRIC_KEYS,
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        endDate: new Date().toISOString(),
+      };
+      if (filters.clientId) body.clientId = filters.clientId;
+      if (filters.source) body.source = filters.source;
+
+      return base44.jsonFetch("/metrics/aggregate", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+  });
+
+  const { data: summaryData } = useQuery({
+    queryKey: ["metrics-summary", filters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set("days", "30");
+      params.set("metricTypes", METRIC_KEYS.join(","));
+      if (filters.clientId) params.set("clientId", filters.clientId);
+      if (filters.source) params.set("source", filters.source);
+      return base44.jsonFetch(`/metrics/summary/quick?${params.toString()}`);
     },
   });
 
   // Calcular totais
-  const totals = metrics.reduce(
-    (acc, m) => ({
-      impressions: acc.impressions + (m.impressions || 0),
-      clicks: acc.clicks + (m.clicks || 0),
-      conversions: acc.conversions + (m.conversions || 0),
-      spend: acc.spend + (m.spend || 0),
-      revenue: acc.revenue + (m.revenue || 0),
-    }),
-    { impressions: 0, clicks: 0, conversions: 0, spend: 0, revenue: 0 }
-  );
+  const totals = METRIC_KEYS.reduce((acc, key) => {
+    acc[key] = summaryData?.totals?.[key] ? Number(summaryData.totals[key]) : 0;
+    return acc;
+  }, { impressions: 0, clicks: 0, conversions: 0, spend: 0, revenue: 0 });
 
   const avgCtr =
     totals.impressions > 0
@@ -127,19 +154,23 @@ export default function Metrics() {
     totals.spend > 0 ? (totals.revenue / totals.spend).toFixed(2) : 0;
 
   // Dados para gráfico
-  const chartData = metrics
-    .slice(0, 14)
-    .reverse()
-    .map((m) => ({
-      date: new Date(m.date).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-      impressions: m.impressions || 0,
-      clicks: m.clicks || 0,
-      conversions: m.conversions || 0,
-      spend: m.spend || 0,
-    }));
+  const chartData = Array.isArray(aggregateData?.buckets)
+    ? aggregateData.buckets
+        .slice(-14)
+        .map((bucket) => {
+          const dateLabel = new Date(bucket.period).toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+          });
+          return {
+            date: dateLabel,
+            impressions: bucket.metrics.impressions || 0,
+            clicks: bucket.metrics.clicks || 0,
+            conversions: bucket.metrics.conversions || 0,
+            spend: bucket.metrics.spend || 0,
+          };
+        })
+    : [];
 
   const stats = [
     {
@@ -201,9 +232,9 @@ export default function Metrics() {
             placeholder="Todas as plataformas"
             options={[
               { value: "all", label: "Todas as plataformas" },
-              { value: "META", label: "Meta Ads" },
-              { value: "GOOGLE", label: "Google Ads" },
-              { value: "TIKTOK", label: "TikTok Ads" },
+              { value: "meta", label: "Meta Ads" },
+              { value: "google_ads", label: "Google Ads" },
+              { value: "tiktok", label: "TikTok Ads" },
             ]}
             className="w-64"
           />
@@ -359,7 +390,7 @@ export default function Metrics() {
         </div>
 
         {/* Empty state */}
-        {metrics.length === 0 && (
+        {aggregateData?.buckets?.length === 0 && !loadingAggregate && (
           <Card className="border border-dashed border-purple-200 mt-4">
             <CardContent className="py-16 text-center">
               <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />

@@ -118,13 +118,15 @@ router.post("/aggregate", async (req, res) => {
  */
 router.get("/summary/quick", async (req, res) => {
   try {
-    const { days, metricTypes } = req.query;
+    const { days, metricTypes, clientId, source } = req.query;
 
     const result = await metricsService.quickSummary(req.tenantId, {
       days: days ? Number(days) : undefined,
       metricTypes: metricTypes
         ? metricTypes.split(",").map((t) => t.trim())
         : undefined,
+      clientId: clientId || undefined,
+      source: source || undefined,
     });
 
     return res.json(result);
@@ -176,20 +178,23 @@ router.get("/campaigns", async (req, res) => {
     const tenantId = req.tenantId;
 
     const campaigns = await prisma.metric.groupBy({
-      by: ["campaignName"],
+      by: ["source"],
       where: { tenantId },
       _sum: {
-        impressions: true,
-        clicks: true,
-        spend: true,
+        value: true,
       },
       orderBy: {
-        _sum: { spend: 'desc' },
+        _sum: { value: 'desc' },
       },
       take: 10,
     });
 
-    return res.json({ items: campaigns });
+    return res.json({
+      items: campaigns.map((item) => ({
+        source: item.source || 'desconhecido',
+        totalValue: item._sum.value || 0,
+      })),
+    });
   } catch (err) {
     console.error("GET /metrics/campaigns error:", err);
     return res.status(500).json({ error: "Erro ao listar campanhas" });

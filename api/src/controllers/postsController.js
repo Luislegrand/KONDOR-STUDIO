@@ -40,7 +40,8 @@ module.exports = {
     try {
       const id = req.params.id;
       const data = req.body;
-      const updated = await postsService.update(req.tenantId, id, data);
+      const userId = req.user?.id || null;
+      const updated = await postsService.update(req.tenantId, id, data, { userId });
       if (!updated) return res.status(404).json({ error: 'post not found' });
       return res.json(updated);
     } catch (err) {

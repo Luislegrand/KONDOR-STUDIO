@@ -88,20 +88,27 @@ async function finalizeJob(entry, status, result, options = {}) {
   });
 }
 
-async function saveMetric(tenantId, metric, providerType, range) {
-  const timestamp = getReferenceTimestamp(range);
-  const { start, end } = getDayBounds(timestamp);
+async function saveMetric(tenantId, metric, providerType, range, defaultClientId = null) {
+  const referenceTs = getReferenceTimestamp(range);
+  const { start, end } = getDayBounds(referenceTs);
 
-  const type = metric.name;
+  const name = metric.name || metric.key || metric.type;
+  if (!name) {
+    safeLog('saveMetric ignorou entrada sem name', metric);
+    return null;
+  }
+
   const value = Number(metric.value || 0);
   const source = providerType || 'integration';
+  const clientId = metric.clientId || metric.client_id || defaultClientId || null;
 
   const existing = await prisma.metric.findFirst({
     where: {
       tenantId,
-      type,
+      name,
       source,
-      timestamp: {
+      clientId,
+      collectedAt: {
         gte: start,
         lt: end,
       },
@@ -113,11 +120,12 @@ async function saveMetric(tenantId, metric, providerType, range) {
       where: { id: existing.id },
       data: {
         value,
-        timestamp,
+        collectedAt: referenceTs,
         meta: {
           ...(existing.meta || {}),
           lastRange: range || null,
           lastUpdatedAt: new Date().toISOString(),
+          ...(metric.meta || {}),
         },
       },
     });
@@ -126,11 +134,12 @@ async function saveMetric(tenantId, metric, providerType, range) {
   return prisma.metric.create({
     data: {
       tenantId,
-      type,
+      clientId,
+      name,
       value,
-      timestamp,
+      collectedAt: referenceTs,
       source,
-      meta: range ? { range } : null,
+      meta: range || metric.meta ? { ...(metric.meta || {}), range: range || null } : null,
     },
   });
 }
@@ -210,7 +219,13 @@ async function processMetricJob(entry) {
       safeLog('Nenhuma métrica retornada do provider', providerKey);
     } else {
       for (const m of metrics) {
-        await saveMetric(tenantId, m, providerKey, payload.range);
+        await saveMetric(
+          tenantId,
+          m,
+          providerKey,
+          payload.range,
+          payload.clientId || null,
+        );
       }
     }
 

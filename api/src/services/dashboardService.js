@@ -1,4 +1,5 @@
 const { prisma } = require('../prisma');
+const metricsService = require('./metricsService');
 
 /**
  * Converte "7d", "30d" para quantidade de dias.
@@ -31,7 +32,6 @@ module.exports = {
       tasksByStatus,
       upcomingTasks,
       financeByType,
-      metricsAggregated,
     ] = await Promise.all([
       // total de clientes
       prisma.client.count({
@@ -102,24 +102,13 @@ module.exports = {
         },
       }),
 
-      // métricas agregadas no range
-      prisma.metric.aggregate({
-        where: {
-          tenantId,
-          ...clientFilter,
-          date: {
-            gte: sinceDate,
-          },
-        },
-        _sum: {
-          impressions: true,
-          clicks: true,
-          conversions: true,
-          spend: true,
-          revenue: true,
-        },
-      }),
     ]);
+
+    const metricsAggregated = await metricsService.quickSummary(tenantId, {
+      days,
+      metricTypes: ['impressions', 'clicks', 'conversions', 'spend', 'revenue'],
+      clientId,
+    });
 
     // Transformar financeByType em estrutura amigável (com valor em reais)
     const financeSummary = financeByType.map((item) => ({
@@ -130,11 +119,11 @@ module.exports = {
 
     // Transformar métricas em estrutura amigável
     const metricsSummary = {
-      impressions: metricsAggregated._sum.impressions || 0,
-      clicks: metricsAggregated._sum.clicks || 0,
-      conversions: metricsAggregated._sum.conversions || 0,
-      spend: metricsAggregated._sum.spend || 0,
-      revenue: metricsAggregated._sum.revenue || 0,
+      impressions: metricsAggregated.totals.impressions || 0,
+      clicks: metricsAggregated.totals.clicks || 0,
+      conversions: metricsAggregated.totals.conversions || 0,
+      spend: metricsAggregated.totals.spend || 0,
+      revenue: metricsAggregated.totals.revenue || 0,
     };
 
     // Map de posts por status

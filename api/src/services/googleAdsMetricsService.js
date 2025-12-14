@@ -215,13 +215,17 @@ async function fetchAccountMetrics(integration, range) {
 
       // Conversão especial para cost_micros -> cost
       if (field === 'metrics.cost_micros' || shortName === 'cost_micros') {
-        shortName = 'cost';
+        shortName = 'spend';
         value = value / 1_000_000; // cost_micros para unidade monetária
       }
 
       metrics.push({
-        name: `google_ads.${shortName}`,
+        name: shortName,
         value,
+        meta: {
+          provider: 'google_ads',
+          rawField: field,
+        },
       });
     }
 

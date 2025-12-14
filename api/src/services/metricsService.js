@@ -14,6 +14,53 @@ function toDateOrNull(v) {
   return d;
 }
 
+async function resolveClientIdForMetric(tenantId, data = {}) {
+  if (data.clientId) return data.clientId;
+  if (data.client_id) return data.client_id;
+
+  const postId = data.postId || data.post_id;
+  if (!postId) return null;
+
+  const post = await prisma.post.findFirst({
+    where: { id: postId, tenantId },
+    select: { clientId: true },
+  });
+  return post?.clientId || null;
+}
+
+async function createMetricRecord(tenantId, data = {}) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Dados de métrica inválidos');
+  }
+
+  const metricKey = data.key || data.name || data.type;
+  if (!metricKey) throw new Error('Campo "key" ou "name" é obrigatório');
+  if (data.value === undefined || data.value === null) {
+    throw new Error('Campo "value" é obrigatório');
+  }
+
+  const postId = data.postId || data.post_id || null;
+  const clientId = await resolveClientIdForMetric(tenantId, {
+    ...data,
+    postId,
+  });
+
+  const payload = {
+    tenantId,
+    clientId,
+    postId,
+    source: data.source || null,
+    name: metricKey,
+    value: Number(data.value),
+    collectedAt: toDateOrNull(
+      data.timestamp || data.collectedAt || data.collected_at
+    ) || new Date(),
+    meta: data.meta || data.metadata || null,
+  };
+
+  return prisma.metric.create({ data: payload });
+}
+
 module.exports = {
   /**
    * Lista métricas com filtros básicos e paginação
@@ -23,8 +70,12 @@ module.exports = {
     const {
       metricType,
       clientId,
+      source,
+      key,
       startDate,
       endDate,
+      startTs,
+      endTs,
       page = 1,
       perPage = 100,
       order = 'desc',
@@ -32,12 +83,17 @@ module.exports = {
 
     const where = { tenantId };
 
-    if (metricType) where.type = metricType;
+    const metricKey = key || metricType;
+    if (metricKey) where.name = metricKey;
     if (clientId) where.clientId = clientId;
-    if (startDate || endDate) {
-      where.timestamp = {};
-      if (startDate) where.timestamp.gte = toDateOrNull(startDate);
-      if (endDate) where.timestamp.lte = toDateOrNull(endDate);
+    if (source) where.source = source;
+
+    const rangeStart = startTs || startDate;
+    const rangeEnd = endTs || endDate;
+    if (rangeStart || rangeEnd) {
+      where.collectedAt = {};
+      if (rangeStart) where.collectedAt.gte = toDateOrNull(rangeStart);
+      if (rangeEnd) where.collectedAt.lte = toDateOrNull(rangeEnd);
     }
 
     const skip = (Math.max(1, page) - 1) * perPage;
@@ -46,7 +102,7 @@ module.exports = {
     const [items, total] = await Promise.all([
       prisma.metric.findMany({
         where,
-        orderBy: { timestamp: order === 'asc' ? 'asc' : 'desc' },
+        orderBy: { collectedAt: order === 'asc' ? 'asc' : 'desc' },
         skip,
         take,
       }),
@@ -64,32 +120,12 @@ module.exports = {
 
   /**
    * Ingesta (cria) uma métrica.
-   * data: {
-   *   clientId?,
-   *   type: 'impression'|'click'|'spend'|'conversion'|...,
-   *   value: number,
-   *   timestamp?: Date|string|number,
-   *   meta?: JSON
-   * }
    */
+  async create(tenantId, data = {}) {
+    return createMetricRecord(tenantId, data);
+  },
   async ingest(tenantId, data = {}) {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Dados de métrica inválidos');
-    }
-    if (!data.type) throw new Error('Campo "type" é obrigatório');
-    if (data.value === undefined || data.value === null) throw new Error('Campo "value" é obrigatório');
-
-    const payload = {
-      tenantId,
-      clientId: data.clientId || data.client_id || null,
-      type: data.type,
-      value: Number(data.value),
-      timestamp: toDateOrNull(data.timestamp) || new Date(),
-      meta: data.meta || data.metadata || null,
-      source: data.source || null, // ex: "facebook", "google", "manual"
-    };
-
-    return prisma.metric.create({ data: payload });
+    return createMetricRecord(tenantId, data);
   },
 
   /**
@@ -109,9 +145,22 @@ module.exports = {
 
     const updateData = {};
     if (data.value !== undefined) updateData.value = Number(data.value);
-    if (data.timestamp !== undefined) updateData.timestamp = toDateOrNull(data.timestamp);
+    if (data.timestamp !== undefined || data.collectedAt !== undefined || data.collected_at !== undefined) {
+      updateData.collectedAt = toDateOrNull(
+        data.timestamp || data.collectedAt || data.collected_at
+      );
+    }
     if (data.meta !== undefined) updateData.meta = data.meta;
-    if (data.clientId !== undefined) updateData.clientId = data.clientId;
+    if (data.clientId !== undefined || data.client_id !== undefined) {
+      updateData.clientId = data.clientId || data.client_id || null;
+    }
+    if (data.postId !== undefined || data.post_id !== undefined) {
+      updateData.postId = data.postId || data.post_id || null;
+    }
+    if (data.source !== undefined) updateData.source = data.source || null;
+    if (data.key !== undefined || data.name !== undefined || data.type !== undefined) {
+      updateData.name = data.key || data.name || data.type;
+    }
 
     await prisma.metric.update({ where: { id }, data: updateData });
     return this.getById(tenantId, id);
@@ -139,6 +188,7 @@ module.exports = {
       groupBy = 'day',
       metricTypes = null,
       clientId = null,
+      source = null,
       startDate = null,
       endDate = null,
     } = options;
@@ -153,40 +203,45 @@ module.exports = {
     const precision = precisionMap[groupBy] || 'day';
 
     const params = [tenantId];
-    let whereSql = `tenant_id = $1`;
+    let whereSql = `"tenantId" = $1`;
     let idx = 2;
 
     if (clientId) {
-      whereSql += ` AND client_id = $${idx}`;
+      whereSql += ` AND "clientId" = $${idx}`;
       params.push(clientId);
       idx++;
     }
+    if (source) {
+      whereSql += ` AND "source" = $${idx}`;
+      params.push(source);
+      idx++;
+    }
     if (startDate) {
-      whereSql += ` AND timestamp >= $${idx}`;
+      whereSql += ` AND "collectedAt" >= $${idx}`;
       params.push(new Date(startDate).toISOString());
       idx++;
     }
     if (endDate) {
-      whereSql += ` AND timestamp <= $${idx}`;
+      whereSql += ` AND "collectedAt" <= $${idx}`;
       params.push(new Date(endDate).toISOString());
       idx++;
     }
     if (Array.isArray(metricTypes) && metricTypes.length) {
       // build IN list with parameter placeholders
       const placeholders = metricTypes.map((_, i) => `$${idx + i}`).join(', ');
-      whereSql += ` AND type IN (${placeholders})`;
+      whereSql += ` AND "name" IN (${placeholders})`;
       metricTypes.forEach((t) => params.push(t));
       idx += metricTypes.length;
     }
 
     // raw query: group by truncated timestamp and type, sum values
     const raw = `
-      SELECT date_trunc('${precision}', timestamp) AS period,
-             type,
+      SELECT date_trunc('${precision}', "collectedAt") AS period,
+             "name",
              SUM(value) AS total_value
-      FROM metric
+      FROM "metrics"
       WHERE ${whereSql}
-      GROUP BY period, type
+      GROUP BY period, "name"
       ORDER BY period ASC
     `;
 
@@ -198,7 +253,7 @@ module.exports = {
       const periodKey = new Date(r.period).toISOString();
       if (!bucketsMap.has(periodKey)) bucketsMap.set(periodKey, { period: periodKey, metrics: {} });
       const bucket = bucketsMap.get(periodKey);
-      bucket.metrics[r.type] = Number(r.total_value);
+      bucket.metrics[r.name] = Number(r.total_value);
     }
 
     return { buckets: Array.from(bucketsMap.values()) };
@@ -209,28 +264,30 @@ module.exports = {
    * options: { days: 7, metricTypes: [] }
    */
   async quickSummary(tenantId, options = {}) {
-    const { days = 7, metricTypes = [] } = options;
+    const { days = 7, metricTypes = [], clientId = null, source = null } = options;
     const start = new Date();
     start.setDate(start.getDate() - days);
 
     const where = {
       tenantId,
-      timestamp: { gte: start },
+      collectedAt: { gte: start },
     };
     if (Array.isArray(metricTypes) && metricTypes.length) {
-      where.type = { in: metricTypes };
+      where.name = { in: metricTypes };
     }
+    if (clientId) where.clientId = clientId;
+    if (source) where.source = source;
 
     // group by type using prisma aggregation
     const rows = await prisma.metric.groupBy({
-      by: ['type'],
+      by: ['name'],
       where,
       _sum: { value: true },
     });
 
     const result = {};
     for (const r of rows) {
-      result[r.type] = (r._sum && r._sum.value) ? Number(r._sum.value) : 0;
+      result[r.name] = (r._sum && r._sum.value) ? Number(r._sum.value) : 0;
     }
 
     return {
