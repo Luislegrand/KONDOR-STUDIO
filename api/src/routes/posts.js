@@ -4,6 +4,8 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const tenantMiddleware = require("../middleware/tenant");
 const postsService = require("../services/postsService");
+const { PostValidationError } = postsService;
+const { Prisma } = require("@prisma/client");
 const { prisma } = require("../prisma");
 //const { whatsappQueue } = require("../queues/whatsappQueue"); //TODO: Reativar automações WhatsApp quando a fila estiver configurada.
 router.use(authMiddleware);
@@ -70,6 +72,16 @@ router.post("/", async (req, res) => {
     const newPost = await postsService.create(req.tenantId, userId, req.body);
     return res.status(201).json(newPost);
   } catch (err) {
+    if (err instanceof PostValidationError) {
+      return res.status(400).json({ error: err.message, code: err.code });
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003") {
+        return res
+          .status(400)
+          .json({ error: "Cliente selecionado não existe mais", code: "INVALID_CLIENT" });
+      }
+    }
     console.error("POST /posts error:", err);
     return res.status(500).json({ error: "Erro ao criar post" });
   }

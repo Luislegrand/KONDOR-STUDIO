@@ -11,7 +11,7 @@ const {
 } = require('../utils/jwt');
 const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
-const { loginSchema } = require('../validators/authValidator');
+const { loginSchema, clientLoginSchema } = require('../validators/authValidator');
 
 /**
  * Helper: parse expires strings like "30d", "7d", "24h" into a Date
@@ -144,7 +144,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
  */
 router.post('/client-login', loginRateLimiter, async (req, res) => {
   try {
-    const parseResult = loginSchema.safeParse(req.body || {});
+    const parseResult = clientLoginSchema.safeParse(req.body || {});
     if (!parseResult.success) {
       const details = parseResult.error.issues.map((issue) => ({
         path: issue.path.join('.'),
@@ -153,26 +153,37 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Dados inválidos', details });
     }
 
-    const { email, password } = parseResult.data;
+    const { email, password, tenantSlug } = parseResult.data;
     const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedSlug = (tenantSlug || '').trim().toLowerCase() || null;
 
-    const client = await prisma.client.findFirst({
-      where: {
-        OR: [
-          {
-            email: {
-              equals: normalizedEmail,
-              mode: 'insensitive',
-            },
+    const whereClause = {
+      OR: [
+        {
+          email: {
+            equals: normalizedEmail,
+            mode: 'insensitive',
           },
-          {
-            portalEmail: {
-              equals: normalizedEmail,
-              mode: 'insensitive',
-            },
+        },
+        {
+          portalEmail: {
+            equals: normalizedEmail,
+            mode: 'insensitive',
           },
-        ],
-      },
+        },
+      ],
+    };
+
+    if (normalizedSlug) {
+      whereClause.tenant = {
+        slug: normalizedSlug,
+      };
+    }
+
+    const matches = await prisma.client.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      take: 3,
       select: {
         id: true,
         tenantId: true,
@@ -181,10 +192,25 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
         portalEmail: true,
         metadata: true,
         portalPasswordHash: true,
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
       },
     });
 
-    if (!client) return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (!matches.length) {
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+
+    if (!normalizedSlug && matches.length > 1) {
+      return res.status(409).json({
+        error:
+          'Encontramos mais de uma conta com este e-mail. Informe o slug/subdomínio da agência para acessar o portal correto.',
+        code: 'CLIENT_LOGIN_AMBIGUOUS',
+      });
+    }
+
+    const client = matches[0];
 
     let metadata = client.metadata || {};
     const columnHash = client.portalPasswordHash || null;
@@ -240,6 +266,13 @@ router.post('/client-login', loginRateLimiter, async (req, res) => {
         name: client.name,
         email: client.portalEmail || client.email,
         tenantId: client.tenantId,
+        tenant: client.tenant
+          ? {
+              id: client.tenant.id,
+              slug: client.tenant.slug,
+              name: client.tenant.name,
+            }
+          : null,
       },
     });
   } catch (err) {

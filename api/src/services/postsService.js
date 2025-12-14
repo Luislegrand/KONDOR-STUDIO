@@ -1,8 +1,17 @@
 // api/src/services/postsService.js
 // Service para CRUD e operações úteis sobre posts (escopado por tenant)
 
+const { Prisma } = require('@prisma/client');
 const { prisma } = require('../prisma');
 const approvalsService = require('./approvalsService');
+
+class PostValidationError extends Error {
+	constructor(message, code = 'POST_VALIDATION_ERROR') {
+		super(message);
+		this.name = 'PostValidationError';
+		this.code = code;
+	}
+}
 
 /**
  * Converte valores de data flexíveis em Date ou null
@@ -13,6 +22,12 @@ function toDateOrNull(value) {
 	const d = new Date(value);
 	if (isNaN(d.getTime())) return null;
 	return d;
+}
+
+function sanitizeString(value) {
+	if (value === undefined || value === null) return null;
+	const trimmed = String(value).trim();
+	return trimmed ? trimmed : null;
 }
 
 async function ensureApprovalRequest(tenantId, post, userId) {
@@ -107,12 +122,26 @@ module.exports = {
  		const scheduledDate = data.scheduledDate || data.scheduled_date || data.scheduledAt || null;
  		const publishedDate = data.publishedDate || data.published_date || null;
 
+ 		const title = sanitizeString(data.title);
+ 		const clientId = sanitizeString(data.clientId || data.client_id);
+ 		const mediaUrl = sanitizeString(data.mediaUrl || data.media_url);
+
+		if (!title) {
+			throw new PostValidationError('Título é obrigatório');
+		}
+		if (!clientId) {
+			throw new PostValidationError('Selecione um cliente antes de salvar o post');
+		}
+		if (!mediaUrl) {
+			throw new PostValidationError('Envie uma mídia antes de salvar o post');
+		}
+
  		const payload = {
  			tenantId,
- 			clientId: data.clientId || data.client_id || null,
- 			title: data.title || null,
- 			caption: data.caption || data.body || null,
- 			mediaUrl: data.mediaUrl || data.media_url || null,
+ 			clientId,
+ 			title,
+ 			caption: sanitizeString(data.caption || data.body),
+ 			mediaUrl,
  			mediaType: data.mediaType || data.media_type || 'image',
  			cta: data.cta || null,
  			tags: Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []),
@@ -125,9 +154,18 @@ module.exports = {
  			createdBy: userId || null,
  		};
 
- 		const created = await prisma.post.create({ data: payload });
- 		await syncApprovalWithPostStatus(tenantId, created, created.status, userId);
- 		return created;
+		try {
+ 			const created = await prisma.post.create({ data: payload });
+ 			await syncApprovalWithPostStatus(tenantId, created, created.status, userId);
+ 			return created;
+		} catch (err) {
+			if (err instanceof Prisma.PrismaClientKnownRequestError) {
+				if (err.code === 'P2003') {
+					throw new PostValidationError('Cliente selecionado não existe mais', 'INVALID_CLIENT');
+				}
+			}
+			throw err;
+		}
  	},
 
  	/**
@@ -255,3 +293,5 @@ module.exports = {
 		return updated;
 	},
 };
+
+module.exports.PostValidationError = PostValidationError;

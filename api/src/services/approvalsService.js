@@ -88,7 +88,7 @@ module.exports = {
       description: data.description || data.body || null,
       postId: data.postId || data.post_id || null,
       clientId: data.clientId || data.client_id || null,
-      status: data.status || 'IDEA', // IDEA, PRODUCTION, REVIEW, APPROVED, SCHEDULED, PUBLISHED
+      status: data.status || 'PENDING',
       assignedTo: data.assignedTo || null,
       createdBy: userId || null,
       dueDate: toDateOrNull(data.dueDate || data.due_date),
