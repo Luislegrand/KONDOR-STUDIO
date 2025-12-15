@@ -248,15 +248,22 @@ export default function ClientPortalLayout() {
   );
 
   const handleRequestChanges = useCallback(
-    async (approvalId) => {
+    async (approvalId, notesOverride) => {
       if (!approvalId) return;
-      const notes =
-        typeof window !== "undefined"
-          ? window.prompt("Descreva os ajustes desejados:", "Preciso ajustar esse post.") ||
-            "Cliente solicitou ajustes"
-          : "Cliente solicitou ajustes";
+      let notes = notesOverride;
+      if (!notes || !notes.trim()) {
+        const fallback =
+          typeof window !== "undefined"
+            ? window.prompt(
+                "Descreva os ajustes desejados:",
+                "Preciso ajustar esse post.",
+              )
+            : "Cliente solicitou ajustes";
+        if (!fallback) return;
+        notes = fallback;
+      }
       await rejectClientApproval(approvalId, {
-        notes,
+        notes: notes.trim(),
         type: "REVISION_REQUESTED",
       });
     },
@@ -392,7 +399,7 @@ function ClientNav() {
   ];
 
   return (
-    <nav className="flex items-center gap-1 rounded-full bg-slate-50 p-1 text-sm">
+    <nav className="flex items-center gap-1 rounded-full bg-purple-50/70 p-1 text-sm">
       {links.map((link) => (
         <NavLink
           key={link.to}
@@ -402,8 +409,8 @@ function ClientNav() {
             [
               "px-4 py-2 rounded-full font-medium transition-colors",
               isActive
-                ? "bg-slate-900 text-white shadow"
-                : "text-slate-500 hover:text-slate-900",
+                ? "bg-purple-600 text-white shadow"
+                : "text-slate-500 hover:text-purple-700",
             ].join(" ")
           }
         >
@@ -418,13 +425,9 @@ function ClientAccountMenu({ clientName, onLogout }) {
   return (
     <div className="flex items-center gap-4 text-sm text-slate-600">
       <span className="font-medium text-slate-900">{clientName}</span>
-      <button
-        type="button"
-        onClick={onLogout}
-        className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-      >
+      <Button type="button" onClick={onLogout} className="px-4 py-2">
         Sair
-      </button>
+      </Button>
     </div>
   );
 }
@@ -631,7 +634,7 @@ function QuickAlertsCard({ pending, awaiting, refused }) {
             className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm text-slate-700 hover:border-slate-200 hover:bg-slate-50"
           >
             <span>{alert.label}</span>
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+            <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-semibold text-white">
               {alert.value}
             </span>
           </Link>
@@ -674,6 +677,21 @@ function MiniMetricsCard({ totalMetrics }) {
 }
 
 function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges, onReject }) {
+  const [adjustmentState, setAdjustmentState] = useState({ postId: null, notes: "" });
+
+  const startAdjustment = (postId) =>
+    setAdjustmentState({
+      postId,
+      notes: "",
+    });
+  const cancelAdjustment = () => setAdjustmentState({ postId: null, notes: "" });
+
+  const handleSubmitAdjustment = async (approvalId) => {
+    if (!approvalId || !adjustmentState.notes.trim()) return;
+    await onRequestChanges(approvalId, adjustmentState.notes);
+    cancelAdjustment();
+  };
+
   return (
     <Card className="shadow-sm border border-slate-100 bg-white/90 backdrop-blur">
       <CardHeader className="pb-2">
@@ -736,23 +754,51 @@ function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges
                   >
                     Aprovar
                   </Button>
-                  <button
+                  {approval && adjustmentState.postId !== post.id && (
+                    <Button type="button" onClick={() => startAdjustment(post.id)}>
+                      Solicitar ajuste
+                    </Button>
+                  )}
+                  <Button
                     type="button"
                     disabled={!approval}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-                    onClick={() => approval && onRequestChanges(approval.id)}
-                  >
-                    Solicitar ajuste
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!approval}
-                    className="inline-flex items-center rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-60"
                     onClick={() => approval && onReject(approval.id)}
                   >
                     Recusar
-                  </button>
+                  </Button>
                 </div>
+                {approval && adjustmentState.postId === post.id && (
+                  <div className="mt-4 w-full rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                    <textarea
+                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      rows={3}
+                      placeholder="Descreva o ajuste desejado"
+                      value={adjustmentState.notes}
+                      onChange={(e) =>
+                        setAdjustmentState((prev) => ({
+                          ...prev,
+                          notes: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        disabled={!adjustmentState.notes.trim()}
+                        onClick={() => handleSubmitAdjustment(approval.id)}
+                      >
+                        Enviar ajuste
+                      </Button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+                        onClick={cancelAdjustment}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </article>
             );
           })
@@ -823,6 +869,20 @@ function KanbanColumn({ title, posts, approvalsByPostId, onApprove, onRequestCha
 function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onPreview }) {
   const mediaUrl = resolveMediaUrl(post.media_url || post.mediaUrl || "");
   const platform = post.platform || post.channel || post.socialNetwork || "Social";
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  const closeAdjustment = () => {
+    setIsAdjusting(false);
+    setNotes("");
+  };
+
+  const submitAdjustment = async () => {
+    if (!approval || !notes.trim()) return;
+    await onRequestChanges(approval.id, notes);
+    closeAdjustment();
+  };
+
   return (
     <article className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
       <button
@@ -854,23 +914,48 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
         >
           <ThumbsUp className="mr-1 h-3 w-3" /> Aprovar
         </Button>
-        <button
+        {approval && !isAdjusting && (
+          <Button size="xs" type="button" onClick={() => setIsAdjusting(true)}>
+            <MessageCircle className="mr-1 h-3 w-3" /> Solicitar ajuste
+          </Button>
+        )}
+        <Button
+          size="xs"
           type="button"
           disabled={!approval}
-          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-          onClick={() => approval && onRequestChanges(approval.id)}
-        >
-          <MessageCircle className="mr-1 h-3 w-3" /> Ajuste
-        </button>
-        <button
-          type="button"
-          disabled={!approval}
-          className="inline-flex items-center rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-60"
           onClick={() => approval && onReject(approval.id)}
         >
           <XCircle className="mr-1 h-3 w-3" /> Recusar
-        </button>
+        </Button>
       </div>
+      {approval && isAdjusting && (
+        <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+          <textarea
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+            rows={3}
+            placeholder="Descreva o ajuste desejado"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="xs"
+              type="button"
+              disabled={!notes.trim()}
+              onClick={submitAdjustment}
+            >
+              Enviar ajuste
+            </Button>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+              onClick={closeAdjustment}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -878,6 +963,21 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
 function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequestChanges }) {
   if (!post) return null;
   const mediaUrl = resolveMediaUrl(post.media_url || post.mediaUrl || "");
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  const closeAdjustment = () => {
+    setIsAdjusting(false);
+    setNotes("");
+  };
+
+  const handleSubmit = async () => {
+    if (!approval || !notes.trim()) return;
+    await onRequestChanges(approval.id, notes);
+    closeAdjustment();
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
@@ -923,29 +1023,49 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
               >
                 Aprovar
               </Button>
-              <button
+              {approval && !isAdjusting && (
+                <Button type="button" onClick={() => setIsAdjusting(true)}>
+                  Solicitar ajuste
+                </Button>
+              )}
+              <Button
                 type="button"
                 disabled={!approval}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-                onClick={() => {
-                  approval && onRequestChanges(approval.id);
-                  onClose();
-                }}
-              >
-                Solicitar ajuste
-              </button>
-              <button
-                type="button"
-                disabled={!approval}
-                className="inline-flex items-center rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-60"
                 onClick={() => {
                   approval && onReject(approval.id);
                   onClose();
                 }}
               >
                 Recusar
-              </button>
+              </Button>
             </div>
+            {approval && isAdjusting && (
+              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                <textarea
+                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  rows={3}
+                  placeholder="Descreva o ajuste desejado"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={!notes.trim()}
+                    onClick={handleSubmit}
+                  >
+                    Enviar ajuste
+                  </Button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+                    onClick={closeAdjustment}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
