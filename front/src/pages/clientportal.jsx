@@ -161,6 +161,16 @@ export default function ClientPortalLayout() {
   });
   const approvals = approvalsData?.items || [];
 
+  const requestPostChanges = useCallback(
+    (postId, note) =>
+      fetchClient(`/posts/${postId}/request-changes`, clientToken, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      }),
+    [clientToken],
+  );
+
   const approvalsByPostId = useMemo(() => {
     const map = new Map();
     approvals.forEach((approval) => {
@@ -184,7 +194,10 @@ export default function ClientPortalLayout() {
   );
 
   const awaitingCorrection = useMemo(
-    () => posts.filter((p) => p.status === "REVISION_REQUESTED"),
+    () =>
+      posts.filter(
+        (p) => p.status === "DRAFT" && Boolean((p.clientFeedback || p.client_feedback || "").trim()),
+      ),
     [posts],
   );
 
@@ -248,26 +261,27 @@ export default function ClientPortalLayout() {
   );
 
   const handleRequestChanges = useCallback(
-    async (approvalId, notesOverride) => {
-      if (!approvalId) return;
-      let notes = notesOverride;
-      if (!notes || !notes.trim()) {
-        const fallback =
-          typeof window !== "undefined"
-            ? window.prompt(
-                "Descreva os ajustes desejados:",
-                "Preciso ajustar esse post.",
-              )
-            : "Cliente solicitou ajustes";
-        if (!fallback) return;
-        notes = fallback;
+    async (postId, approvalId, note) => {
+      const trimmed = (note || "").trim();
+      if (!postId || trimmed.length < 3) {
+        throw new Error("Descreva o ajuste com pelo menos 3 caracteres");
       }
-      await rejectClientApproval(approvalId, {
-        notes: notes.trim(),
-        type: "REVISION_REQUESTED",
-      });
+
+      await requestPostChanges(postId, trimmed);
+
+      if (approvalId) {
+        await rejectClientApproval(approvalId, {
+          notes: trimmed,
+          type: "REVISION_REQUESTED",
+        });
+      }
+
+      queryClientInvalidate();
+      if (typeof window !== "undefined") {
+        window.alert("Solicitação de ajuste enviada.");
+      }
     },
-    [rejectClientApproval],
+    [queryClientInvalidate, rejectClientApproval, requestPostChanges],
   );
 
   const handleLogout = useCallback(() => {
@@ -493,9 +507,13 @@ export function ClientPostsPage() {
   const [previewPost, setPreviewPost] = useState(null);
 
   const grouped = useMemo(() => {
+    const withFeedback = (post) =>
+      post.status === "DRAFT" &&
+      Boolean((post.clientFeedback || post.client_feedback || "").trim());
+
     return {
       pending: posts.filter((p) => p.status === "PENDING_APPROVAL"),
-      revision: posts.filter((p) => p.status === "REVISION_REQUESTED"),
+      revision: posts.filter(withFeedback),
       approved: posts.filter((p) => ["APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status)),
       archived: posts.filter((p) => p.status === "ARCHIVED"),
       rejected: posts.filter((p) => p.status === "REJECTED" || p.status === "CANCELLED"),
@@ -677,19 +695,30 @@ function MiniMetricsCard({ totalMetrics }) {
 }
 
 function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges, onReject }) {
-  const [adjustmentState, setAdjustmentState] = useState({ postId: null, notes: "" });
+  const [adjustmentState, setAdjustmentState] = useState({ postId: null, notes: "", loading: false });
 
   const startAdjustment = (postId) =>
     setAdjustmentState({
       postId,
       notes: "",
+      loading: false,
     });
-  const cancelAdjustment = () => setAdjustmentState({ postId: null, notes: "" });
+  const cancelAdjustment = () => setAdjustmentState({ postId: null, notes: "", loading: false });
 
-  const handleSubmitAdjustment = async (approvalId) => {
-    if (!approvalId || !adjustmentState.notes.trim()) return;
-    await onRequestChanges(approvalId, adjustmentState.notes);
-    cancelAdjustment();
+  const handleSubmitAdjustment = async (postId, approvalId) => {
+    if (!postId || !adjustmentState.notes.trim()) return;
+    setAdjustmentState((prev) => ({ ...prev, loading: true }));
+    try {
+      await onRequestChanges(postId, approvalId, adjustmentState.notes);
+      cancelAdjustment();
+    } catch (error) {
+      console.error("requestChanges failed:", error);
+      if (typeof window !== "undefined") {
+        window.alert(error?.message || "Não foi possível enviar o ajuste.");
+      }
+    } finally {
+      setAdjustmentState((prev) => ({ ...prev, loading: false }));
+    }
   };
 
   return (
@@ -784,14 +813,15 @@ function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        disabled={!adjustmentState.notes.trim()}
-                        onClick={() => handleSubmitAdjustment(approval.id)}
+                        disabled={!adjustmentState.notes.trim() || adjustmentState.loading}
+                        onClick={() => handleSubmitAdjustment(post.id, approval.id)}
                       >
                         Enviar ajuste
                       </Button>
                       <button
                         type="button"
-                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+                        disabled={adjustmentState.loading}
+                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
                         onClick={cancelAdjustment}
                       >
                         Cancelar
@@ -871,6 +901,7 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
   const platform = post.platform || post.channel || post.socialNetwork || "Social";
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const closeAdjustment = () => {
     setIsAdjusting(false);
@@ -878,9 +909,19 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
   };
 
   const submitAdjustment = async () => {
-    if (!approval || !notes.trim()) return;
-    await onRequestChanges(approval.id, notes);
-    closeAdjustment();
+    if (!post.id || !notes.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onRequestChanges(post.id, approval?.id || null, notes);
+      closeAdjustment();
+    } catch (error) {
+      console.error("submitAdjustment failed:", error);
+      if (typeof window !== "undefined") {
+        window.alert(error?.message || "Não foi possível enviar o ajuste.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -941,14 +982,15 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
             <Button
               size="xs"
               type="button"
-              disabled={!notes.trim()}
+              disabled={!notes.trim() || isSubmitting}
               onClick={submitAdjustment}
             >
               Enviar ajuste
             </Button>
             <button
               type="button"
-              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+              disabled={isSubmitting}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
               onClick={closeAdjustment}
             >
               Cancelar
@@ -965,6 +1007,7 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
   const mediaUrl = resolveMediaUrl(post.media_url || post.mediaUrl || "");
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const closeAdjustment = () => {
     setIsAdjusting(false);
@@ -972,10 +1015,20 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
   };
 
   const handleSubmit = async () => {
-    if (!approval || !notes.trim()) return;
-    await onRequestChanges(approval.id, notes);
-    closeAdjustment();
-    onClose();
+    if (!post.id || !notes.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onRequestChanges(post.id, approval?.id || null, notes);
+      closeAdjustment();
+      onClose();
+    } catch (error) {
+      console.error("handleSubmit failed:", error);
+      if (typeof window !== "undefined") {
+        window.alert(error?.message || "Não foi possível enviar o ajuste.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1051,14 +1104,15 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     type="button"
-                    disabled={!notes.trim()}
+                    disabled={!notes.trim() || isSubmitting}
                     onClick={handleSubmit}
                   >
                     Enviar ajuste
                   </Button>
                   <button
                     type="button"
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
                     onClick={closeAdjustment}
                   >
                     Cancelar

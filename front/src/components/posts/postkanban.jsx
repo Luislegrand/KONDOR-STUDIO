@@ -2,12 +2,43 @@ import React from "react";
 import Postcard from "./postcard.jsx";
 
 const COLUMNS = [
-  { status: "DRAFT", title: "Rascunho", description: "Ideias e conteúdos em rascunho." },
-  { status: "PENDING_APPROVAL", title: "Aguardando aprovação", description: "Posts enviados para o cliente revisar." },
-  { status: "APPROVED", title: "Aprovado", description: "Pronto para programar ou publicar." },
-  { status: "SCHEDULED", title: "Programado", description: "Agendado nas plataformas." },
-  { status: "PUBLISHED", title: "Publicado", description: "Entrou no ar recentemente." },
-  { status: "ARCHIVED", title: "Arquivado", description: "Itens antigos ou pausados." },
+  {
+    key: "REVISION_REQUESTED",
+    title: "Aguardando correção",
+    description: "Posts com ajustes solicitados pelo cliente.",
+    filter: (post) => post.status === "DRAFT" && Boolean((post.clientFeedback || "").trim()),
+  },
+  {
+    status: "DRAFT",
+    title: "Rascunho",
+    description: "Ideias e conteúdos em rascunho.",
+    filter: (post) => post.status === "DRAFT" && !Boolean((post.clientFeedback || "").trim()),
+  },
+  {
+    status: "PENDING_APPROVAL",
+    title: "Aguardando aprovação",
+    description: "Posts enviados para o cliente revisar.",
+  },
+  {
+    status: "APPROVED",
+    title: "Aprovado",
+    description: "Pronto para programar ou publicar.",
+  },
+  {
+    status: "SCHEDULED",
+    title: "Programado",
+    description: "Agendado nas plataformas.",
+  },
+  {
+    status: "PUBLISHED",
+    title: "Publicado",
+    description: "Entrou no ar recentemente.",
+  },
+  {
+    status: "ARCHIVED",
+    title: "Arquivado",
+    description: "Itens antigos ou pausados.",
+  },
 ];
 
 export default function Postkanban({
@@ -24,16 +55,6 @@ export default function Postkanban({
     });
     return map;
   }, [clients]);
-
-  const postsByStatus = React.useMemo(() => {
-    const map = new Map();
-    (posts || []).forEach((post) => {
-      const bucket = map.get(post.status) || [];
-      bucket.push(post);
-      map.set(post.status, bucket);
-    });
-    return map;
-  }, [posts]);
 
   const getClientById = (clientId) => {
     if (!clientId) return null;
@@ -62,11 +83,13 @@ export default function Postkanban({
       {/* wrapper horizontal */}
       <div className="flex w-full gap-5 overflow-x-auto pb-2">
         {COLUMNS.map((col) => {
-          const columnPosts = postsByStatus.get(col.status) || [];
+          const columnPosts = (posts || []).filter((post) =>
+            typeof col.filter === "function" ? col.filter(post) : post.status === col.status,
+          );
 
           return (
             <div
-              key={col.status}
+              key={col.status || col.key}
               className="min-w-[360px] flex-shrink-0"
             >
               <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-100 backdrop-blur-md">

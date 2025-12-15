@@ -106,6 +106,38 @@ router.put("/:id", async (req, res) => {
 });
 
 /**
+ * POST /posts/:id/request-changes
+ */
+router.post("/:id/request-changes", async (req, res) => {
+  try {
+    const userId = req.user?.id || null;
+    const body = req.body || {};
+    const noteInput =
+      typeof body.note === "string"
+        ? body.note
+        : typeof body.message === "string"
+          ? body.message
+          : "";
+
+    const updated = await postsService.requestChanges(
+      req.tenantId,
+      req.params.id,
+      noteInput,
+      userId
+    );
+
+    if (!updated) return res.status(404).json({ error: "Post não encontrado" });
+    return res.json(updated);
+  } catch (err) {
+    if (err instanceof PostValidationError) {
+      return res.status(400).json({ error: err.message, code: err.code });
+    }
+    console.error("POST /posts/:id/request-changes error:", err);
+    return res.status(500).json({ error: "Erro ao solicitar ajustes" });
+  }
+});
+
+/**
  * DELETE /posts/:id
  */
 router.delete("/:id", async (req, res) => {

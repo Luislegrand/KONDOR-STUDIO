@@ -292,6 +292,9 @@ module.exports = {
       const norm = normalizePostStatusInput(data.status);
       updateData.status = norm.postStatus;
       approvalOverride = norm.approvalOverride;
+      if (norm.postStatus === 'PENDING_APPROVAL') {
+        updateData.clientFeedback = null;
+      }
     }
 
     if (
@@ -391,9 +394,16 @@ module.exports = {
 
     if (existing.status === postStatus && !approvalOverride) return existing;
 
+    const statusUpdate = {
+      status: postStatus,
+    };
+    if (postStatus === 'PENDING_APPROVAL') {
+      statusUpdate.clientFeedback = null;
+    }
+
     const updated = await prisma.post.update({
       where: { id },
-      data: { status: postStatus },
+      data: statusUpdate,
     });
 
     try {
@@ -403,6 +413,29 @@ module.exports = {
     }
 
     return updated;
+  },
+
+  async requestChanges(tenantId, postId, note, userId = null) {
+    const feedback = sanitizeString(note);
+    if (!feedback || feedback.length < 3) {
+      throw new PostValidationError(
+        'Descreva o ajuste desejado com pelo menos 3 caracteres',
+        'INVALID_FEEDBACK'
+      );
+    }
+
+    const existing = await prisma.post.findFirst({
+      where: { id: postId, tenantId },
+    });
+    if (!existing) return null;
+
+    return prisma.post.update({
+      where: { id: postId },
+      data: {
+        clientFeedback: feedback,
+        status: 'DRAFT',
+      },
+    });
   },
 };
 

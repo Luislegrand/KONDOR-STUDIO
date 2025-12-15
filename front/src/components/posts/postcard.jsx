@@ -47,6 +47,10 @@ export default function Postcard({ post, client, onEdit, onStatusChange }) {
     left: 0,
     width: 0,
   });
+  const clientFeedback = (post.clientFeedback || "").trim();
+  const hasClientFeedback = Boolean(clientFeedback);
+  const awaitingCorrection = post.status === "DRAFT" && hasClientFeedback;
+  const statusLabel = awaitingCorrection ? "Aguardando correção" : formatStatusLabel(localStatus);
 
   const updateMenuPosition = React.useCallback(() => {
     if (!triggerRef.current) return;
@@ -136,16 +140,28 @@ export default function Postcard({ post, client, onEdit, onStatusChange }) {
             )}
           </div>
           <Badge className="text-[10px] bg-purple-50 text-purple-700 border border-purple-100">
-            {formatStatusLabel(localStatus)}
+            {statusLabel}
           </Badge>
         </div>
       </CardHeader>
 
-      {description && (
-        <CardContent className="pb-2 pr-3">
-          <p className="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">
-            {description}
-          </p>
+      {(description || clientFeedback) && (
+        <CardContent className="pb-2 pr-3 space-y-3">
+          {description && (
+            <p className="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">
+              {description}
+            </p>
+          )}
+          {hasClientFeedback && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                Correção solicitada
+              </p>
+              <p className="text-xs text-amber-800 line-clamp-2 whitespace-pre-line">
+                {clientFeedback}
+              </p>
+            </div>
+          )}
         </CardContent>
       )}
 
@@ -164,7 +180,7 @@ export default function Postcard({ post, client, onEdit, onStatusChange }) {
               ref={triggerRef}
               className="w-full sm:w-[170px] inline-flex items-center justify-between rounded-full border border-purple-200 bg-white px-3 py-2 text-xs font-medium text-purple-700 transition hover:border-purple-300 hover:bg-purple-50"
             >
-              <span>{formatStatusLabel(localStatus)}</span>
+              <span>{statusLabel}</span>
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
