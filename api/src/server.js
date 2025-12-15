@@ -1,7 +1,6 @@
 require("dotenv").config();
 
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -185,29 +184,7 @@ function safeMount(path, router) {
   }
 }
 
-// Básico
-app.use(bodyParser.json({ limit: "10mb" }));
-app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
-
-// 🔧 Helmet configurado para permitir recursos cross-origin (imagens, etc.)
-app.use(
-  helmet({
-    // Permite que recursos (ex.: imagens) sejam carregados de outros origins
-    // como kondor-api.onrender.com -> kondor-front.onrender.com
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-
-    // Evita problemas com COEP/COOP em front/back separados
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-
-    // Se você tiver um contentSecurityPolicy custom, configure aqui em vez de desativar.
-    // contentSecurityPolicy: false,
-  })
-);
-
-app.use(morgan(isProduction ? "combined" : "dev"));
-
-// CORS
+// CORS configurado antes de qualquer parser, para garantir headers em respostas de erro
 const devOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -237,6 +214,44 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+// Body parsers (JSON / urlencoded)
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, res, buf) => {
+      req.rawBody = buf?.toString();
+    },
+  })
+);
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// 🔧 Helmet configurado para permitir recursos cross-origin (imagens, etc.)
+app.use(
+  helmet({
+    // Permite que recursos (ex.: imagens) sejam carregados de outros origins
+    // como kondor-api.onrender.com -> kondor-front.onrender.com
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+
+    // Evita problemas com COEP/COOP em front/back separados
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+
+    // Se você tiver um contentSecurityPolicy custom, configure aqui em vez de desativar.
+    // contentSecurityPolicy: false,
+  })
+);
+
+app.use(morgan(isProduction ? "combined" : "dev"));
+
+// Handler específico para JSON inválido
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+  return next(err);
+});
 
 // Static uploads (fallback local storage)
 const localUploadsDir =

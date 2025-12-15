@@ -58,16 +58,24 @@ function errorLogger(options = {}) {
 
       payload.metadata = meta;
 
-      await prisma.systemLog.create({
-        data: {
-          level: payload.level,
-          source: payload.source,
-          message: payload.message,
-          stack: payload.stack,
-          tenantId: payload.tenantId,
-          metadata: payload.metadata,
-        },
-      });
+      try {
+        await prisma.systemLog.create({
+          data: {
+            level: payload.level,
+            source: payload.source,
+            message: payload.message,
+            stack: payload.stack,
+            tenantId: payload.tenantId,
+            metadata: payload.metadata,
+          },
+        });
+      } catch (dbErr) {
+        if (dbErr?.code === 'P2021') {
+          console.error('[ERROR_LOGGER] system_logs table missing; skipping DB log');
+        } else {
+          console.error('[ERROR_LOGGER] failed to log error:', dbErr);
+        }
+      }
     } catch (loggingErr) {
       console.error('[ERROR_LOGGER] Falha ao registrar log', loggingErr);
     }

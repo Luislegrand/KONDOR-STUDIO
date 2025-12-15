@@ -48,14 +48,22 @@ function useClientPortal() {
 }
 
 async function fetchClient(path, token, options = {}) {
-  const res = await base44.rawFetch(path, {
+  const fetchOptions = {
     method: options.method || "GET",
-    body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
       ...(options.headers || {}),
       Authorization: `Bearer ${token}`,
     },
-  });
+  };
+
+  if (options.body !== undefined) {
+    fetchOptions.body =
+      typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+    fetchOptions.headers["Content-Type"] =
+      options.headers?.["Content-Type"] || "application/json";
+  }
+
+  const res = await base44.rawFetch(path, fetchOptions);
 
   let data = null;
   try {
@@ -165,8 +173,7 @@ export default function ClientPortalLayout() {
     (postId, note) =>
       fetchClient(`/posts/${postId}/request-changes`, clientToken, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
+        body: { note },
       }),
     [clientToken],
   );

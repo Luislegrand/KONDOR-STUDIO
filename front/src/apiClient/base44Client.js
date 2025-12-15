@@ -159,6 +159,9 @@ async function rawFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   };
+  if (options && options.body && typeof options.body !== "string") {
+    opts.body = JSON.stringify(options.body);
+  }
 
   const res = await fetch(url, opts);
   return res;
