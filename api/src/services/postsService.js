@@ -3,14 +3,13 @@
 
 const { Prisma } = require('@prisma/client');
 const { prisma } = require('../prisma');
-const approvalsService = require('./approvalsService');
 
 class PostValidationError extends Error {
-	constructor(message, code = 'POST_VALIDATION_ERROR') {
-		super(message);
-		this.name = 'PostValidationError';
-		this.code = code;
-	}
+  constructor(message, code = 'POST_VALIDATION_ERROR') {
+    super(message);
+    this.name = 'PostValidationError';
+    this.code = code;
+  }
 }
 
 /**
@@ -18,282 +17,393 @@ class PostValidationError extends Error {
  * Aceita: ISO string, timestamp number, ou null/undefined
  */
 function toDateOrNull(value) {
-	if (!value && value !== 0) return null;
-	const d = new Date(value);
-	if (isNaN(d.getTime())) return null;
-	return d;
+  if (!value && value !== 0) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
 }
 
 function sanitizeString(value) {
-	if (value === undefined || value === null) return null;
-	const trimmed = String(value).trim();
-	return trimmed ? trimmed : null;
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * PostStatus existentes no seu schema (conforme você colou):
+ * DRAFT, PENDING_APPROVAL, ARCHIVED, SCHEDULED, PUBLISHED, FAILED, CANCELLED, IDEA, APPROVED
+ *
+ * Importante:
+ * - ApprovalStatus tem: PENDING, APPROVED, REJECTED
+ * - PostStatus NÃO tem REJECTED
+ *
+ * Então:
+ * - Aceitamos "REJECTED" como ALIAS (input) -> postStatus vira "DRAFT"
+ * - E sincronizamos Approval para "REJECTED"
+ */
+const POST_STATUSES = new Set([
+  'DRAFT',
+  'PENDING_APPROVAL',
+  'ARCHIVED',
+  'SCHEDULED',
+  'PUBLISHED',
+  'FAILED',
+  'CANCELLED',
+  'IDEA',
+  'APPROVED',
+]);
+
+function normalizePostStatusInput(inputStatus) {
+  const raw = sanitizeString(inputStatus);
+  if (!raw) return { postStatus: 'DRAFT', approvalOverride: null };
+
+  // Se o front mandar "REJECTED", não existe no PostStatus -> vira DRAFT + override no approval
+  if (raw === 'REJECTED') {
+    return { postStatus: 'DRAFT', approvalOverride: 'REJECTED' };
+  }
+
+  if (!POST_STATUSES.has(raw)) {
+    // Evita quebrar Prisma por enum inválido
+    return { postStatus: 'DRAFT', approvalOverride: null };
+  }
+
+  return { postStatus: raw, approvalOverride: null };
 }
 
 async function ensureApprovalRequest(tenantId, post, userId) {
-	if (!post || !post.clientId) return null;
+  if (!post || !post.clientId) return null;
 
-	const existing = await prisma.approval.findFirst({
-		where: { tenantId, postId: post.id, status: 'PENDING' },
-		orderBy: { createdAt: 'desc' },
-	});
-	if (existing) return existing;
+  const existing = await prisma.approval.findFirst({
+    where: { tenantId, postId: post.id, status: 'PENDING' },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (existing) return existing;
 
-	return approvalsService.create(tenantId, userId, {
-		postId: post.id,
-		clientId: post.clientId,
-		status: 'PENDING',
-		notes: post.caption || post.body || null,
-		metadata: {
-			postTitle: post.title || null,
-		},
-	});
+  return prisma.approval.create({
+    data: {
+      tenantId,
+      postId: post.id,
+      status: 'PENDING',
+      // Mantém simples e compatível com o schema atual
+      notes: post.caption || post.content || null,
+      requesterId: userId || null,
+    },
+  });
 }
 
-async function syncApprovalWithPostStatus(tenantId, post, status, userId) {
-	if (!post || !status) return;
+/**
+ * Sincroniza Approval baseado no STATUS DO POST.
+ * - PENDING_APPROVAL -> garante Approval PENDING
+ * - APPROVED -> seta Approval APPROVED (se existir pending)
+ * - Rejeição: quando o caller passar approvalOverride="REJECTED" (post fica DRAFT)
+ */
+async function syncApprovalWithPostStatus(tenantId, post, postStatus, userId, approvalOverride = null) {
+  if (!post || !postStatus) return;
 
-	if (status === 'PENDING_APPROVAL') {
-		await ensureApprovalRequest(tenantId, post, userId);
-		return;
-	}
+  // Se post precisa de aprovação, garante um approval pendente
+  if (postStatus === 'PENDING_APPROVAL') {
+    await ensureApprovalRequest(tenantId, post, userId);
+    return;
+  }
 
-	if (!['APPROVED', 'REJECTED'].includes(status)) return;
+  // Descobre qual status de approval aplicar (se houver)
+  let approvalStatusToApply = null;
 
-	const latest = await prisma.approval.findFirst({
-		where: { tenantId, postId: post.id },
-		orderBy: { createdAt: 'desc' },
-	});
+  if (approvalOverride === 'REJECTED') approvalStatusToApply = 'REJECTED';
+  else if (postStatus === 'APPROVED') approvalStatusToApply = 'APPROVED';
+  else return; // outros status do post não mexem em approvals
 
-	if (!latest || latest.status === status) return;
+  const latestPending = await prisma.approval.findFirst({
+    where: { tenantId, postId: post.id, status: 'PENDING' },
+    orderBy: { createdAt: 'desc' },
+  });
 
-	await approvalsService.changeStatus(tenantId, latest.id, status, {
-		by: userId || null,
-		note: `Status sincronizado com o post (${status})`,
-	});
+  if (!latestPending) return;
+
+  await prisma.approval.update({
+    where: { id: latestPending.id },
+    data: {
+      status: approvalStatusToApply,
+      approverId: userId || latestPending.approverId || null,
+    },
+  });
 }
 
 module.exports = {
- 	/**
- 	 * Lista posts do tenant com filtros e paginação
- 	 * @param {String} tenantId
- 	 * @param {Object} opts - { status, clientId, q, page, perPage }
- 	 */
- 	async list(tenantId, opts = {}) {
- 		const { status, clientId, q, page = 1, perPage = 50 } = opts;
- 		const where = { tenantId };
+  /**
+   * Lista posts do tenant com filtros e paginação
+   * @param {String} tenantId
+   * @param {Object} opts - { status, clientId, q, page, perPage }
+   */
+  async list(tenantId, opts = {}) {
+    const { status, clientId, q } = opts;
 
- 		if (status) where.status = status;
- 		if (clientId) where.clientId = clientId;
- 		if (q) {
- 			where.OR = [
- 				{ title: { contains: q, mode: 'insensitive' } },
- 				{ caption: { contains: q, mode: 'insensitive' } },
- 			];
- 		}
+    const page = Math.max(1, Number(opts.page || 1));
+    const perPage = Math.min(100, Math.max(1, Number(opts.perPage || 50)));
 
- 		const skip = (Math.max(1, page) - 1) * perPage;
- 		const take = perPage;
+    const where = { tenantId };
 
- 		const [items, total] = await Promise.all([
- 			prisma.post.findMany({
- 				where,
- 				orderBy: { createdAt: 'desc' },
- 				skip,
- 				take,
- 			}),
- 			prisma.post.count({ where }),
- 		]);
+    if (status) {
+      // aceita alias REJECTED sem quebrar; REJECTED no post vira DRAFT.
+      const { postStatus } = normalizePostStatusInput(status);
+      where.status = postStatus;
+    }
 
- 		return {
- 			items,
- 			total,
- 			page,
- 			perPage,
- 			totalPages: Math.ceil(total / perPage),
- 		};
- 	},
+    if (clientId) where.clientId = clientId;
 
- 	/**
- 	 * Cria um novo post dentro do tenant
- 	 * @param {String} tenantId
- 	 * @param {String} userId - id do usuário que cria
- 	 * @param {Object} data
- 	 */
- 	async create(tenantId, userId, data = {}) {
- 		const scheduledDate = data.scheduledDate || data.scheduled_date || data.scheduledAt || null;
- 		const publishedDate = data.publishedDate || data.published_date || null;
+    if (q) {
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { caption: { contains: q, mode: 'insensitive' } },
+      ];
+    }
 
- 		const title = sanitizeString(data.title);
- 		const clientId = sanitizeString(data.clientId || data.client_id);
- 		const mediaUrl = sanitizeString(data.mediaUrl || data.media_url);
+    const skip = (page - 1) * perPage;
+    const take = perPage;
 
-		if (!title) {
-			throw new PostValidationError('Título é obrigatório');
-		}
-		if (!clientId) {
-			throw new PostValidationError('Selecione um cliente antes de salvar o post');
-		}
-		if (!mediaUrl) {
-			throw new PostValidationError('Envie uma mídia antes de salvar o post');
-		}
+    const [items, total] = await Promise.all([
+      prisma.post.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.post.count({ where }),
+    ]);
 
- 		const payload = {
- 			tenantId,
- 			clientId,
- 			title,
- 			caption: sanitizeString(data.caption || data.body),
- 			mediaUrl,
- 			mediaType: data.mediaType || data.media_type || 'image',
- 			cta: data.cta || null,
- 			tags: Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []),
-			status: data.status || 'DRAFT',
- 			scheduledDate: toDateOrNull(scheduledDate),
- 			publishedDate: toDateOrNull(publishedDate),
- 			clientFeedback: data.clientFeedback || data.client_feedback || null,
- 			version: data.version || 1,
- 			history: data.history || null,
- 			createdBy: userId || null,
- 		};
+    return {
+      items,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    };
+  },
 
-		try {
- 			const created = await prisma.post.create({ data: payload });
- 			await syncApprovalWithPostStatus(tenantId, created, created.status, userId);
- 			return created;
-		} catch (err) {
-			if (err instanceof Prisma.PrismaClientKnownRequestError) {
-				if (err.code === 'P2003') {
-					throw new PostValidationError('Cliente selecionado não existe mais', 'INVALID_CLIENT');
-				}
-			}
-			throw err;
-		}
- 	},
+  /**
+   * Cria um novo post dentro do tenant
+   * @param {String} tenantId
+   * @param {String} userId - id do usuário que cria
+   * @param {Object} data
+   */
+  async create(tenantId, userId, data = {}) {
+    const scheduledDate = data.scheduledDate || data.scheduled_date || data.scheduledAt || null;
+    const publishedDate = data.publishedDate || data.published_date || null;
 
- 	/**
- 	 * Busca post por id dentro do tenant
- 	 * @param {String} tenantId
- 	 * @param {String} id
- 	 */
-	async getById(tenantId, id, options = {}) {
-		if (!id) return null;
-		return prisma.post.findFirst({
-			where: { id, tenantId },
-			...options,
-		});
-	},
+    const title = sanitizeString(data.title);
+    const clientId = sanitizeString(data.clientId || data.client_id);
+    const mediaUrl = sanitizeString(data.mediaUrl || data.media_url);
 
- 	/**
- 	 * Atualiza post
- 	 * @param {String} tenantId
- 	 * @param {String} id
- 	 * @param {Object} data
- 	 */
- 	async update(tenantId, id, data = {}, options = {}) {
- 		const existing = await this.getById(tenantId, id);
- 		if (!existing) return null;
+    if (!title) throw new PostValidationError('Título é obrigatório');
+    if (!clientId) throw new PostValidationError('Selecione um cliente antes de salvar o post');
+    if (!mediaUrl) throw new PostValidationError('Envie uma mídia antes de salvar o post');
 
- 		const updateData = {};
+    const { postStatus, approvalOverride } = normalizePostStatusInput(data.status || 'DRAFT');
 
- 		if (data.title !== undefined) updateData.title = data.title;
- 		if (data.caption !== undefined || data.body !== undefined) {
- 			updateData.caption = data.caption || data.body;
- 		}
- 		if (data.mediaUrl !== undefined || data.media_url !== undefined) {
- 			updateData.mediaUrl = data.mediaUrl || data.media_url;
- 		}
- 		if (data.mediaType !== undefined || data.media_type !== undefined) {
- 			updateData.mediaType = data.mediaType || data.media_type;
- 		}
- 		if (data.cta !== undefined) updateData.cta = data.cta;
- 		if (data.tags !== undefined) updateData.tags = Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []);
- 		if (data.clientId !== undefined || data.client_id !== undefined) {
- 			updateData.clientId = data.clientId || data.client_id || null;
- 		}
- 		if (data.status !== undefined) updateData.status = data.status;
+    const payload = {
+      tenantId,
+      clientId,
+      title,
+      caption: sanitizeString(data.caption || data.body),
+      mediaUrl,
+      mediaType: sanitizeString(data.mediaType || data.media_type) || 'image',
+      cta: sanitizeString(data.cta),
+      tags: Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []),
+      status: postStatus,
+      scheduledDate: toDateOrNull(scheduledDate),
+      publishedDate: toDateOrNull(publishedDate),
+      clientFeedback: sanitizeString(data.clientFeedback || data.client_feedback),
+      version: Number(data.version || 1),
+      history: data.history || null,
+      createdBy: userId || null,
+    };
 
- 		if (data.scheduledDate !== undefined || data.scheduled_date !== undefined || data.scheduledAt !== undefined) {
- 			const scheduledValue = data.scheduledDate || data.scheduled_date || data.scheduledAt;
- 			updateData.scheduledDate = toDateOrNull(scheduledValue);
- 		}
+    try {
+      const created = await prisma.post.create({ data: payload });
 
- 		if (data.publishedDate !== undefined || data.published_date !== undefined) {
- 			const publishedValue = data.publishedDate || data.published_date;
- 			updateData.publishedDate = toDateOrNull(publishedValue);
- 		}
+      try {
+        await syncApprovalWithPostStatus(tenantId, created, created.status, userId, approvalOverride);
+      } catch (syncErr) {
+        console.error('syncApprovalWithPostStatus(create) failed:', syncErr);
+      }
 
- 		if (data.clientFeedback !== undefined || data.client_feedback !== undefined) {
- 			updateData.clientFeedback = data.clientFeedback || data.client_feedback || null;
- 		}
+      return created;
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === 'P2003') {
+          throw new PostValidationError('Cliente selecionado não existe mais', 'INVALID_CLIENT');
+        }
+      }
+      throw err;
+    }
+  },
 
- 		if (data.version !== undefined) updateData.version = data.version;
- 		if (data.history !== undefined) updateData.history = data.history;
+  /**
+   * Busca post por id dentro do tenant
+   * @param {String} tenantId
+   * @param {String} id
+   */
+  async getById(tenantId, id, options = {}) {
+    if (!id) return null;
+    return prisma.post.findFirst({
+      where: { id, tenantId },
+      ...options,
+    });
+  },
 
- 		const updated = await prisma.post.update({
- 			where: { id },
- 			data: updateData,
- 		});
+  /**
+   * Atualiza post
+   * @param {String} tenantId
+   * @param {String} id
+   * @param {Object} data
+   */
+  async update(tenantId, id, data = {}, options = {}) {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) return null;
 
-		if (updateData.status && updateData.status !== existing.status) {
-			await syncApprovalWithPostStatus(tenantId, updated, updateData.status, options.userId || null);
-		}
+    const updateData = {};
+    let approvalOverride = null;
 
- 		return updated;
- 	},
+    if (data.title !== undefined) updateData.title = sanitizeString(data.title);
 
- 	/**
- 	 * Remove post (dentro do tenant)
- 	 * @param {String} tenantId
- 	 * @param {String} id
- 	 */
- 	async remove(tenantId, id) {
- 		const existing = await this.getById(tenantId, id);
- 		if (!existing) return false;
+    if (data.caption !== undefined || data.body !== undefined) {
+      updateData.caption = sanitizeString(data.caption || data.body);
+    }
 
- 		await prisma.post.delete({
- 			where: { id },
- 		});
+    if (data.mediaUrl !== undefined || data.media_url !== undefined) {
+      updateData.mediaUrl = sanitizeString(data.mediaUrl || data.media_url);
+    }
 
- 		return true;
- 	},
+    if (data.mediaType !== undefined || data.media_type !== undefined) {
+      updateData.mediaType = sanitizeString(data.mediaType || data.media_type);
+    }
 
- 	/**
- 	 * Sugestão rápida para buscar posts por termos (útil para selects/autocomplete)
- 	 */
- 	async suggest(tenantId, term, limit = 10) {
- 		if (!term) return [];
- 		return prisma.post.findMany({
- 			where: {
- 				tenantId,
- 				OR: [
- 					{ title: { contains: term, mode: 'insensitive' } },
- 					{ caption: { contains: term, mode: 'insensitive' } },
- 				],
- 			},
- 			take: limit,
- 			orderBy: { createdAt: 'desc' },
- 			select: { id: true, title: true, caption: true },
- 		});
- 	},
+    if (data.cta !== undefined) updateData.cta = sanitizeString(data.cta);
 
-	/**
-	 * Atualiza apenas o status do post (atalho para automações)
-	 */
-	async updateStatus(tenantId, id, status, userId = null) {
-		if (!status) return null;
-		const existing = await this.getById(tenantId, id);
-		if (!existing) return null;
+    if (data.tags !== undefined) {
+      updateData.tags = Array.isArray(data.tags) ? data.tags : (data.tags ? [data.tags] : []);
+    }
 
-		if (existing.status === status) return existing;
+    if (data.clientId !== undefined || data.client_id !== undefined) {
+      updateData.clientId = sanitizeString(data.clientId || data.client_id);
+    }
 
-		const updated = await prisma.post.update({
-			where: { id },
-			data: { status },
-		});
+    if (data.status !== undefined) {
+      const norm = normalizePostStatusInput(data.status);
+      updateData.status = norm.postStatus;
+      approvalOverride = norm.approvalOverride;
+    }
 
-		await syncApprovalWithPostStatus(tenantId, updated, status, userId);
-		return updated;
-	},
+    if (
+      data.scheduledDate !== undefined ||
+      data.scheduled_date !== undefined ||
+      data.scheduledAt !== undefined
+    ) {
+      const scheduledValue = data.scheduledDate || data.scheduled_date || data.scheduledAt;
+      updateData.scheduledDate = toDateOrNull(scheduledValue);
+    }
+
+    if (data.publishedDate !== undefined || data.published_date !== undefined) {
+      const publishedValue = data.publishedDate || data.published_date;
+      updateData.publishedDate = toDateOrNull(publishedValue);
+    }
+
+    if (data.clientFeedback !== undefined || data.client_feedback !== undefined) {
+      updateData.clientFeedback = sanitizeString(data.clientFeedback || data.client_feedback);
+    }
+
+    if (data.version !== undefined) updateData.version = Number(data.version);
+    if (data.history !== undefined) updateData.history = data.history;
+
+    const updated = await prisma.post.update({
+      where: { id },
+      data: updateData,
+    });
+
+    // Só sincroniza se status mudou (ou se veio override de REJECTED)
+    const statusChanged = updateData.status && updateData.status !== existing.status;
+    const hasOverride = approvalOverride === 'REJECTED';
+
+    if (statusChanged || hasOverride) {
+      try {
+        await syncApprovalWithPostStatus(
+          tenantId,
+          updated,
+          updated.status,
+          options.userId || null,
+          approvalOverride
+        );
+      } catch (syncErr) {
+        console.error('syncApprovalWithPostStatus(update) failed:', syncErr);
+      }
+    }
+
+    return updated;
+  },
+
+  /**
+   * Remove post (dentro do tenant)
+   * @param {String} tenantId
+   * @param {String} id
+   */
+  async remove(tenantId, id) {
+    const existing = await this.getById(tenantId, id);
+    if (!existing) return false;
+
+    await prisma.post.delete({
+      where: { id },
+    });
+
+    return true;
+  },
+
+  /**
+   * Sugestão rápida para buscar posts por termos (útil para selects/autocomplete)
+   */
+  async suggest(tenantId, term, limit = 10) {
+    if (!term) return [];
+    const take = Math.min(25, Math.max(1, Number(limit || 10)));
+
+    return prisma.post.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { title: { contains: term, mode: 'insensitive' } },
+          { caption: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      take,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, title: true, caption: true },
+    });
+  },
+
+  /**
+   * Atualiza apenas o status do post (atalho para automações)
+   */
+  async updateStatus(tenantId, id, status, userId = null) {
+    if (!status) return null;
+
+    const existing = await this.getById(tenantId, id);
+    if (!existing) return null;
+
+    const { postStatus, approvalOverride } = normalizePostStatusInput(status);
+
+    if (existing.status === postStatus && !approvalOverride) return existing;
+
+    const updated = await prisma.post.update({
+      where: { id },
+      data: { status: postStatus },
+    });
+
+    try {
+      await syncApprovalWithPostStatus(tenantId, updated, postStatus, userId, approvalOverride);
+    } catch (syncErr) {
+      console.error('syncApprovalWithPostStatus(updateStatus) failed:', syncErr);
+    }
+
+    return updated;
+  },
 };
 
 module.exports.PostValidationError = PostValidationError;
