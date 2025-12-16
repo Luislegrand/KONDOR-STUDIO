@@ -41,6 +41,7 @@ async function authMiddleware(req, res, next) {
 
     // Se a rota estiver na lista de públicas, não exige token
     if (PUBLIC_PATHS.some((p) => path.startsWith(p))) {
+      req.isClientPortal = false;
       return next();
     }
 
@@ -92,6 +93,8 @@ async function authMiddleware(req, res, next) {
       };
       req.clientId = payload.clientId;
       req.tenantId = payload.tenantId || payload.tenant_id || null;
+      req.role = req.user.role;
+      req.isClientPortal = true;
       return next();
     }
 
@@ -118,7 +121,9 @@ async function authMiddleware(req, res, next) {
       role: payload.role || user.role,
       name: user.name,
     };
+    req.role = req.user.role;
     req.tenantId = payload.tenantId || user.tenantId;
+    req.isClientPortal = false;
 
     return next();
   } catch (error) {
@@ -176,8 +181,17 @@ async function requireClientAuth(req, res, next) {
       name: client.name,
       email: client.portalEmail || null,
     };
+    req.user = {
+      id: client.id,
+      role: 'CLIENT',
+      email: client.portalEmail || null,
+      name: client.name || null,
+      type: 'client',
+    };
+    req.role = req.user.role;
     req.clientId = client.id;
     req.tenantId = client.tenantId;
+    req.isClientPortal = true;
 
     return next();
   } catch (error) {
@@ -214,9 +228,33 @@ function requireRole(...allowedRoles) {
   };
 }
 
+function requireAuth(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Autenticação requerida' });
+  }
+  return next();
+}
+
+function requireTenant(req, res, next) {
+  if (!req.tenantId) {
+    return res.status(400).json({ error: 'TenantId não definido no contexto da requisição' });
+  }
+  return next();
+}
+
+function requireClientPortal(req, res, next) {
+  if (!req.isClientPortal || !req.clientId) {
+    return res.status(403).json({ error: 'Acesso restrito ao portal do cliente' });
+  }
+  return next();
+}
+
 // Export padrão continua sendo o authMiddleware de usuário
 module.exports = authMiddleware;
 
 // Exports auxiliares para quem precisar de client portal / roles
 module.exports.requireClientAuth = requireClientAuth;
 module.exports.requireRole = requireRole;
+module.exports.requireAuth = requireAuth;
+module.exports.requireTenant = requireTenant;
+module.exports.requireClientPortal = requireClientPortal;

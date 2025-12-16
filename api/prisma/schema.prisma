@@ -60,6 +60,11 @@ enum IntegrationStatus {
   ERROR
 }
 
+enum IntegrationOwnerType {
+  AGENCY
+  CLIENT
+}
+
 enum BillingInterval {
   MONTHLY
   YEARLY
@@ -272,6 +277,7 @@ model Client {
   billingContactName  String?
   billingContactEmail String?
   whatsappOptIn      Boolean   @default(false) // Cliente autorizou receber mensagens via WhatsApp
+  whatsappNumberE164 String?
 
   // Login específico do portal do cliente
   portalEmail        String?
@@ -280,6 +286,7 @@ model Client {
   projects           Project[]
   posts              Post[]
   financialRecords   FinancialRecord[]
+  integrations       Integration[]
 
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -343,6 +350,9 @@ model Post {
   clientFeedback String?
   version        Int          @default(1)
   history        Json?
+
+  whatsappSentAt DateTime?
+  whatsappMessageId String?
 
   createdBy      String?
 
@@ -629,6 +639,8 @@ model Integration {
   id             String              @id @default(uuid())
   tenantId       String
   tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId       String?
+  client         Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
   provider       IntegrationProvider
   providerName   String?
   accessToken    String?             // encrypted at application level
@@ -637,6 +649,8 @@ model Integration {
   settings       Json?
   status         IntegrationStatus   @default(ACTIVE)
   lastSyncedAt   DateTime?
+  ownerType      IntegrationOwnerType @default(AGENCY)
+  ownerKey       String              @default("AGENCY")
 
   integrationJobs IntegrationJob[]
 
@@ -644,8 +658,11 @@ model Integration {
   updatedAt      DateTime            @updatedAt
 
   @@map("integrations")
+  @@unique([tenantId, provider, ownerKey])
   @@index([tenantId])
   @@index([provider])
+  @@index([ownerType, ownerKey])
+  @@index([clientId])
 }
 
 model IntegrationJob {

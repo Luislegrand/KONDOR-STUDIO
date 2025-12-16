@@ -118,20 +118,22 @@ async function fetchAccountMetrics(integration, range) {
     return [];
   }
 
-  let credentials = null;
+  let credentials = {};
   try {
     // compatível com integrationsService.create (credentialsJson)
     credentials = integration.credentialsJson
-      ? JSON.parse(integration.credentialsJson)
-      : null;
+      ? JSON.parse(integration.credentialsJson) || {}
+      : (integration.settings && typeof integration.settings === 'object' ? integration.settings : {});
   } catch (err) {
-    safeLog('Erro ao parsear credentialsJson', err && err.message ? err.message : err);
+    safeLog('Erro ao parsear credenciais', err && err.message ? err.message : err);
     return [];
   }
 
-  const accessToken = credentials && credentials.accessToken;
-  const developerToken = credentials && credentials.developerToken;
-  let customerId = credentials && (credentials.customerId || credentials.customer_id);
+  const accessToken = credentials.accessToken || integration.accessToken;
+  const developerToken =
+    credentials.developerToken ||
+    (integration.settings && integration.settings.developerToken);
+  let customerId = credentials.customerId || credentials.customer_id;
 
   if (!accessToken || !developerToken || !customerId) {
     safeLog('Credenciais incompletas para Google Ads (accessToken/developerToken/customerId ausentes)');

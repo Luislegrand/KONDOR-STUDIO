@@ -1,16 +1,8 @@
 // api/src/services/integrationsService.js
-// Service para gerenciar integrações (Meta, Google, TikTok, GA, YouTube etc.)
-// Responsabilidades:
-// - CRUD de integrações por tenant
-// - Testar conexão
-// - Sincronizar métricas (placeholder para enfileirar job)
-// - Registrar logs de atualização
+// Gerencia integrações (Meta, Google, TikTok, WhatsApp) com suporte a ownerType/ownerKey
 
 const { prisma } = require('../prisma');
 
-/**
- * Converte tempo para Date ou null
- */
 function toDateOrNull(v) {
   if (!v && v !== 0) return null;
   const d = new Date(v);
@@ -18,21 +10,57 @@ function toDateOrNull(v) {
   return d;
 }
 
+function sanitizeScopes(scopes) {
+  if (!scopes) return [];
+  if (Array.isArray(scopes)) return scopes.map((s) => String(s));
+  if (typeof scopes === 'string') return scopes.split(',').map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
+function buildOwnerFields(data = {}) {
+  const isClientIntegration =
+    (data.ownerType && data.ownerType === 'CLIENT') ||
+    Boolean(data.clientId);
+
+  const ownerType = isClientIntegration ? 'CLIENT' : data.ownerType || 'AGENCY';
+  const ownerKey = isClientIntegration
+    ? String(data.ownerKey || data.clientId)
+    : data.ownerKey || 'AGENCY';
+
+  return {
+    ownerType,
+    ownerKey,
+    clientId: isClientIntegration ? String(data.clientId || ownerKey) : null,
+  };
+}
+
+function sanitizeIntegrationResponse(record) {
+  if (!record) return null;
+  const cloned = { ...record };
+  delete cloned.accessToken;
+  delete cloned.refreshToken;
+  return cloned;
+}
+
+async function ensureIntegrationBelongsToTenant(tenantId, integrationId) {
+  return prisma.integration.findFirst({
+    where: { id: integrationId, tenantId },
+  });
+}
+
 module.exports = {
-  /**
-   * Lista integrações do tenant
-   * opts: { provider, active, page, perPage, q }
-   */
   async list(tenantId, opts = {}) {
-    const { provider, active, q, page = 1, perPage = 50 } = opts;
+    const { provider, status, ownerType, ownerKey, clientId, page = 1, perPage = 50 } = opts;
     const where = { tenantId };
 
     if (provider) where.provider = provider;
-    if (active !== undefined) where.active = Boolean(active);
-    if (q) {
+    if (status) where.status = status;
+    if (ownerType) where.ownerType = ownerType;
+    if (ownerKey) where.ownerKey = ownerKey;
+    if (clientId) {
       where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { credentialsJson: { contains: q, mode: 'insensitive' } },
+        { clientId },
+        { ownerKey: String(clientId), ownerType: 'CLIENT' },
       ];
     }
 
@@ -47,11 +75,16 @@ module.exports = {
         select: {
           id: true,
           tenantId: true,
-          name: true,
+          clientId: true,
           provider: true,
-          active: true,
-          lastSyncAt: true,
+          providerName: true,
+          status: true,
           settings: true,
+          ownerType: true,
+          ownerKey: true,
+          lastSyncedAt: true,
+          createdAt: true,
+          updatedAt: true,
         },
       }),
       prisma.integration.count({ where }),
@@ -66,178 +99,152 @@ module.exports = {
     };
   },
 
-  /**
-   * Cria integração para o tenant
-   * data: { name, provider, credentials (object), settings (object), active }
-   */
   async create(tenantId, data = {}) {
     if (!data.provider) throw new Error('Provider é obrigatório');
+    const owner = buildOwnerFields(data);
+
     const payload = {
       tenantId,
-      name: data.name || `${data.provider} integration`,
       provider: data.provider,
-      credentialsJson: data.credentials ? JSON.stringify(data.credentials) : null,
+      providerName: data.providerName || data.name || null,
+      accessToken: data.accessToken || null,
+      refreshToken: data.refreshToken || null,
+      scopes: sanitizeScopes(data.scopes),
       settings: data.settings || null,
-      active: data.active === undefined ? true : Boolean(data.active),
-      lastSyncAt: data.lastSyncAt ? toDateOrNull(data.lastSyncAt) : null,
-      metadata: data.metadata || null,
+      status: data.status || 'ACTIVE',
+      lastSyncedAt: toDateOrNull(data.lastSyncedAt),
+      ownerType: owner.ownerType,
+      ownerKey: owner.ownerKey,
+      clientId: owner.clientId,
     };
 
-    return prisma.integration.create({ data: payload });
+    const created = await prisma.integration.create({ data: payload });
+    return sanitizeIntegrationResponse(created);
   },
 
-  /**
-   * Busca integração por id
-   */
   async getById(tenantId, id) {
     if (!id) return null;
-    return prisma.integration.findFirst({
+    const record = await prisma.integration.findFirst({
       where: { id, tenantId },
     });
+    return sanitizeIntegrationResponse(record);
   },
 
-  /**
-   * Atualiza integração
-   */
   async update(tenantId, id, data = {}) {
-    const existing = await this.getById(tenantId, id);
+    const existing = await ensureIntegrationBelongsToTenant(tenantId, id);
     if (!existing) return null;
 
     const updateData = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.active !== undefined) updateData.active = Boolean(data.active);
-    if (data.settings !== undefined) updateData.settings = data.settings;
-    if (data.credentials !== undefined) {
-      updateData.credentialsJson = data.credentials ? JSON.stringify(data.credentials) : null;
+    if (data.providerName !== undefined || data.name !== undefined) {
+      updateData.providerName = data.providerName || data.name || null;
     }
-    if (data.lastSyncAt !== undefined) updateData.lastSyncAt = toDateOrNull(data.lastSyncAt);
-    if (data.metadata !== undefined) updateData.metadata = data.metadata;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.settings !== undefined) updateData.settings = data.settings;
+    if (data.scopes !== undefined) updateData.scopes = sanitizeScopes(data.scopes);
+    if (data.accessToken !== undefined) updateData.accessToken = data.accessToken || null;
+    if (data.refreshToken !== undefined) updateData.refreshToken = data.refreshToken || null;
+    if (data.lastSyncedAt !== undefined) updateData.lastSyncedAt = toDateOrNull(data.lastSyncedAt);
+
+    if (data.ownerType !== undefined || data.ownerKey !== undefined || data.clientId !== undefined) {
+      const owner = buildOwnerFields({
+        ownerType: data.ownerType !== undefined ? data.ownerType : existing.ownerType,
+        ownerKey: data.ownerKey !== undefined ? data.ownerKey : existing.ownerKey,
+        clientId: data.clientId !== undefined ? data.clientId : existing.clientId,
+      });
+      updateData.ownerType = owner.ownerType;
+      updateData.ownerKey = owner.ownerKey;
+      updateData.clientId = owner.clientId;
+    }
 
     await prisma.integration.update({ where: { id }, data: updateData });
     return this.getById(tenantId, id);
   },
 
-  /**
-   * Remove integração
-   */
   async remove(tenantId, id) {
-    const existing = await this.getById(tenantId, id);
+    const existing = await ensureIntegrationBelongsToTenant(tenantId, id);
     if (!existing) return false;
     await prisma.integration.delete({ where: { id } });
     return true;
   },
 
-  /**
-   * Registra um log de sync/update para auditoria
-   * data: { integrationId, success: bool, message, rawResponse }
-   */
-  async log(tenantId, integrationId, data = {}) {
-    // assume tabela integrationLog com fields: integrationId, tenantId, success, message, raw, createdAt
-    return prisma.integrationLog.create({
-      data: {
-        tenantId,
-        integrationId,
-        success: data.success === undefined ? true : Boolean(data.success),
-        message: data.message || null,
-        raw: data.rawResponse ? JSON.stringify(data.rawResponse) : null,
-      },
-    });
-  },
-
-  /**
-   * Testa a conexão com as credenciais da integração.
-   * Implementa checks básicos por provider (placeholders).
-   * Retorna { ok: boolean, info?: string }
-   */
-  async testConnection(tenantId, id) {
-    const integration = await this.getById(tenantId, id);
-    if (!integration) return { ok: false, info: 'Integration not found' };
-
-    const creds = integration.credentialsJson ? JSON.parse(integration.credentialsJson) : null;
-    if (!creds) return { ok: false, info: 'No credentials configured' };
-
-    try {
-      // Implement provider-specific lightweight checks (placeholders)
-      switch ((integration.provider || '').toLowerCase()) {
-        case 'meta':
-        case 'facebook':
-        case 'instagram':
-          // expect accessToken or appId/appSecret pair
-          if (creds.accessToken || (creds.appId && creds.appSecret)) {
-            return { ok: true, info: 'Credentials look valid (basic check)' };
-          }
-          return { ok: false, info: 'Missing access token or appId/appSecret' };
-
-        case 'google':
-        case 'google-ads':
-        case 'ga4':
-          if (creds.client_email || creds.refresh_token || creds.client_id) {
-            return { ok: true, info: 'Credentials look valid (basic check)' };
-          }
-          return { ok: false, info: 'Missing Google credentials' };
-
-        case 'tiktok':
-          if (creds.accessToken || creds.client_key) return { ok: true, info: 'Basic check ok' };
-          return { ok: false, info: 'Missing TikTok credentials' };
-
-        default:
-          return { ok: true, info: 'Provider unknown — no deep check performed' };
-      }
-    } catch (err) {
-      return { ok: false, info: `Error testing connection: ${String(err)}` };
+  async connectClientIntegration(tenantId, clientId, provider, data = {}) {
+    if (!tenantId || !clientId || !provider) {
+      throw new Error('tenantId, clientId e provider são obrigatórios');
     }
+
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, tenantId },
+    });
+    if (!client) {
+      throw new Error('Cliente não encontrado para este tenant');
+    }
+
+    const owner = buildOwnerFields({ ownerType: 'CLIENT', ownerKey: clientId, clientId });
+
+    const payload = {
+      tenantId,
+      provider,
+      providerName: data.providerName || data.name || null,
+      accessToken: data.accessToken || null,
+      refreshToken: data.refreshToken || null,
+      scopes: sanitizeScopes(data.scopes),
+      settings: data.settings || null,
+      status: data.status || 'ACTIVE',
+      ownerType: owner.ownerType,
+      ownerKey: owner.ownerKey,
+      clientId: owner.clientId,
+    };
+
+    const created = await prisma.integration.create({ data: payload });
+    return sanitizeIntegrationResponse(created);
   },
 
-  /**
-   * Sincroniza métricas dessa integração.
-   * Aqui colocamos placeholder que registra o pedido e devolve status.
-   * Ideal: enfileirar job em BullMQ para processar assincronamente.
-   *
-   * options: { since, until, force, schedule }
-   */
-  async syncMetrics(tenantId, id, options = {}) {
-    const integration = await this.getById(tenantId, id);
+  async disconnect(tenantId, id) {
+    const existing = await ensureIntegrationBelongsToTenant(tenantId, id);
+    if (!existing) return null;
+
+    await prisma.integration.update({
+      where: { id },
+      data: { status: 'INACTIVE', accessToken: null, refreshToken: null },
+    });
+
+    return this.getById(tenantId, id);
+  },
+
+  async queueIntegrationJob(tenantId, integrationId, type, payload = {}) {
+    const integration = await ensureIntegrationBelongsToTenant(tenantId, integrationId);
     if (!integration) throw new Error('Integration not found');
 
-    // Register a sync request in DB (integrationSync table) to be picked by worker
-    const syncRecord = await prisma.integrationSync.create({
+    const job = await prisma.integrationJob.create({
       data: {
-        tenantId,
         integrationId: integration.id,
-        status: 'queued',
-        options: options || null,
-        requestedBy: options.requestedBy || null,
+        type,
+        status: 'pending',
+        payload,
       },
     });
-
-    // Log short message
-    await this.log(tenantId, integration.id, { success: true, message: 'Sync queued', rawResponse: { syncId: syncRecord.id } });
-
-    // Return record info so caller can track
-    return {
-      ok: true,
-      queued: true,
-      syncId: syncRecord.id,
-    };
+    return job;
   },
 
-  /**
-   * Função utilitária que workers podem usar para aplicar dados de métricas vindos do provider
-   * payload: { type, value, timestamp, clientId, meta }
-   */
-  async ingestMetricFromProvider(tenantId, payload = {}) {
-    // Usa a tabela metric via prisma
-    const metric = await prisma.metric.create({
+  async processIntegrationJob(integrationJobId) {
+    const job = await prisma.integrationJob.findUnique({
+      where: { id: integrationJobId },
+      include: { integration: true },
+    });
+
+    if (!job || !job.integration) {
+      throw new Error('IntegrationJob não encontrado ou sem integração associada');
+    }
+
+    await prisma.integrationJob.update({
+      where: { id: job.id },
       data: {
-        tenantId,
-        clientId: payload.clientId || null,
-        type: payload.type || 'unknown',
-        value: Number(payload.value || 0),
-        timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
-        meta: payload.meta || null,
-        source: payload.source || 'integration',
+        status: 'done',
+        attempt: job.attempt + 1,
+        result: { processedAt: new Date(), type: job.type || null },
       },
     });
-    return metric;
+
+    return { ok: true, jobId: job.id };
   },
 };

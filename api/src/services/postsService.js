@@ -3,6 +3,11 @@
 
 const { Prisma } = require('@prisma/client');
 const { prisma } = require('../prisma');
+const approvalsService = require('./approvalsService');
+const { whatsappQueue } = require('../queues');
+const whatsappCloud = require('./whatsappCloud');
+const APPROVAL_LINK_TTL_DAYS =
+  Number(process.env.POST_APPROVAL_TTL_DAYS || process.env.APPROVAL_LINK_TTL_DAYS || 7);
 
 class PostValidationError extends Error {
   constructor(message, code = 'POST_VALIDATION_ERROR') {
@@ -27,6 +32,23 @@ function sanitizeString(value) {
   if (value === undefined || value === null) return null;
   const trimmed = String(value).trim();
   return trimmed ? trimmed : null;
+}
+
+function getPublicAppUrl() {
+  const base =
+    process.env.APP_PUBLIC_URL ||
+    process.env.PUBLIC_APP_URL ||
+    process.env.PUBLIC_APP_BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    '';
+  return base ? base.replace(/\/$/, '') : '';
+}
+
+function buildApprovalLink(token) {
+  const base = getPublicAppUrl();
+  if (!base) return null;
+  if (!token) return `${base}/public/approvals`;
+  return `${base}/public/approvals/${token}`;
 }
 
 /**
@@ -127,6 +149,54 @@ async function syncApprovalWithPostStatus(tenantId, post, postStatus, userId, ap
       approverId: userId || latestPending.approverId || null,
     },
   });
+}
+
+async function getOrCreatePendingApproval(tenantId, post, userId, { forceNewToken = false } = {}) {
+  if (!post) return null;
+
+  let approval = await prisma.approval.findFirst({
+    where: { tenantId, postId: post.id, status: 'PENDING' },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!approval) {
+    approval = await prisma.approval.create({
+      data: {
+        tenantId,
+        postId: post.id,
+        status: 'PENDING',
+        notes: post.caption || post.content || null,
+        requesterId: userId || null,
+      },
+    });
+  }
+
+  const ttlHours = Math.max(1, APPROVAL_LINK_TTL_DAYS * 24);
+  const publicLink = await approvalsService.getOrCreatePublicLink(tenantId, approval.id, {
+    forceNew: forceNewToken,
+    ttlHours,
+  });
+
+  return { approval, publicLink };
+}
+
+async function enqueueWhatsappApprovalJob(payload = {}) {
+  if (!whatsappQueue || typeof whatsappQueue.add !== 'function') {
+    return { queued: false, reason: 'queue_unavailable' };
+  }
+
+  const job = await whatsappQueue.add(
+    'whatsapp_send_approval_request',
+    payload,
+    {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    },
+  );
+
+  return { queued: true, jobId: job?.id || null };
 }
 
 module.exports = {
@@ -413,6 +483,100 @@ module.exports = {
     }
 
     return updated;
+  },
+
+  /**
+   * Solicita aprovação do cliente para um post.
+   * - Garante Approval pendente + token público
+   * - Atualiza status do post para PENDING_APPROVAL
+   * - Enfileira job de WhatsApp (idempotente)
+   */
+  async requestApproval(tenantId, postId, options = {}) {
+    const userId = options.userId || null;
+    const forceNewLink = options.forceNewLink || false;
+
+    const post = await prisma.post.findFirst({
+      where: { id: postId, tenantId },
+      include: { client: true },
+    });
+
+    if (!post) {
+      throw new PostValidationError('Post não encontrado para este tenant', 'NOT_FOUND');
+    }
+
+    if (!post.clientId || !post.client) {
+      throw new PostValidationError(
+        'Selecione um cliente antes de solicitar aprovação',
+        'MISSING_CLIENT',
+      );
+    }
+
+    const client = post.client;
+    const { approval, publicLink } = await getOrCreatePendingApproval(
+      tenantId,
+      post,
+      userId,
+      { forceNewToken: forceNewLink },
+    );
+
+    const shouldUpdateStatus = post.status !== 'PENDING_APPROVAL';
+    let updatedPost = post;
+    if (shouldUpdateStatus) {
+      updatedPost = await prisma.post.update({
+        where: { id: post.id },
+        data: { status: 'PENDING_APPROVAL', clientFeedback: null },
+      });
+    }
+
+    const whatsappInfo = {
+      ready: Boolean(client.whatsappOptIn && client.whatsappNumberE164),
+      alreadySent: Boolean(updatedPost.whatsappSentAt),
+      number: client.whatsappNumberE164 || null,
+      enqueued: false,
+      jobId: null,
+    };
+
+    if (!whatsappInfo.ready) {
+      whatsappInfo.skippedReason = client.whatsappOptIn
+        ? 'missing_number'
+        : 'client_opt_out';
+    } else if (whatsappInfo.alreadySent) {
+      whatsappInfo.skippedReason = 'already_sent';
+    } else {
+      const integration = await whatsappCloud.getAgencyWhatsAppIntegration(tenantId);
+      if (!integration || integration.incomplete) {
+        whatsappInfo.skippedReason = 'integration_missing';
+        whatsappInfo.ready = false;
+      } else {
+        whatsappInfo.integrationId = integration.integration?.id || null;
+      }
+    }
+
+    if (!whatsappInfo.alreadySent && whatsappInfo.ready && options.enqueueWhatsapp !== false) {
+      const enqueueResult = await enqueueWhatsappApprovalJob({
+        tenantId,
+        postId: updatedPost.id,
+        clientId: client.id,
+        approvalId: approval.id,
+        publicToken: publicLink?.token || null,
+      });
+      whatsappInfo.enqueued = enqueueResult.queued;
+      whatsappInfo.jobId = enqueueResult.jobId;
+    }
+
+    const approvalUrl = buildApprovalLink(publicLink?.token);
+
+    return {
+      ok: true,
+      postId: updatedPost.id,
+      clientId: client.id,
+      approvalId: approval.id,
+      status: updatedPost.status,
+      publicToken: publicLink?.token || null,
+      publicTokenExpiresAt: publicLink?.expiresAt || null,
+      approvalUrl,
+      whatsapp: whatsappInfo,
+    };
   },
 
   async requestChanges(tenantId, postId, note, userId = null) {

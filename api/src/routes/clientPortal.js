@@ -43,6 +43,7 @@ async function clientAuth(req, res, next) {
         email: true,
         phone: true,
         metadata: true,
+        portalEmail: true,
       },
     });
 
@@ -50,6 +51,16 @@ async function clientAuth(req, res, next) {
 
     req.client = client;
     req.tenantId = payload.tenantId;
+    req.clientId = client.id;
+    req.user = {
+      id: client.id,
+      role: 'CLIENT',
+      email: client.portalEmail || null,
+      name: client.name || null,
+      type: 'client',
+    };
+    req.role = req.user.role;
+    req.isClientPortal = true;
     return next();
   } catch (err) {
     console.error('clientAuth error:', err);

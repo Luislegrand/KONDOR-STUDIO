@@ -12,6 +12,7 @@ const { prisma } = require('./prisma');
 const updateMetricsJob = require('./jobs/updateMetricsJob');
 const reportGenerationJob = require('./jobs/reportGenerationJob');
 const automationWhatsAppJob = require('./jobs/automationWhatsAppJob');
+const whatsappApprovalJob = require('./jobs/whatsappApprovalRequestJob');
 
 // ------------------------------------------------------
 // Conexão do BullMQ (usa REDIS_URL da env; em dev cai pro localhost)
@@ -77,6 +78,14 @@ const reportsWorker = new Worker(
 const whatsappWorker = new Worker(
   whatsappQueue.name,
   async (job) => {
+    if (job.name === 'whatsapp_send_approval_request') {
+      console.log('[whatsapp] sending approval request job', job.id);
+      await whatsappApprovalJob.processApprovalRequestJob(job.data || {}, {
+        jobId: job.id,
+        attemptsMade: job.attemptsMade,
+      });
+      return;
+    }
     console.log('[whatsapp] processing job', job.id, job.name);
     await runPollOnce(automationWhatsAppJob, 'automationWhatsAppJob');
   },

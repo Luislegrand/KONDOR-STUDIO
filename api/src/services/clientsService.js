@@ -18,6 +18,12 @@ function normalizeHandle(value) {
   return sanitized.replace(/^@/, '');
 }
 
+function toE164(value) {
+  const normalized = sanitizeString(value);
+  if (!normalized) return null;
+  return /^\+\d{8,15}$/.test(normalized) ? normalized : null;
+}
+
 function parseTags(input) {
   if (!input && input !== '') return [];
   if (Array.isArray(input)) {
@@ -103,6 +109,9 @@ function buildPreparedInput(data = {}, { defaultPortalEmail } = {}) {
       data.billingContactEmail || data.billing_contact_email
     ),
     whatsappOptIn: data.whatsappOptIn === true,
+    whatsappNumberE164: toE164(
+      data.whatsappNumberE164 || data.whatsapp_number_e164 || data.phoneE164
+    ),
   };
 
   const tagsInput = data.tags ?? data.tagsInput;
@@ -312,6 +321,7 @@ module.exports = {
       billingContactName: prepared.prepared.billingContactName,
       billingContactEmail: prepared.prepared.billingContactEmail,
       whatsappOptIn: prepared.prepared.whatsappOptIn,
+      whatsappNumberE164: prepared.prepared.whatsappNumberE164,
       metadata: prepared.metadata || null,
       tags: prepared.tags,
       monthlyFeeCents: prepared.monthlyFeeCents,
@@ -394,6 +404,13 @@ module.exports = {
       data.billingContactEmail !== undefined || data.billing_contact_email !== undefined
     );
     assign('whatsappOptIn', prepared.prepared.whatsappOptIn, data.whatsappOptIn !== undefined);
+    assign(
+      'whatsappNumberE164',
+      prepared.prepared.whatsappNumberE164,
+      data.whatsappNumberE164 !== undefined ||
+        data.whatsapp_number_e164 !== undefined ||
+        data.phoneE164 !== undefined
+    );
     assign('tags', prepared.tags, data.tags !== undefined || data.tagsInput !== undefined);
     assign('metadata', prepared.metadata || null, data.metadata !== undefined);
 

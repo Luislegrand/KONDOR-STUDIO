@@ -5,6 +5,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const tenantMiddleware = require('../middleware/tenant');
 const clientsService = require('../services/clientsService');
+const integrationsService = require('../services/integrationsService');
 
 // Todas as rotas exigem auth + tenant
 router.use(authMiddleware);
@@ -55,6 +56,23 @@ router.get('/suggest', async (req, res) => {
   } catch (err) {
     console.error('GET /clients/suggest error:', err);
     return res.status(500).json({ error: 'Erro ao buscar sugestões' });
+  }
+});
+
+// POST /clients/:clientId/integrations/:provider/connect (stub OAuth/connect)
+router.post('/:clientId/integrations/:provider/connect', async (req, res) => {
+  try {
+    const { clientId, provider } = req.params;
+    const integration = await integrationsService.connectClientIntegration(
+      req.tenantId,
+      clientId,
+      provider,
+      req.body || {},
+    );
+    return res.json(integration);
+  } catch (err) {
+    console.error('POST /clients/:clientId/integrations/:provider/connect error:', err);
+    return res.status(400).json({ error: err.message || 'Erro ao conectar integração do cliente' });
   }
 });
 

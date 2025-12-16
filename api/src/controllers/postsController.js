@@ -1,4 +1,5 @@
 const postsService = require('../services/postsService');
+const { PostValidationError } = postsService;
 
 module.exports = {
   async list(req, res) {
@@ -76,6 +77,25 @@ module.exports = {
       return res.json({ ok: true });
     } catch (err) {
       console.error('Error deleting post:', err);
+      return res.status(500).json({ error: 'server error' });
+    }
+  },
+
+  async requestApproval(req, res) {
+    try {
+      const postId = req.params.id;
+      const userId = req.user?.id || null;
+      const result = await postsService.requestApproval(req.tenantId, postId, {
+        userId,
+        forceNewLink: req.body?.forceNewLink || false,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (err instanceof PostValidationError) {
+        const statusCode = err.code === 'NOT_FOUND' ? 404 : err.code === 'MISSING_CLIENT' ? 400 : 409;
+        return res.status(statusCode).json({ error: err.message, code: err.code });
+      }
+      console.error('Error requesting approval:', err);
       return res.status(500).json({ error: 'server error' });
     }
   },

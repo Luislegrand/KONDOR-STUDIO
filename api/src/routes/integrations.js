@@ -12,8 +12,13 @@ router.use(tenantMiddleware);
 
 router.get('/', integrationsController.list);
 router.post('/', integrationsController.create);
+router.post(
+  '/clients/:clientId/integrations/:provider/connect',
+  integrationsController.connectForClient
+);
 router.get('/:id', integrationsController.getById);
 router.put('/:id', integrationsController.update);
 router.delete('/:id', integrationsController.remove);
+router.post('/:id/disconnect', integrationsController.disconnect);
 
 module.exports = router;

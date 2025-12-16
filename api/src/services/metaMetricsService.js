@@ -86,25 +86,24 @@ async function fetchAccountMetrics(integration, range) {
     return [];
   }
 
-  let credentials = null;
+  let credentials = {};
   try {
-    credentials = integration.credentialsJson
-      ? JSON.parse(integration.credentialsJson)
-      : null;
+    if (integration.credentialsJson) {
+      credentials = JSON.parse(integration.credentialsJson) || {};
+    } else if (integration.settings && typeof integration.settings === 'object') {
+      credentials = integration.settings;
+    }
   } catch (err) {
-    safeLog(
-      'Erro ao parsear credentialsJson',
-      err && err.message ? err.message : err,
-    );
+    safeLog('Erro ao parsear credenciais', err && err.message ? err.message : err);
     return [];
   }
 
-  const accessToken = credentials && credentials.accessToken;
+  const accessToken = credentials.accessToken || integration.accessToken;
   const accountId =
-    credentials &&
-    (credentials.accountId ||
-      credentials.adAccountId ||
-      credentials.account_id);
+    credentials.accountId ||
+    credentials.adAccountId ||
+    credentials.account_id ||
+    (integration.settings && integration.settings.accountId);
 
   if (!accessToken || !accountId) {
     safeLog('Credenciais incompletas para Meta (accessToken/accountId ausentes)');

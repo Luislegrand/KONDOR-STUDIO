@@ -3,8 +3,14 @@ const integrationsService = require('../services/integrationsService');
 module.exports = {
   async list(req, res) {
     try {
-      const { provider, status } = req.query;
-      const integrations = await integrationsService.list(req.tenantId, { provider, status });
+      const { provider, status, clientId, ownerType, ownerKey } = req.query;
+      const integrations = await integrationsService.list(req.tenantId, {
+        provider,
+        status,
+        clientId,
+        ownerType,
+        ownerKey,
+      });
       return res.json(integrations);
     } catch (err) {
       console.error('Error listing integrations:', err);
@@ -61,6 +67,34 @@ module.exports = {
       return res.json({ ok: true });
     } catch (err) {
       console.error('Error deleting integration:', err);
+      return res.status(500).json({ error: 'server error' });
+    }
+  },
+
+  async connectForClient(req, res) {
+    try {
+      const { clientId, provider } = req.params;
+      const integration = await integrationsService.connectClientIntegration(
+        req.tenantId,
+        clientId,
+        provider,
+        req.body || {},
+      );
+      return res.json(integration);
+    } catch (err) {
+      console.error('Error connecting client integration:', err);
+      return res.status(400).json({ error: err.message || 'Erro ao conectar integração' });
+    }
+  },
+
+  async disconnect(req, res) {
+    try {
+      const id = req.params.id;
+      const integration = await integrationsService.disconnect(req.tenantId, id);
+      if (!integration) return res.status(404).json({ error: 'integration not found' });
+      return res.json(integration);
+    } catch (err) {
+      console.error('Error disconnecting integration:', err);
       return res.status(500).json({ error: 'server error' });
     }
   },

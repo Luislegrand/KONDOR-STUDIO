@@ -5,8 +5,8 @@ const authMiddleware = require("../middleware/auth");
 const tenantMiddleware = require("../middleware/tenant");
 const postsService = require("../services/postsService");
 const { PostValidationError } = postsService;
+const postsController = require("../controllers/postsController");
 const { Prisma } = require("@prisma/client");
-const { prisma } = require("../prisma");
 //const { whatsappQueue } = require("../queues/whatsappQueue"); //TODO: Reativar automações WhatsApp quando a fila estiver configurada.
 router.use(authMiddleware);
 router.use(tenantMiddleware);
@@ -138,6 +138,14 @@ router.post("/:id/request-changes", async (req, res) => {
 });
 
 /**
+ * POST /posts/:id/request-approval
+ * Solicita aprovação do cliente e enfileira WhatsApp
+ */
+router.post("/:id/request-approval", async (req, res) => {
+  return postsController.requestApproval(req, res);
+});
+
+/**
  * DELETE /posts/:id
  */
 router.delete("/:id", async (req, res) => {
@@ -156,52 +164,7 @@ router.delete("/:id", async (req, res) => {
  * Atualiza o post para status AGUARDANDO_APROVACAO e cria uma approval
  */
 router.post("/:id/send-to-approval", async (req, res) => {
-  try {
-    const postId = req.params.id;
-    const tenantId = req.tenantId;
-
-    const post = await prisma.post.findUnique({
-      where: { id: postId },
-    });
-
-    if (!post || post.tenantId !== tenantId) {
-      return res.status(404).json({ error: "Post não encontrado" });
-    }
-
-    // Atualizar status do post
-    await prisma.post.update({
-      where: { id: postId },
-      data: {
-        status: "AWAITING_APPROVAL",
-      },
-    });
-
-    // Criar registro em approvals
-    await prisma.approval.create({
-      data: {
-        postId: post.id,
-        tenantId,
-        status: "PENDING",
-        requestedAt: new Date(),
-      },
-    });
-
-    // Enviar para fila WhatsApp (opcional)
-    if (whatsappQueue) {
-      await whatsappQueue.add("notifyNewPostApproval", {
-        tenantId,
-        postId,
-        clientId: post.clientId,
-      });
-    }
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("POST /posts/:id/send-to-approval error:", err);
-    return res
-      .status(500)
-      .json({ error: "Erro ao enviar post para aprovação" });
-  }
+  return postsController.requestApproval(req, res);
 });
 
 module.exports = router;
