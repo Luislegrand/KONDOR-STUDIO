@@ -4,7 +4,7 @@
   "description": "Kondor Studio API (Express + Prisma + Multi-tenant)",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "npm run prisma:migrate:deploy && node src/server.js",
     "dev": "nodemon src/server.js",
     "worker": "node src/worker.js",
     "build": "npm run prisma:generate",
