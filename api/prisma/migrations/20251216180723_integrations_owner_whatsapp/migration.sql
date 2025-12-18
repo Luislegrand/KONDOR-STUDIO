@@ -28,11 +28,19 @@ EXCEPTION
 END $$;
 
 -- AlterEnum
-DO $$ BEGIN
-  ALTER TYPE "Role" ADD VALUE 'SUPER_ADMIN';
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'Role'
+      AND e.enumlabel = 'SUPER_ADMIN'
+  ) THEN
+    ALTER TYPE "Role" ADD VALUE 'SUPER_ADMIN';
+  END IF;
+END
+$$;
 
 -- AlterTable
 ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "whatsappNumberE164" TEXT;
