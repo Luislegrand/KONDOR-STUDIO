@@ -1,50 +1,14 @@
-import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card.jsx";
-
 import { Button } from "@/components/ui/button.jsx";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
+import { RefreshCw, PlugZap2 } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.jsx";
-
-import { Label } from "@/components/ui/label.jsx";
-
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select.jsx";
-
-import { Textarea } from "@/components/ui/textarea.jsx";
-
-import { RefreshCw, PlugZap2, Trash2 } from "lucide-react";
-
-const PROVIDER_OPTIONS = [
-  { value: "META", label: "Meta Ads (Facebook/Instagram)" },
-  { value: "GOOGLE", label: "Google Ads" },
-  { value: "TIKTOK", label: "TikTok Ads" },
-  { value: "WHATSAPP_360DIALOG", label: "WhatsApp (360dialog)" },
-  { value: "TWILIO", label: "Twilio (WhatsApp/SMS)" },
-];
-
-function formatProviderLabel(value) {
-  const found = PROVIDER_OPTIONS.find((p) => p.value === value);
-  return found ? found.label : value;
-}
+import WhatsAppIntegrationCard from "@/components/integrations/WhatsAppIntegrationCard.jsx";
+import NewIntegrationDialog from "@/components/integrations/NewIntegrationDialog.jsx";
 
 function formatDate(dt) {
   if (!dt) return "-";
@@ -58,11 +22,24 @@ function formatDate(dt) {
   });
 }
 
+function StatusBadge({ status }) {
+  const s = (status || "disconnected").toLowerCase();
+  const cls =
+    s === "connected"
+      ? "border-emerald-200 text-emerald-700"
+      : s === "error"
+        ? "border-red-200 text-red-700"
+        : "border-amber-200 text-amber-700";
+
+  return (
+    <Badge variant="outline" className={cls}>
+      {s}
+    </Badge>
+  );
+}
+
 export default function Integrations() {
-  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState("");
-  const [configText, setConfigText] = useState("");
 
   const {
     data: integrations = [],
@@ -74,49 +51,10 @@ export default function Integrations() {
     queryFn: () => base44.entities.Integration.list(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedProvider) throw new Error("Selecione um provedor");
-
-      const payload = {
-        provider: selectedProvider,
-        status: "connected",
-        config: configText ? { raw: configText } : null,
-      };
-
-      return base44.entities.Integration.create(payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["integrations"] });
-      setDialogOpen(false);
-      setSelectedProvider("");
-      setConfigText("");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Integration.remove(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["integrations"] });
-    },
-  });
-
-  const handleOpenDialog = () => {
-    setSelectedProvider("");
-    setConfigText("");
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (confirm("Desconectar essa integração?")) {
-      await deleteMutation.mutateAsync(id);
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    createMutation.mutate();
-  };
+  const genericIntegrations = useMemo(() => {
+    const waProviders = new Set(["WHATSAPP_META_CLOUD", "WHATSAPP", "META_WHATSAPP"]);
+    return integrations.filter((i) => !waProviders.has(i.provider));
+  }, [integrations]);
 
   return (
     <div className="p-6 md:p-8">
@@ -124,12 +62,9 @@ export default function Integrations() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Integrações
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Integrações</h1>
             <p className="text-gray-600">
-              Conecte suas contas de anúncios e canais para puxar métricas
-              automaticamente.
+              Conecte seus canais para automações, aprovações e métricas — no padrão SaaS (sem gambiarra de token colado).
             </p>
           </div>
 
@@ -140,16 +75,12 @@ export default function Integrations() {
               disabled={isFetching}
               className="flex items-center gap-2"
             >
-              <RefreshCw
-                className={`w-4 h-4 ${
-                  isFetching ? "animate-spin" : ""
-                }`}
-              />
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
               Atualizar
             </Button>
 
             <Button
-              onClick={handleOpenDialog}
+              onClick={() => setDialogOpen(true)}
               className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 flex items-center gap-2"
             >
               <PlugZap2 className="w-4 h-4" />
@@ -158,31 +89,32 @@ export default function Integrations() {
           </div>
         </div>
 
-        {/* Lista de integrações */}
+        {/* Cards principais */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <WhatsAppIntegrationCard integrations={integrations} />
+        </div>
+
+        {/* Lista */}
         <Card className="border border-purple-100">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-gray-800">
-              Conexões ativas
+              Conexões registradas
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-12 bg-gray-100 animate-pulse rounded-lg"
-                  />
+                  <div key={i} className="h-12 bg-gray-100 animate-pulse rounded-lg" />
                 ))}
               </div>
-            ) : integrations.length === 0 ? (
+            ) : genericIntegrations.length === 0 ? (
               <p className="text-sm text-gray-500">
-                Nenhuma integração configurada ainda. Clique em "Nova
-                integração" para começar.
+                Nenhuma integração registrada ainda. Clique em “Nova integração” para começar.
               </p>
             ) : (
               <div className="space-y-3">
-                {integrations.map((integration) => (
+                {genericIntegrations.map((integration) => (
                   <div
                     key={integration.id}
                     className="flex flex-col md:flex-row md:items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2 bg-white"
@@ -190,48 +122,24 @@ export default function Integrations() {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-900">
-                          {formatProviderLabel(integration.provider)}
+                          {integration.provider}
                         </span>
-
-                        {integration.status && (
-                          <Badge
-                            variant="outline"
-                            className={
-                              integration.status === "connected"
-                                ? "border-emerald-200 text-emerald-700"
-                                : "border-amber-200 text-amber-700"
-                            }
-                          >
-                            {integration.status}
-                          </Badge>
-                        )}
+                        <StatusBadge status={integration.status} />
                       </div>
 
                       <div className="flex flex-wrap gap-3 text-[11px] text-gray-500">
                         <span>
-                          Último sync:{" "}
-                          <span className="font-medium">
-                            {formatDate(integration.lastSyncAt)}
-                          </span>
+                          Último sync: <span className="font-medium">{formatDate(integration.lastSyncAt)}</span>
                         </span>
 
-                        {integration.errorMessage && (
-                          <span className="text-red-500">
-                            Erro: {integration.errorMessage}
-                          </span>
-                        )}
+                        {integration.errorMessage ? (
+                          <span className="text-red-500">Erro: {integration.errorMessage}</span>
+                        ) : null}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end md:self-auto">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-8 w-8 border-red-200 text-red-600 hover:bg-red-50"
-                        onClick={() => handleDelete(integration.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="text-[11px] text-gray-500">
+                      (Gerencie via “Nova integração” ou cards guiados no futuro)
                     </div>
                   </div>
                 ))}
@@ -240,71 +148,7 @@ export default function Integrations() {
           </CardContent>
         </Card>
 
-        {/* Dialog de nova integração */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nova integração</DialogTitle>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label>Provedor</Label>
-                <Select
-                  value={selectedProvider}
-                  onValueChange={setSelectedProvider}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um provedor" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {PROVIDER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Configuração (opcional)</Label>
-                <Textarea
-                  rows={4}
-                  value={configText}
-                  onChange={(e) => setConfigText(e.target.value)}
-                  placeholder="Tokens, IDs de conta, etc. Você pode colar JSON ou notas livres."
-                />
-                <p className="text-[11px] text-gray-500">
-                  O conteúdo será salvo como JSON bruto em{" "}
-                  <code className="px-1 rounded bg-gray-100 ml-1">config</code>.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={createMutation.isPending}
-                >
-                  Cancelar
-                </Button>
-
-                <Button
-                  type="submit"
-                  className="bg-purple-600 hover:bg-purple-700"
-                  disabled={createMutation.isPending || !selectedProvider}
-                >
-                  {createMutation.isPending
-                    ? "Conectando..."
-                    : "Conectar"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <NewIntegrationDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       </div>
     </div>
   );
