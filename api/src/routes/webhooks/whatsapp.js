@@ -16,10 +16,11 @@ async function sendWhatsAppText({ to, body, phoneNumberId }) {
     process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (!token) throw new Error("WHATSAPP_META_TOKEN não configurado");
-  if (!pnid)
+  if (!pnid) {
     throw new Error(
       "WHATSAPP_META_PHONE_NUMBER_ID/WHATSAPP_PHONE_NUMBER_ID não configurado"
     );
+  }
 
   const baseUrl =
     process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v22.0";
@@ -105,30 +106,36 @@ router.post("/meta", express.json({ type: "*/*" }), (req, res) => {
       // ======= RESPOSTA AUTOMÁTICA (primeiro teste) =======
       // responde somente quando vier texto
       if (parsedMessage.type === "text") {
-        const replyText = `Recebi sua mensagem ✅\n\nMensagem: "${parsedMessage.text || ""}"`;
+        const replyText = `Recebi sua mensagem ✅\n\nMensagem: "${
+          parsedMessage.text || ""
+        }"`;
 
-const fallbackPnId =
-  process.env.WHATSAPP_META_PHONE_NUMBER_ID ||
-  process.env.WHATSAPP_PHONE_NUMBER_ID;
+        // fallback pro phone_number_id real (evita quebrar em evento de teste com ID fake)
+        const fallbackPnId =
+          process.env.WHATSAPP_META_PHONE_NUMBER_ID ||
+          process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-// se vier evento de teste com phone_number_id fake, cai pro fallback
-const pnidToUse =
-  parsedMessage.phoneNumberId && /^\d{10,}$/.test(String(parsedMessage.phoneNumberId))
-    ? parsedMessage.phoneNumberId
-    : fallbackPnId;
+        const pnidToUse =
+          parsedMessage.phoneNumberId &&
+          /^\d{10,}$/.test(String(parsedMessage.phoneNumberId))
+            ? parsedMessage.phoneNumberId
+            : fallbackPnId;
 
-if (!pnidToUse) {
-  console.error("❌ phoneNumberId ausente (pnidToUse vazio). Configure WHATSAPP_META_PHONE_NUMBER_ID.");
-  return;
-}
+        if (!pnidToUse) {
+          console.error(
+            "❌ phoneNumberId ausente (pnidToUse vazio). Configure WHATSAPP_META_PHONE_NUMBER_ID."
+          );
+          return;
+        }
 
-await sendWhatsAppText({
-  to: parsedMessage.from,
-  body: replyText,
-  phoneNumberId: pnidToUse,
-});
+        const sent = await sendWhatsAppText({
+          to: parsedMessage.from, // responde para quem enviou
+          body: replyText,
+          phoneNumberId: pnidToUse,
+        });
 
-
+        console.log("📤 WhatsApp reply sent:", sent);
+      }
     } catch (err) {
       console.error("❌ Error handling WhatsApp webhook:", err?.message || err);
     }
