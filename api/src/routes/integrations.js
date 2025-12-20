@@ -14,7 +14,7 @@ router.use(authMiddleware);
 router.use(tenantMiddleware);
 
 // =========================
-// WhatsApp (Meta Cloud) - Onboarding/OAuth (fase 3)
+// WhatsApp (Meta Cloud) - Onboarding/OAuth (placeholder)
 // =========================
 
 // A) GET /api/integrations/whatsapp/connect-url
@@ -23,17 +23,13 @@ router.get('/whatsapp/connect-url', async (req, res) => {
     const tenantId = req.tenantId || (req.user && req.user.tenantId);
     if (!tenantId) return res.status(400).json({ error: 'tenantId missing' });
 
-    // ✅ Obrigatório: META_APP_ID + META_OAUTH_REDIRECT_URI precisam existir
     const oauthVersion = process.env.META_OAUTH_VERSION || 'v20.0';
     const appId = process.env.META_APP_ID;
     const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
 
-    if (!appId) {
-      return res.status(500).json({ error: 'META_APP_ID missing' });
-    }
-    if (!redirectUri) {
+    if (!appId) return res.status(500).json({ error: 'META_APP_ID missing' });
+    if (!redirectUri)
       return res.status(500).json({ error: 'META_OAUTH_REDIRECT_URI missing' });
-    }
 
     const nonce = crypto.randomBytes(16).toString('hex');
     const state = jwt.sign(
@@ -42,9 +38,8 @@ router.get('/whatsapp/connect-url', async (req, res) => {
       { expiresIn: '10m' }
     );
 
-    // ✅ Scopes mínimos "supported" pro Facebook Login Web
-    // (sem isso o Meta mostra "app não disponível / supported permission")
-    const scope = ['public_profile', 'email'].join(',');
+    // ✅ scope com permissão business (destrava o "supported permission" em Business Login)
+    const scope = ['public_profile', 'email', 'business_management'].join(',');
 
     const url = new URL(`https://www.facebook.com/${oauthVersion}/dialog/oauth`);
     url.searchParams.set('client_id', String(appId));
@@ -67,7 +62,10 @@ router.post('/whatsapp/disconnect', async (req, res) => {
 
     const db = req.db;
     const existing = await db.integration.findFirst({
-      where: { tenantId: String(tenantId), provider: 'WHATSAPP_META_CLOUD' },
+      where: {
+        tenantId: String(tenantId),
+        provider: 'WHATSAPP_META_CLOUD',
+      },
       select: { id: true, config: true },
     });
 
@@ -76,9 +74,11 @@ router.post('/whatsapp/disconnect', async (req, res) => {
     let nextConfig = existing.config;
     if (nextConfig && typeof nextConfig === 'object' && !Array.isArray(nextConfig)) {
       nextConfig = { ...nextConfig };
+
       if (Object.prototype.hasOwnProperty.call(nextConfig, 'phone_number_id')) {
         delete nextConfig.phone_number_id;
       }
+
       if (Object.keys(nextConfig).length === 0) nextConfig = null;
     }
 
@@ -107,7 +107,10 @@ router.post('/whatsapp/test', async (req, res) => {
 
     const db = req.db;
     const existing = await db.integration.findFirst({
-      where: { tenantId: String(tenantId), provider: 'WHATSAPP_META_CLOUD' },
+      where: {
+        tenantId: String(tenantId),
+        provider: 'WHATSAPP_META_CLOUD',
+      },
       select: { id: true, status: true },
     });
 
@@ -121,7 +124,9 @@ router.post('/whatsapp/test', async (req, res) => {
   }
 });
 
+// =========================
 // Rotas genéricas existentes
+// =========================
 router.get('/', integrationsController.list);
 router.post('/', integrationsController.create);
 router.post(
