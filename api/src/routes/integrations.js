@@ -54,6 +54,51 @@ router.get('/whatsapp/connect-url', async (req, res) => {
   }
 });
 
+// B) GET /api/integrations/whatsapp/status
+router.get('/whatsapp/status', async (req, res) => {
+  try {
+    const tenantId = req.tenantId || (req.user && req.user.tenantId);
+    if (!tenantId) return res.status(400).json({ error: 'tenantId missing' });
+
+    const db = req.db;
+    const integration = await db.integration.findFirst({
+      where: {
+        tenantId: String(tenantId),
+        provider: 'WHATSAPP_META_CLOUD',
+        ownerType: 'AGENCY',
+        ownerKey: 'AGENCY',
+      },
+      select: { status: true, config: true, updatedAt: true },
+    });
+
+    if (!integration) {
+      return res.json({ ok: true, status: 'DISCONNECTED', config: null });
+    }
+
+    const status = integration.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED';
+
+    let config = integration.config;
+    if (config && typeof config === 'object' && !Array.isArray(config)) {
+      config = { ...config };
+      // hardening: nunca retornar nada parecido com token
+      for (const key of [
+        'access_token',
+        'accessToken',
+        'accessTokenEncrypted',
+        'token',
+        'refresh_token',
+        'refreshToken',
+      ]) {
+        if (Object.prototype.hasOwnProperty.call(config, key)) delete config[key];
+      }
+    }
+
+    return res.json({ ok: true, status, config });
+  } catch (err) {
+    return res.status(500).json({ error: 'server error' });
+  }
+});
+
 // C) POST /api/integrations/whatsapp/disconnect
 router.post('/whatsapp/disconnect', async (req, res) => {
   try {
