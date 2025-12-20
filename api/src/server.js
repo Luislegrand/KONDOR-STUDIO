@@ -15,9 +15,11 @@ const auditLog = require("./middleware/auditLog");
 const errorLogger = require("./middleware/errorLogger");
 
 const app = express();
+
 // Honra X-Forwarded-* headers quando estamos atrás de proxies (Render / Nginx).
 // Sem isso, req.protocol fica como "http" e os links de upload retornam URLs inseguras.
 app.set("trust proxy", 1);
+
 const isProduction = process.env.NODE_ENV === "production";
 
 async function ensureRefreshTokenColumns() {
@@ -129,6 +131,7 @@ async function ensureTeamMemberColumns() {
     );
   }
 }
+
 async function ensureWhatsAppMessagesTable() {
   try {
     await prisma.$executeRawUnsafe(`
@@ -168,6 +171,7 @@ async function ensureWhatsAppMessagesTable() {
   }
 }
 
+// Fire-and-forget (não bloqueia o boot)
 ensureRefreshTokenColumns();
 ensureUserColumns();
 ensureClientOnboardingColumns();
@@ -176,11 +180,11 @@ ensureTeamMemberColumns();
 ensureWhatsAppMessagesTable();
 
 // Helpers
-function safeMount(path, router) {
+function safeMount(mountPath, router) {
   if (router && typeof router === "function") {
-    app.use(path, router);
+    app.use(mountPath, router);
   } else {
-    console.warn(`⚠️ Rota "${path}" NÃO montada: export inválido.`);
+    console.warn(`⚠️ Rota "${mountPath}" NÃO montada: export inválido.`);
   }
 }
 
@@ -230,16 +234,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // 🔧 Helmet configurado para permitir recursos cross-origin (imagens, etc.)
 app.use(
   helmet({
-    // Permite que recursos (ex.: imagens) sejam carregados de outros origins
-    // como kondor-api.onrender.com -> kondor-front.onrender.com
     crossOriginResourcePolicy: { policy: "cross-origin" },
-
-    // Evita problemas com COEP/COOP em front/back separados
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: false,
-
-    // Se você tiver um contentSecurityPolicy custom, configure aqui em vez de desativar.
-    // contentSecurityPolicy: false,
   })
 );
 
@@ -273,13 +270,18 @@ app.get("/healthz", async (req, res) => {
   }
 });
 
+// =========================
 // Rotas públicas
+// =========================
 const authRoutes = require("./routes/auth");
 const clientPortalRoutes = require("./routes/clientPortal");
 const uploadsPublicRoutes = require("./routes/uploadsPublic");
 
 // ✅ WHATSAPP WEBHOOK (rota pública - Meta não envia seu JWT)
 const whatsappWebhookRoutes = require("./routes/webhooks/whatsapp");
+
+// ✅ WHATSAPP INTEGRATION CALLBACK (rota pública - redirecionamento OAuth)
+const whatsappIntegrationPublicRoutes = require("./routes/integrationsWhatsAppPublic");
 
 let publicRoutes;
 try {
@@ -298,11 +300,14 @@ safeMount("/api/client-portal", clientPortalRoutes);
 safeMount("/uploads/public", uploadsPublicRoutes);
 if (publicRoutes) safeMount("/api/public", publicRoutes);
 
-// ✅ Monta o webhook ANTES de proteger /api com auth/tenant/subscription
+// ✅ Monta o webhook e o callback ANTES de proteger /api com auth/tenant/subscription
 safeMount("/api/webhooks/whatsapp", whatsappWebhookRoutes);
+safeMount("/api/integrations/whatsapp", whatsappIntegrationPublicRoutes);
 
-// === ROTAS INTERNAS ===
+// =========================
+// Rotas internas (protegidas)
 // Protegidas: auth → tenant → assinatura válida
+// =========================
 app.use("/api", authMiddleware, tenantMiddleware, checkSubscription);
 
 // AuditLog (opcional)
