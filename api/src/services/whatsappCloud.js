@@ -1,6 +1,7 @@
 // api/src/services/whatsappCloud.js
 // Integração com WhatsApp Cloud API (Meta)
 const { prisma } = require('../prisma');
+const { decrypt } = require('../utils/crypto');
 
 const GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v17.0';
 
@@ -14,34 +15,69 @@ function safeLog(...args) {
   console.log('[whatsappCloud]', ...args);
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 async function getAgencyWhatsAppIntegration(tenantId) {
   if (!tenantId) return null;
 
   const integration = await prisma.integration.findFirst({
     where: {
       tenantId,
-      provider: 'WHATSAPP',
+      provider: 'WHATSAPP_META_CLOUD',
       ownerType: 'AGENCY',
       ownerKey: 'AGENCY',
-      status: 'ACTIVE',
+      status: 'CONNECTED',
+    },
+    select: {
+      id: true,
+      tenantId: true,
+      provider: true,
+      status: true,
+      accessTokenEncrypted: true,
+      settings: true,
+      config: true,
     },
   });
 
   if (!integration) return null;
 
-  const settings = integration.settings || {};
-  const phoneNumberId = settings.phone_number_id || settings.phoneNumberId || settings.phoneNumberID;
+  const settings = isPlainObject(integration.settings) ? integration.settings : {};
+  const config = isPlainObject(integration.config) ? integration.config : {};
 
-  if (!integration.accessToken || !phoneNumberId) {
+  const phoneNumberId =
+    config.phone_number_id ||
+    config.phoneNumberId ||
+    config.phoneNumberID ||
+    settings.phone_number_id ||
+    settings.phoneNumberId ||
+    settings.phoneNumberID ||
+    null;
+
+  if (!phoneNumberId) {
     return {
       integration,
       phoneNumberId: phoneNumberId || null,
-      accessToken: integration.accessToken || null,
+      accessToken: null,
+      settings,
       incomplete: true,
     };
   }
 
-  return { integration, phoneNumberId, accessToken: integration.accessToken, settings };
+  if (!integration.accessTokenEncrypted) {
+    throw new Error('Missing encrypted token for integration');
+  }
+
+  let accessToken;
+  try {
+    accessToken = decrypt(integration.accessTokenEncrypted);
+  } catch (err) {
+    safeLog('Encrypted token inválido para integração WhatsApp', err?.message || err);
+    throw new Error('Invalid encrypted token for integration');
+  }
+
+  return { integration, phoneNumberId, accessToken, settings };
 }
 
 async function sendTextMessage({ phoneNumberId, accessToken, toE164, text }) {

@@ -1,8 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 
 const { prisma } = require('../prisma');
+const { encrypt } = require('../utils/crypto');
 
 const router = express.Router();
 
@@ -14,38 +14,6 @@ function buildRedirectUrl(result) {
   const base = process.env.PUBLIC_APP_URL;
   if (!base) return fallback;
   return `${String(base).replace(/\/+$/, '')}${fallback}`;
-}
-
-function maskSecret(token) {
-  if (!token) return null;
-  const str = String(token);
-  if (str.length <= 12) return '***';
-  return `${str.slice(0, 4)}***${str.slice(-4)}`;
-}
-
-function getTokenEncryptionKey() {
-  const raw =
-    process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY ||
-    process.env.INTEGRATIONS_TOKEN_ENCRYPTION_KEY ||
-    process.env.JWT_SECRET ||
-    '';
-  if (!raw) return null;
-
-  // Deriva uma chave estável de 32 bytes (AES-256) a partir do segredo.
-  return crypto.createHash('sha256').update(String(raw)).digest();
-}
-
-function encryptSecret(plaintext) {
-  if (!plaintext) return null;
-  const key = getTokenEncryptionKey();
-  if (!key) return null;
-
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const ciphertext = Buffer.concat([cipher.update(String(plaintext), 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return `v1:${iv.toString('base64')}:${tag.toString('base64')}:${ciphertext.toString('base64')}`;
 }
 
 async function fetchJsonWithTimeout(url, { method = 'GET', headers = {}, timeoutMs = 8000 } = {}) {
@@ -311,8 +279,7 @@ router.get('/callback', async (req, res) => {
       phone_number_id: phoneNumberId || undefined,
     });
 
-    const encryptedToken = encryptSecret(finalToken);
-    // TODO(security): trocar para uma chave dedicada (INTEGRATIONS_TOKEN_ENCRYPTION_KEY) e implementar rotação.
+    const encryptedToken = encrypt(finalToken);
 
     if (existing) {
       await prisma.integration.update({
@@ -322,7 +289,7 @@ router.get('/callback', async (req, res) => {
           ownerKey: 'AGENCY',
           status: 'CONNECTED',
           accessToken: null,
-          accessTokenEncrypted: encryptedToken || null,
+          accessTokenEncrypted: encryptedToken,
           refreshToken: null,
           scopes: Array.isArray(grantedScopes) ? grantedScopes : [],
           config: nextConfig,
@@ -337,7 +304,7 @@ router.get('/callback', async (req, res) => {
           ownerKey: 'AGENCY',
           status: 'CONNECTED',
           accessToken: null,
-          accessTokenEncrypted: encryptedToken || null,
+          accessTokenEncrypted: encryptedToken,
           refreshToken: null,
           scopes: Array.isArray(grantedScopes) ? grantedScopes : [],
           config: nextConfig,
@@ -354,8 +321,7 @@ router.get('/callback', async (req, res) => {
       meta_user_id: metaUserId,
       waba_id: wabaId,
       phone_number_id: phoneNumberId,
-      token_saved: Boolean(encryptedToken),
-      token_hint: maskSecret(finalToken),
+      token_saved: true,
     });
   } catch (err) {
     const redirectUrl = buildRedirectUrl('error');
@@ -364,6 +330,8 @@ router.get('/callback', async (req, res) => {
     const message =
       err?.code === 'MISSING_ENV'
         ? err.message
+        : String(err?.message || '').includes('Missing CRYPTO_KEY')
+          ? err.message
         : err?.code === 'ETIMEDOUT'
           ? 'Timeout ao chamar Meta'
           : 'server error';
