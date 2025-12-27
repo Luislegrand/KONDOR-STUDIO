@@ -338,15 +338,15 @@ export default function Integrations() {
           </div>
         </div>
 
-        <section className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 px-6 py-8 md:px-10 md:py-10 shadow-2xl shadow-slate-900/40 border border-slate-800/60">
+        <section className="rounded-3xl bg-white px-6 py-8 md:px-10 md:py-10 shadow-sm shadow-slate-200/70 border border-slate-200/70">
           <div className="flex flex-col gap-2 mb-8">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
               Conexões da agência
             </p>
-            <h2 className="text-2xl md:text-3xl font-semibold text-white">
+            <h2 className="text-2xl md:text-3xl font-semibold text-slate-900">
               Adicionar produtos ao seu aplicativo
             </h2>
-            <p className="text-sm text-slate-400 max-w-2xl">
+            <p className="text-sm text-slate-600 max-w-2xl">
               Selecione a integração desejada para posts, métricas e aprovações. Cada conexão fica
               vinculada à sua agência e pode ser refinada depois.
             </p>
@@ -357,7 +357,7 @@ export default function Integrations() {
               {[1, 2, 3, 4, 5, 6].map((item) => (
                 <div
                   key={item}
-                  className="h-56 rounded-2xl bg-slate-800/60 animate-pulse"
+                  className="h-56 rounded-2xl bg-slate-100 animate-pulse"
                 />
               ))}
             </div>
