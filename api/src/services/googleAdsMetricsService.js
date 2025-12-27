@@ -1,7 +1,7 @@
 // Provider de métricas para integrações "google" (Google Ads).
 //
 // É usado pelo updateMetricsJob.js, que espera a função:
-//    fetchAccountMetrics(integration, range) -> Promise<Array<{ name, value }>>
+//    fetchAccountMetrics(integration, options) -> Promise<Array<{ name, value }>>
 //
 // - Não salva nada no banco (isso é responsabilidade do job).
 // - Não quebra se credenciais estiverem incompletas: apenas retorna [].
@@ -21,12 +21,14 @@
 //   GOOGLE_ADS_API_BASE_URL  (default: https://googleads.googleapis.com/v14)
 //   GOOGLE_ADS_DEFAULT_FIELDS (csv, ex: "metrics.impressions,metrics.clicks,metrics.cost_micros")
 //
-// Parâmetro `range` (opcional) vindo do job:
-//   { since: "YYYY-MM-DD", until: "YYYY-MM-DD" }
+// Opções (options):
+//   - range: { since: "YYYY-MM-DD", until: "YYYY-MM-DD" }
+//   - metricTypes: ["impressions","clicks","spend",...]
+//   - granularity: "day" (default)
 //
 // Observação importante:
 // - Se o campo "metrics.cost_micros" for retornado, ele será convertido para valor monetário
-//   (cost_micros / 1_000_000) e exposto como "google_ads.cost".
+//   (cost_micros / 1_000_000) e exposto como "spend".
 
 function safeLog(...args) {
   if (process.env.NODE_ENV === 'test') return;
@@ -38,22 +40,56 @@ function getBaseUrl() {
   return process.env.GOOGLE_ADS_API_BASE_URL || 'https://googleads.googleapis.com/v14';
 }
 
+function normalizeList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (typeof value === 'string') {
+    return value.split(',').map((v) => v.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+const METRIC_FIELD_MAP = {
+  impressions: 'metrics.impressions',
+  clicks: 'metrics.clicks',
+  spend: 'metrics.cost_micros',
+  cost: 'metrics.cost_micros',
+  conversions: 'metrics.conversions',
+  revenue: 'metrics.conversions_value',
+  value: 'metrics.conversions_value',
+  ctr: 'metrics.ctr',
+  cpc: 'metrics.average_cpc',
+  cpm: 'metrics.average_cpm',
+};
+
+function mapMetricField(metric) {
+  if (!metric) return null;
+  const raw = String(metric).trim();
+  if (!raw) return null;
+  if (raw.includes('.')) return raw;
+  return METRIC_FIELD_MAP[raw] || `metrics.${raw}`;
+}
+
 /**
- * buildFieldsList(credentials)
+ * buildFieldsList(credentials, metricTypes)
  * Prioridade:
- *  - credentials.fields (array)
+ *  - metricTypes (array)
+ *  - credentials.fields (array or csv)
  *  - GOOGLE_ADS_DEFAULT_FIELDS (csv)
  *  - fallback: ["metrics.impressions","metrics.clicks","metrics.cost_micros"]
  */
-function buildFieldsList(credentials) {
-  if (Array.isArray(credentials.fields) && credentials.fields.length) {
-    return credentials.fields;
-  }
+function buildFieldsList(credentials, metricTypes) {
+  const fromMetrics = normalizeList(metricTypes).map(mapMetricField).filter(Boolean);
+  if (fromMetrics.length) return Array.from(new Set(fromMetrics));
+
+  const fromCredentials = normalizeList(credentials.fields).map(mapMetricField).filter(Boolean);
+  if (fromCredentials.length) return Array.from(new Set(fromCredentials));
 
   if (process.env.GOOGLE_ADS_DEFAULT_FIELDS) {
-    return process.env.GOOGLE_ADS_DEFAULT_FIELDS.split(',')
-      .map((f) => f.trim())
+    const fromEnv = normalizeList(process.env.GOOGLE_ADS_DEFAULT_FIELDS)
+      .map(mapMetricField)
       .filter(Boolean);
+    if (fromEnv.length) return Array.from(new Set(fromEnv));
   }
 
   return ['metrics.impressions', 'metrics.clicks', 'metrics.cost_micros'];
@@ -69,7 +105,6 @@ function buildDateFilter(range) {
   const { since, until } = range;
   if (!since && !until) return '';
 
-  // Google Ads exige formato YYYY-MM-DD
   if (since && until) {
     return ` WHERE segments.date BETWEEN '${since}' AND '${until}'`;
   }
@@ -97,30 +132,28 @@ function safeGetDeep(row, path) {
 }
 
 /**
- * fetchAccountMetrics(integration, range?)
+ * fetchAccountMetrics(integration, options?)
  *
  * - integration: registro prisma.Integration com:
  *    - type/provider "google"
  *    - credentialsJson com accessToken + developerToken + customerId
- * - range: { since, until } (datas em string "YYYY-MM-DD")
+ * - options: { range, metricTypes, granularity }
  *
- * Retorna: Array<{ name: string, value: number }>
- *   name: "google_ads.<campoSimples>", ex: "google_ads.impressions"
- *
- * Regras especiais:
- *   - metrics.cost_micros é convertido para:
- *       name: "google_ads.cost"
- *       value: cost_micros_total / 1_000_000
+ * Retorna: Array<{ name: string, value: number, collectedAt?: string }>
  */
-async function fetchAccountMetrics(integration, range) {
+async function fetchAccountMetrics(integration, options = {}) {
   if (!integration) {
     safeLog('fetchAccountMetrics chamado sem integration');
     return [];
   }
 
+  const range = options.range || (options.since || options.until ? options : null);
+  const metricTypes = Array.isArray(options.metricTypes) ? options.metricTypes : null;
+  const granularity = options.granularity || 'day';
+  const includeDate = granularity === 'day' || granularity === 'date';
+
   let credentials = {};
   try {
-    // compatível com integrationsService.create (credentialsJson)
     credentials = integration.credentialsJson
       ? JSON.parse(integration.credentialsJson) || {}
       : (integration.settings && typeof integration.settings === 'object' ? integration.settings : {});
@@ -140,14 +173,16 @@ async function fetchAccountMetrics(integration, range) {
     return [];
   }
 
-  // Normaliza customerId removendo traços
   customerId = String(customerId).replace(/-/g, '');
 
-  const fields = buildFieldsList(credentials);
+  const fields = buildFieldsList(credentials, metricTypes);
   const baseUrl = getBaseUrl();
 
-  // Monta GAQL
-  const selectClause = `SELECT ${fields.join(', ')}`;
+  const selectFields = includeDate
+    ? ['segments.date', ...fields]
+    : fields;
+
+  const selectClause = `SELECT ${selectFields.join(', ')}`;
   const fromClause = ' FROM customer';
   const whereClause = buildDateFilter(range);
 
@@ -195,7 +230,44 @@ async function fetchAccountMetrics(integration, range) {
       return [];
     }
 
-    // Agregamos métricas por campo (somatório)
+    const metrics = [];
+
+    if (includeDate) {
+      for (const row of results) {
+        const dateValue = safeGetDeep(row, 'segments.date') || null;
+        for (const field of fields) {
+          const rawVal = safeGetDeep(row, field);
+          if (rawVal === undefined || rawVal === null) continue;
+
+          let numVal = Number(rawVal);
+          if (Number.isNaN(numVal)) continue;
+
+          let shortName = field.split('.').pop() || field;
+          if (field === 'metrics.cost_micros' || shortName === 'cost_micros') {
+            shortName = 'spend';
+            numVal = numVal / 1_000_000;
+          }
+
+          metrics.push({
+            name: shortName,
+            value: numVal,
+            collectedAt: dateValue,
+            meta: {
+              provider: 'google_ads',
+              rawField: field,
+            },
+          });
+        }
+      }
+
+      safeLog('Google Ads metrics obtidas', {
+        integrationId: integration.id,
+        count: metrics.length,
+      });
+
+      return metrics;
+    }
+
     const totals = {};
     for (const row of results) {
       for (const field of fields) {
@@ -210,15 +282,13 @@ async function fetchAccountMetrics(integration, range) {
       }
     }
 
-    const metrics = [];
     for (const field of Object.keys(totals)) {
       let value = totals[field];
       let shortName = field.split('.').pop() || field;
 
-      // Conversão especial para cost_micros -> cost
       if (field === 'metrics.cost_micros' || shortName === 'cost_micros') {
         shortName = 'spend';
-        value = value / 1_000_000; // cost_micros para unidade monetária
+        value = value / 1_000_000;
       }
 
       metrics.push({
@@ -242,7 +312,6 @@ async function fetchAccountMetrics(integration, range) {
       'Erro ao chamar Google Ads API',
       err && err.message ? err.message : err,
     );
-    // Não jogamos erro pra fora, para não derrubar o worker inteiro.
     return [];
   }
 }

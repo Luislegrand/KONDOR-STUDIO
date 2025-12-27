@@ -1,5 +1,6 @@
 const { prisma } = require('../prisma');
 const { buildAndPersistReport } = require('../services/reportBuilder');
+const automationEngine = require('../services/automationEngine');
 
 const MAX_ATTEMPTS = Number(process.env.WORKER_MAX_ATTEMPTS) || 5;
 const BACKOFF_MS = Number(process.env.REPORT_BACKOFF_MS) || 60000;
@@ -94,6 +95,31 @@ async function finalizeJob(entry, status, result, options = {}) {
   });
 }
 
+async function resolveReportClient(tenantId, payload) {
+  if (!tenantId) return null;
+
+  if (payload.clientId) {
+    return prisma.client.findFirst({
+      where: { id: payload.clientId, tenantId },
+    });
+  }
+
+  if (payload.integrationId) {
+    const integration = await prisma.integration.findFirst({
+      where: { id: payload.integrationId, tenantId },
+      select: { clientId: true },
+    });
+
+    if (integration?.clientId) {
+      return prisma.client.findFirst({
+        where: { id: integration.clientId, tenantId },
+      });
+    }
+  }
+
+  return null;
+}
+
 async function processReportEntry(entry) {
   if (!entry) return null;
 
@@ -106,8 +132,8 @@ async function processReportEntry(entry) {
 
   const payload = entry.payload || {};
   const now = new Date();
-  let from = parseDateOrNull(payload.rangeFrom);
-  let to = parseDateOrNull(payload.rangeTo);
+  let from = parseDateOrNull(payload.rangeFrom || payload.range_from);
+  let to = parseDateOrNull(payload.rangeTo || payload.range_to);
 
   if (!to) to = now;
   if (!from) {
@@ -115,16 +141,41 @@ async function processReportEntry(entry) {
     from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
   }
 
-  const metrics = await prisma.metric.findMany({
-    where: {
-      tenantId,
-      collectedAt: {
-        gte: from,
-        lte: to,
-      },
-    },
-  });
+  const metricTypes = Array.isArray(payload.metricTypes)
+    ? payload.metricTypes
+    : (typeof payload.metricTypes === 'string'
+        ? payload.metricTypes.split(',').map((item) => item.trim()).filter(Boolean)
+        : null);
 
+  const where = {
+    tenantId,
+    collectedAt: {
+      gte: from,
+      lte: to,
+    },
+  };
+
+  if (metricTypes && metricTypes.length) {
+    where.name = { in: metricTypes };
+  }
+
+  if (payload.integrationId) {
+    where.integrationId = payload.integrationId;
+  }
+
+  if (payload.provider) {
+    where.provider = payload.provider;
+  }
+
+  if (payload.clientId) {
+    where.OR = [
+      { clientId: payload.clientId },
+      { post: { clientId: payload.clientId } },
+      { integration: { clientId: payload.clientId } },
+    ];
+  }
+
+  const metrics = await prisma.metric.findMany({ where });
   const summary = buildSummary(metrics, from, to);
 
   const baseParams =
@@ -136,7 +187,15 @@ async function processReportEntry(entry) {
   const options = {
     name,
     type,
-    params: baseParams,
+    params: {
+      ...baseParams,
+      clientId: payload.clientId || null,
+      integrationId: payload.integrationId || null,
+      provider: payload.provider || null,
+      metricTypes: metricTypes || null,
+      rangeFrom: from.toISOString(),
+      rangeTo: to.toISOString(),
+    },
     summary,
     range: {
       from: from.toISOString(),
@@ -181,6 +240,36 @@ async function processReportEntry(entry) {
     reportId: report.id,
     uploadId: upload?.id || null,
   });
+
+  if (payload.sendWhatsApp) {
+    try {
+      const client = await resolveReportClient(tenantId, payload);
+      const shouldSend = client ? client.whatsappOptIn !== false : false;
+      if (!client || !shouldSend) {
+        safeLog('Envio WhatsApp ignorado (cliente ausente ou opt-out)');
+      } else if (automationEngine && typeof automationEngine.evaluateEventAndEnqueue === 'function') {
+        await automationEngine.evaluateEventAndEnqueue(tenantId, {
+          type: 'report.ready',
+          payload: {
+            reportId: report.id,
+            reportType: report.type || type,
+            clientId: client.id,
+            clientName: client.name,
+            clientPhone: client.whatsappNumberE164 || client.phone || null,
+            clientWhatsapp: client.contacts?.whatsapp || null,
+            client: {
+              id: client.id,
+              name: client.name,
+              phone: client.phone,
+              contacts: client.contacts,
+            },
+          },
+        });
+      }
+    } catch (err) {
+      safeLog('Erro ao enfileirar envio WhatsApp do relatório', err?.message || err);
+    }
+  }
 
   return report;
 }

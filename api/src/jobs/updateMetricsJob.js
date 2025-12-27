@@ -5,6 +5,7 @@ const BACKOFF_MS = Number(process.env.METRICS_BACKOFF_MS) || 60000;
 
 let metaProvider = null;
 let googleProvider = null;
+let googleAnalyticsProvider = null;
 let tiktokProvider = null;
 
 try {
@@ -13,6 +14,10 @@ try {
 
 try {
   googleProvider = require('../services/googleAdsMetricsService');
+} catch (_) {}
+
+try {
+  googleAnalyticsProvider = require('../services/googleAnalyticsMetricsService');
 } catch (_) {}
 
 try {
@@ -25,12 +30,62 @@ function safeLog(...args) {
   }
 }
 
-function getReferenceTimestamp(range) {
-  if (range && typeof range === 'object') {
-    const { since, until } = range;
-    if (until) return new Date(`${until}T00:00:00.000Z`);
-    if (since) return new Date(`${since}T00:00:00.000Z`);
+function parseDate(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function formatDateOnly(date) {
+  const d = parseDate(date);
+  if (!d) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function buildRangeInfo(payload = {}) {
+  const rawRange = payload.range && typeof payload.range === 'object' ? payload.range : {};
+  let from = parseDate(payload.rangeFrom || payload.range_from || rawRange.since);
+  let to = parseDate(payload.rangeTo || payload.range_to || rawRange.until);
+
+  if (!from && !to && payload.rangeDays) {
+    const days = Number(payload.rangeDays);
+    if (days > 0) {
+      to = new Date();
+      from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+    }
   }
+
+  const range = {};
+  if (from) range.since = formatDateOnly(from);
+  if (to) range.until = formatDateOnly(to);
+
+  return {
+    range: Object.keys(range).length ? range : null,
+    rangeFrom: from || null,
+    rangeTo: to || null,
+  };
+}
+
+function resolveCollectedAt(metric, rangeInfo) {
+  const candidates = [
+    metric.collectedAt,
+    metric.collected_at,
+    metric.date,
+    metric.date_start,
+    metric.dateStart,
+    metric.day,
+    metric.timestamp,
+  ];
+
+  for (const candidate of candidates) {
+    const d = parseDate(candidate);
+    if (d) return d;
+  }
+
+  if (rangeInfo?.rangeTo) return rangeInfo.rangeTo;
+  if (rangeInfo?.rangeFrom) return rangeInfo.rangeFrom;
   return new Date();
 }
 
@@ -41,6 +96,45 @@ function getDayBounds(date) {
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
+}
+
+function normalizeIntegrationKind(integration) {
+  if (!integration) return '';
+  const raw = integration.settings?.kind || integration.config?.kind || '';
+  return String(raw).trim().toLowerCase();
+}
+
+function resolveProviderKey(integration) {
+  const kind = normalizeIntegrationKind(integration);
+  if (kind) {
+    if (['meta_ads', 'meta-ads'].includes(kind)) return 'meta';
+    if (['google_ads', 'google-ads'].includes(kind)) return 'google_ads';
+    if (['google_analytics', 'ga4'].includes(kind)) return 'google_analytics';
+    if (['tiktok_ads', 'tiktok'].includes(kind)) return 'tiktok';
+    return null;
+  }
+
+  const providerRaw = (integration.provider || integration.type || integration.providerName || '')
+    .toString()
+    .toLowerCase();
+
+  if (['meta', 'facebook', 'instagram', 'facebook-ads', 'instagram-ads'].includes(providerRaw)) {
+    return 'meta';
+  }
+
+  if (['google', 'google-ads', 'google_ads'].includes(providerRaw)) {
+    return 'google_ads';
+  }
+
+  if (['google_analytics', 'ga4'].includes(providerRaw)) {
+    return 'google_analytics';
+  }
+
+  if (['tiktok', 'tiktok-ads'].includes(providerRaw)) {
+    return 'tiktok';
+  }
+
+  return null;
 }
 
 async function claimNextMetricJob() {
@@ -88,46 +182,63 @@ async function finalizeJob(entry, status, result, options = {}) {
   });
 }
 
-async function saveMetric(tenantId, metric, providerType, range) {
-  const referenceTs = getReferenceTimestamp(range);
-  const { start, end } = getDayBounds(referenceTs);
-
+async function saveMetric({ tenantId, metric, providerType, rangeInfo, integrationId, clientId }) {
   const name = metric.name || metric.key || metric.type;
   if (!name) {
     safeLog('saveMetric ignorou entrada sem name', metric);
     return null;
   }
 
-  const value = Number(metric.value || 0);
-  const postId = metric.postId || metric.post_id || null;
-  if (!postId) {
-    safeLog('saveMetric ignorou métrica sem postId', metric);
+  const value = Number(metric.value ?? metric.total ?? 0);
+  if (Number.isNaN(value)) {
+    safeLog('saveMetric ignorou métrica com valor inválido', metric);
     return null;
   }
 
-  const existing = await prisma.metric.findFirst({
-    where: {
-      tenantId,
-      name,
-      postId,
-      collectedAt: {
-        gte: start,
-        lt: end,
-      },
+  const postId = metric.postId || metric.post_id || null;
+  if (!postId && !integrationId) {
+    safeLog('saveMetric ignorou métrica sem postId ou integrationId', metric);
+    return null;
+  }
+
+  const collectedAt = resolveCollectedAt(metric, rangeInfo);
+  const { start, end } = getDayBounds(collectedAt);
+
+  const where = {
+    tenantId,
+    name,
+    collectedAt: {
+      gte: start,
+      lt: end,
     },
-  });
+  };
+
+  if (postId) where.postId = postId;
+  if (integrationId) where.integrationId = integrationId;
+  if (clientId) where.clientId = clientId;
+
+  const existing = await prisma.metric.findFirst({ where });
+
+  const rangeMeta = rangeInfo?.range ? { range: rangeInfo.range } : null;
+  const meta = metric.meta || metric.metadata || null;
 
   if (existing) {
     return prisma.metric.update({
       where: { id: existing.id },
       data: {
         value,
-        collectedAt: referenceTs,
+        collectedAt,
+        provider: providerType || metric.provider || existing.provider || null,
+        rangeFrom: rangeInfo?.rangeFrom || existing.rangeFrom || null,
+        rangeTo: rangeInfo?.rangeTo || existing.rangeTo || null,
+        clientId: clientId || existing.clientId || null,
+        integrationId: integrationId || existing.integrationId || null,
+        postId: postId || existing.postId || null,
         meta: {
           ...(existing.meta || {}),
-          lastRange: range || null,
+          ...(meta || {}),
+          ...(rangeMeta || {}),
           lastUpdatedAt: new Date().toISOString(),
-          ...(metric.meta || {}),
         },
       },
     });
@@ -137,12 +248,21 @@ async function saveMetric(tenantId, metric, providerType, range) {
     data: {
       tenantId,
       postId,
+      integrationId: integrationId || null,
+      clientId: clientId || null,
       name,
       value,
-      collectedAt: referenceTs,
+      provider: providerType || metric.provider || null,
+      collectedAt,
+      rangeFrom: rangeInfo?.rangeFrom || null,
+      rangeTo: rangeInfo?.rangeTo || null,
       meta:
-        range || metric.meta
-          ? { ...(metric.meta || {}), range: range || null, provider: providerType || null }
+        meta || rangeMeta || providerType
+          ? {
+              ...(meta || {}),
+              ...(rangeMeta || {}),
+              ...(providerType ? { provider: providerType } : {}),
+            }
           : null,
     },
   });
@@ -160,6 +280,7 @@ async function processMetricJob(entry) {
 
   const payload = entry.payload || {};
   const integrationId = payload.integrationId || null;
+  const rangeInfo = buildRangeInfo(payload);
 
   const integration = await prisma.integration.findFirst({
     where: { id: integrationId, tenantId },
@@ -171,7 +292,8 @@ async function processMetricJob(entry) {
     return null;
   }
 
-  if (integration.active === false) {
+  const status = String(integration.status || '').toUpperCase();
+  if (['INACTIVE', 'DISCONNECTED'].includes(status)) {
     safeLog('Integração inativa — skipped', integration.id);
     await finalizeJob(entry, 'done', {
       ok: true,
@@ -184,47 +306,67 @@ async function processMetricJob(entry) {
   let metrics = [];
 
   try {
-    const providerTypeRaw = (integration.provider || integration.type || '').toLowerCase();
-    let providerKey = null;
-
-    if (['meta', 'facebook', 'instagram', 'facebook-ads', 'instagram-ads'].includes(providerTypeRaw)) {
-      providerKey = 'meta';
-      if (metaProvider?.fetchAccountMetrics) {
-        metrics = await metaProvider.fetchAccountMetrics(integration, payload.range);
-      }
-    }
-
-    if (['google', 'google-ads', 'google_ads'].includes(providerTypeRaw)) {
-      providerKey = 'google_ads';
-      if (googleProvider?.fetchAccountMetrics) {
-        metrics = await googleProvider.fetchAccountMetrics(integration, payload.range);
-      }
-    }
-
-    if (['tiktok', 'tiktok-ads'].includes(providerTypeRaw)) {
-      providerKey = 'tiktok';
-      if (tiktokProvider?.fetchAccountMetrics) {
-        metrics = await tiktokProvider.fetchAccountMetrics(integration, payload.range);
-      }
-    }
+    const providerKey = resolveProviderKey(integration);
 
     if (!providerKey) {
-      safeLog('Provider de integração não suportado para métricas', providerTypeRaw);
+      safeLog('Provider de integração não suportado para métricas', {
+        provider: integration.provider,
+        kind: integration.settings?.kind,
+      });
       await finalizeJob(entry, 'done', {
         ok: true,
         skipped: true,
         reason: 'unsupported_provider',
-        provider: providerTypeRaw,
+        provider: integration.provider || null,
       });
       return null;
+    }
+
+    const providerOptions = {
+      range: rangeInfo.range,
+      metricTypes: Array.isArray(payload.metricTypes) ? payload.metricTypes : undefined,
+      granularity: payload.granularity || 'day',
+    };
+
+    if (providerKey === 'meta' && metaProvider?.fetchAccountMetrics) {
+      metrics = await metaProvider.fetchAccountMetrics(integration, providerOptions);
+    }
+
+    if (providerKey === 'google_ads' && googleProvider?.fetchAccountMetrics) {
+      metrics = await googleProvider.fetchAccountMetrics(integration, providerOptions);
+    }
+
+    if (providerKey === 'google_analytics' && googleAnalyticsProvider?.fetchAccountMetrics) {
+      metrics = await googleAnalyticsProvider.fetchAccountMetrics(integration, providerOptions);
+    }
+
+    if (providerKey === 'tiktok' && tiktokProvider?.fetchAccountMetrics) {
+      metrics = await tiktokProvider.fetchAccountMetrics(integration, providerOptions);
     }
 
     if (!metrics || !metrics.length) {
       safeLog('Nenhuma métrica retornada do provider', providerKey);
     } else {
+      const clientId = payload.clientId || integration.clientId || null;
       for (const m of metrics) {
-        await saveMetric(tenantId, m, providerKey, payload.range);
+        await saveMetric({
+          tenantId,
+          metric: m,
+          providerType: providerKey,
+          rangeInfo,
+          integrationId: integration.id,
+          clientId,
+        });
       }
+    }
+
+    try {
+      await prisma.integration.update({
+        where: { id: integration.id },
+        data: { lastSyncedAt: new Date() },
+      });
+    } catch (err) {
+      safeLog('Falha ao atualizar lastSyncedAt', err?.message || err);
     }
 
     await finalizeJob(entry, 'done', {

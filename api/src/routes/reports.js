@@ -8,6 +8,8 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const tenantMiddleware = require('../middleware/tenant');
 const reportsService = require('../services/reportsService');
+const automationEngine = require('../services/automationEngine');
+const { prisma } = require('../prisma');
 let whatsappProvider = null;
 let uploadsService = null;
 
@@ -53,6 +55,97 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('GET /reports error:', err);
     return res.status(500).json({ error: 'Erro ao listar relatórios' });
+  }
+});
+
+/**
+ * POST /reports/generate
+ * Enfileira geração de relatório e cria o registro inicial.
+ * Body:
+ *  - name (opcional)
+ *  - type (opcional)
+ *  - clientId (opcional)
+ *  - integrationId (opcional)
+ *  - provider (opcional)
+ *  - metricTypes (array opcional)
+ *  - rangeFrom / rangeTo / rangeDays
+ *  - sendWhatsApp (boolean)
+ */
+router.post('/generate', async (req, res) => {
+  try {
+    const {
+      name,
+      type,
+      clientId,
+      integrationId,
+      provider,
+      metricTypes,
+      rangeFrom,
+      rangeTo,
+      rangeDays,
+      sendWhatsApp,
+    } = req.body || {};
+
+    let effectiveClientId = clientId || null;
+
+    if (integrationId) {
+      const integration = await prisma.integration.findFirst({
+        where: { id: integrationId, tenantId: req.tenantId },
+        select: { id: true, clientId: true },
+      });
+
+      if (!integration) {
+        return res.status(404).json({ error: 'Integração não encontrada' });
+      }
+
+      if (clientId && integration.clientId && integration.clientId !== clientId) {
+        return res
+          .status(400)
+          .json({ error: 'Integração não pertence ao cliente informado' });
+      }
+
+      if (!effectiveClientId) {
+        effectiveClientId = integration.clientId || null;
+      }
+    }
+
+    const report = await reportsService.create(req.tenantId, req.user?.id || null, {
+      name,
+      type,
+      status: 'pending',
+      params: {
+        clientId: effectiveClientId,
+        integrationId: integrationId || null,
+        provider: provider || null,
+        metricTypes: Array.isArray(metricTypes) ? metricTypes : null,
+        rangeFrom: rangeFrom || null,
+        rangeTo: rangeTo || null,
+        rangeDays: rangeDays || null,
+        sendWhatsApp: !!sendWhatsApp,
+      },
+    });
+
+    const job = await automationEngine.enqueueJob(req.tenantId, {
+      jobType: 'report_generation',
+      name: 'report_generation',
+      referenceId: report.id,
+      payload: {
+        reportId: report.id,
+        clientId: effectiveClientId,
+        integrationId: integrationId || null,
+        provider: provider || null,
+        metricTypes: Array.isArray(metricTypes) ? metricTypes : undefined,
+        rangeFrom: rangeFrom || undefined,
+        rangeTo: rangeTo || undefined,
+        rangeDays: rangeDays || undefined,
+        sendWhatsApp: !!sendWhatsApp,
+      },
+    });
+
+    return res.status(201).json({ ok: true, report, job });
+  } catch (err) {
+    console.error('POST /reports/generate error:', err);
+    return res.status(500).json({ error: 'Erro ao gerar relatório' });
   }
 });
 

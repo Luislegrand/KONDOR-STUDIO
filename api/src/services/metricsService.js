@@ -1,5 +1,5 @@
 // api/src/services/metricsService.js
-// Serviço de métricas baseado no schema atual (metric -> post obrigatório).
+// Serviço de métricas com suporte a integrações (ads/analytics) e posts.
 
 const { prisma } = require('../prisma');
 
@@ -20,10 +20,27 @@ async function resolvePostId(tenantId, data = {}) {
   return post ? post.id : null;
 }
 
+async function resolveIntegration(tenantId, data = {}) {
+  const integrationId = data.integrationId || data.integration_id;
+  if (!integrationId) return null;
+  const integration = await prisma.integration.findFirst({
+    where: { id: integrationId, tenantId },
+    select: { id: true, clientId: true, provider: true },
+  });
+  return integration || null;
+}
+
+function normalizeMetricName(input) {
+  const raw = input || 'metric';
+  return String(raw).trim();
+}
+
 module.exports = {
   async list(tenantId, opts = {}) {
     const {
       clientId,
+      integrationId,
+      provider,
       key,
       metricType,
       startDate,
@@ -40,8 +57,14 @@ module.exports = {
     if (metricKey) where.name = metricKey;
 
     if (clientId) {
-      where.post = { clientId };
+      where.OR = [
+        { clientId },
+        { post: { clientId } },
+        { integration: { clientId } },
+      ];
     }
+    if (integrationId) where.integrationId = integrationId;
+    if (provider) where.provider = provider;
 
     const rangeStart = startTs || startDate;
     const rangeEnd = endTs || endDate;
@@ -62,6 +85,7 @@ module.exports = {
         take,
         include: {
           post: { select: { id: true, clientId: true, title: true } },
+          integration: { select: { id: true, provider: true, ownerType: true, clientId: true } },
         },
       }),
       prisma.metric.count({ where }),
@@ -78,18 +102,28 @@ module.exports = {
 
   async create(tenantId, data = {}) {
     const postId = await resolvePostId(tenantId, data);
-    if (!postId) {
-      throw new Error('postId é obrigatório para criar a métrica');
+    const integration = await resolveIntegration(tenantId, data);
+    if (!postId && !integration) {
+      throw new Error('postId ou integrationId é obrigatório para criar a métrica');
     }
 
     const payload = {
       tenantId,
       postId,
-      name: data.key || data.name || data.type || 'metric',
+      integrationId: integration ? integration.id : null,
+      clientId:
+        data.clientId ||
+        data.client_id ||
+        (integration ? integration.clientId : null) ||
+        null,
+      provider: data.provider || data.source || (integration ? integration.provider : null),
+      name: normalizeMetricName(data.key || data.name || data.type),
       value: Number(data.value),
       collectedAt:
         toDateOrNull(data.timestamp || data.collectedAt || data.collected_at) ||
         new Date(),
+      rangeFrom: toDateOrNull(data.rangeFrom || data.range_from),
+      rangeTo: toDateOrNull(data.rangeTo || data.range_to),
       meta: data.meta || data.metadata || {},
     };
 
@@ -122,7 +156,7 @@ module.exports = {
     }
     if (data.meta !== undefined) updateData.meta = data.meta;
     if (data.key !== undefined || data.name !== undefined || data.type !== undefined) {
-      updateData.name = data.key || data.name || data.type;
+      updateData.name = normalizeMetricName(data.key || data.name || data.type);
     }
     if (data.postId !== undefined || data.post_id !== undefined) {
       const resolved = await resolvePostId(tenantId, data);
@@ -130,6 +164,27 @@ module.exports = {
         throw new Error('postId inválido');
       }
       updateData.postId = resolved;
+    }
+    if (data.integrationId !== undefined || data.integration_id !== undefined) {
+      const integration = await resolveIntegration(tenantId, data);
+      if (!integration) {
+        throw new Error('integrationId inválido');
+      }
+      updateData.integrationId = integration.id;
+      updateData.clientId = integration.clientId || null;
+      updateData.provider = integration.provider || null;
+    }
+    if (data.clientId !== undefined || data.client_id !== undefined) {
+      updateData.clientId = data.clientId || data.client_id || null;
+    }
+    if (data.provider !== undefined || data.source !== undefined) {
+      updateData.provider = data.provider || data.source || null;
+    }
+    if (data.rangeFrom !== undefined || data.range_from !== undefined) {
+      updateData.rangeFrom = toDateOrNull(data.rangeFrom || data.range_from);
+    }
+    if (data.rangeTo !== undefined || data.range_to !== undefined) {
+      updateData.rangeTo = toDateOrNull(data.rangeTo || data.range_to);
     }
 
     await prisma.metric.update({ where: { id }, data: updateData });
@@ -148,6 +203,8 @@ module.exports = {
       groupBy = 'day',
       metricTypes = null,
       clientId = null,
+      integrationId = null,
+      provider = null,
       startDate = null,
       endDate = null,
     } = options;
@@ -166,9 +223,19 @@ module.exports = {
     let whereSql = `m."tenantId" = $1`;
 
     if (clientId) {
-      joinSql = 'INNER JOIN "posts" p ON p.id = m."postId"';
-      whereSql += ` AND p."clientId" = $${idx}`;
+      joinSql = 'LEFT JOIN "posts" p ON p.id = m."postId" LEFT JOIN "integrations" i ON i.id = m."integrationId"';
+      whereSql += ` AND (m."clientId" = $${idx} OR p."clientId" = $${idx} OR i."clientId" = $${idx})`;
       params.push(clientId);
+      idx += 1;
+    }
+    if (integrationId) {
+      whereSql += ` AND m."integrationId" = $${idx}`;
+      params.push(integrationId);
+      idx += 1;
+    }
+    if (provider) {
+      whereSql += ` AND m."provider" = $${idx}`;
+      params.push(provider);
       idx += 1;
     }
 
@@ -216,13 +283,30 @@ module.exports = {
   },
 
   async quickSummary(tenantId, options = {}) {
-    const { days = 7, metricTypes = [], clientId = null } = options;
-    const start = new Date();
-    start.setDate(start.getDate() - days);
+    const {
+      days = 7,
+      metricTypes = [],
+      clientId = null,
+      integrationId = null,
+      provider = null,
+      startDate = null,
+      endDate = null,
+    } = options;
+
+    let end = endDate ? new Date(endDate) : new Date();
+    if (Number.isNaN(end.getTime())) {
+      end = new Date();
+    }
+
+    let start = startDate ? new Date(startDate) : null;
+    if (!start || Number.isNaN(start.getTime())) {
+      start = new Date(end);
+      start.setDate(start.getDate() - days);
+    }
 
     const where = {
       tenantId,
-      collectedAt: { gte: start },
+      collectedAt: { gte: start, lte: end },
     };
 
     if (Array.isArray(metricTypes) && metricTypes.length) {
@@ -230,7 +314,17 @@ module.exports = {
     }
 
     if (clientId) {
-      where.post = { clientId };
+      where.OR = [
+        { clientId },
+        { post: { clientId } },
+        { integration: { clientId } },
+      ];
+    }
+    if (integrationId) {
+      where.integrationId = integrationId;
+    }
+    if (provider) {
+      where.provider = provider;
     }
 
     const rows = await prisma.metric.groupBy({

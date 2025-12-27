@@ -4,6 +4,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const tenantMiddleware = require("../middleware/tenant");
 const metricsService = require("../services/metricsService");
+const automationEngine = require("../services/automationEngine");
 const { prisma } = require("../prisma");
 
 router.use(authMiddleware);
@@ -17,6 +18,8 @@ router.get("/", async (req, res) => {
     const {
       metricType,
       clientId,
+      integrationId,
+      provider,
       startDate,
       endDate,
       page,
@@ -27,6 +30,8 @@ router.get("/", async (req, res) => {
     const result = await metricsService.list(req.tenantId, {
       metricType,
       clientId,
+      integrationId,
+      provider,
       startDate,
       endDate,
       order,
@@ -118,7 +123,7 @@ router.post("/aggregate", async (req, res) => {
  */
 router.get("/summary/quick", async (req, res) => {
   try {
-    const { days, metricTypes, clientId, source } = req.query;
+    const { days, metricTypes, clientId, integrationId, provider, source, startDate, endDate } = req.query;
 
     const result = await metricsService.quickSummary(req.tenantId, {
       days: days ? Number(days) : undefined,
@@ -126,13 +131,74 @@ router.get("/summary/quick", async (req, res) => {
         ? metricTypes.split(",").map((t) => t.trim())
         : undefined,
       clientId: clientId || undefined,
-      source: source || undefined,
+      integrationId: integrationId || undefined,
+      provider: provider || source || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
     });
 
     return res.json(result);
   } catch (err) {
     console.error("GET /metrics/summary/quick error:", err);
     return res.status(500).json({ error: "Erro ao gerar resumo" });
+  }
+});
+
+/**
+ * POST /metrics/sync
+ * Enfileira sincronização de métricas para uma integração (por client/integration).
+ * Body:
+ *  - clientId (opcional, usado para validar integração)
+ *  - integrationId (obrigatório)
+ *  - metricTypes (array)
+ *  - rangeFrom | rangeTo | rangeDays
+ */
+router.post("/sync", async (req, res) => {
+  try {
+    const { integrationId, clientId, metricTypes, rangeFrom, rangeTo, rangeDays } = req.body || {};
+
+    if (!integrationId) {
+      return res.status(400).json({ error: "integrationId é obrigatório" });
+    }
+
+    const integration = await prisma.integration.findFirst({
+      where: { id: integrationId, tenantId: req.tenantId },
+      select: { id: true, clientId: true },
+    });
+
+    if (!integration) {
+      return res.status(404).json({ error: "Integração não encontrada" });
+    }
+
+    if (clientId && integration.clientId && integration.clientId !== clientId) {
+      return res.status(400).json({ error: "Integração não pertence ao cliente informado" });
+    }
+
+    const payload = {
+      integrationId: integration.id,
+      clientId: integration.clientId || clientId || null,
+      metricTypes: Array.isArray(metricTypes) ? metricTypes : undefined,
+      rangeFrom: rangeFrom || undefined,
+      rangeTo: rangeTo || undefined,
+      rangeDays: rangeDays || undefined,
+      range: {
+        since: rangeFrom || undefined,
+        until: rangeTo || undefined,
+      },
+      granularity: "day",
+    };
+
+    const job = await automationEngine.enqueueJob(req.tenantId, {
+      jobType: "update_metrics",
+      name: "metrics_sync",
+      referenceId: integration.id,
+      payload,
+    });
+
+    return res.json({ ok: true, job });
+  } catch (err) {
+    console.error("POST /metrics/sync error:", err);
+    return res.status(500).json({ error: "Erro ao enfileirar sync de métricas" });
   }
 });
 

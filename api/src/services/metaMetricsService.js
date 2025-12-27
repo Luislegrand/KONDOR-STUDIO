@@ -1,7 +1,7 @@
 // Provider de métricas para integrações "meta" (Facebook/Instagram Ads).
 //
 // É usado pelo updateMetricsJob.js, que espera a função:
-//    fetchAccountMetrics(integration, range) -> Promise<Array<{ name, value }>>
+//    fetchAccountMetrics(integration, options) -> Promise<Array<{ name, value }>>
 //
 // - Não salva nada no banco (isso é responsabilidade do job).
 // - Não quebra se credenciais estiverem incompletas: apenas retorna [].
@@ -19,8 +19,10 @@
 //   META_GRAPH_BASE_URL (default: https://graph.facebook.com/v17.0)
 //   META_DEFAULT_FIELDS (csv, ex: "impressions,clicks,spend")
 //
-// Parâmetro `range` (opcional) vindo do job:
-//   { since: "YYYY-MM-DD", until: "YYYY-MM-DD" }
+// Opções (options):
+//   - range: { since: "YYYY-MM-DD", until: "YYYY-MM-DD" }
+//   - metricTypes: ["impressions","clicks",...]
+//   - granularity: "day" (default)
 
 function safeLog(...args) {
   if (process.env.NODE_ENV === 'test') return;
@@ -32,23 +34,33 @@ function getBaseUrl() {
   return process.env.META_GRAPH_BASE_URL || 'https://graph.facebook.com/v17.0';
 }
 
+function normalizeList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (typeof value === 'string') {
+    return value.split(',').map((v) => v.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 /**
- * buildFieldsList(credentials)
+ * buildFieldsList(credentials, metricTypes)
  * Prioridade:
- *  - credentials.fields (array)
+ *  - metricTypes (array)
+ *  - credentials.fields (array or csv)
  *  - META_DEFAULT_FIELDS (csv)
  *  - fallback: ["impressions","clicks","spend"]
  */
-function buildFieldsList(credentials) {
-  if (Array.isArray(credentials.fields) && credentials.fields.length) {
-    return credentials.fields;
-  }
+function buildFieldsList(credentials, metricTypes) {
+  const fromMetrics = normalizeList(metricTypes);
+  if (fromMetrics.length) return fromMetrics;
+
+  const fromCredentials = normalizeList(credentials.fields);
+  if (fromCredentials.length) return fromCredentials;
 
   if (process.env.META_DEFAULT_FIELDS) {
-    return process.env.META_DEFAULT_FIELDS
-      .split(',')
-      .map((f) => f.trim())
-      .filter(Boolean);
+    const fromEnv = normalizeList(process.env.META_DEFAULT_FIELDS);
+    if (fromEnv.length) return fromEnv;
   }
 
   return ['impressions', 'clicks', 'spend'];
@@ -71,20 +83,25 @@ function buildTimeRangeParams(range) {
 }
 
 /**
- * fetchAccountMetrics(integration, range?)
+ * fetchAccountMetrics(integration, options?)
  *
  * - integration: registro prisma.Integration com:
  *    - provider/type "meta"
- *    - credentialsJson com accessToken + accountId
- * - range: { since, until } (datas em string "YYYY-MM-DD")
+ *    - settings/credentialsJson com accessToken + accountId
+ * - options:
+ *    - range: { since, until }
+ *    - metricTypes
  *
- * Retorna: Array<{ name: string, value: number }>
+ * Retorna: Array<{ name: string, value: number, collectedAt?: string }>
  */
-async function fetchAccountMetrics(integration, range) {
+async function fetchAccountMetrics(integration, options = {}) {
   if (!integration) {
     safeLog('fetchAccountMetrics chamado sem integration');
     return [];
   }
+
+  const range = options.range || (options.since || options.until ? options : null);
+  const metricTypes = Array.isArray(options.metricTypes) ? options.metricTypes : null;
 
   let credentials = {};
   try {
@@ -111,10 +128,9 @@ async function fetchAccountMetrics(integration, range) {
   }
 
   const level = credentials.level || 'account';
-  const fields = buildFieldsList(credentials);
+  const fields = buildFieldsList(credentials, metricTypes);
   const baseUrl = getBaseUrl();
 
-  // Monta time_range (quando range foi informado)
   const timeRangePayload = buildTimeRangeParams(range);
 
   const params = new URLSearchParams();
@@ -155,6 +171,7 @@ async function fetchAccountMetrics(integration, range) {
     const metrics = [];
 
     for (const row of data) {
+      const collectedAt = row.date_start || row.date || null;
       for (const field of fields) {
         if (row[field] === undefined || row[field] === null) continue;
 
@@ -164,9 +181,12 @@ async function fetchAccountMetrics(integration, range) {
         metrics.push({
           name: field,
           value: numVal,
+          collectedAt,
           meta: {
             provider: 'meta',
             rawField: field,
+            dateStart: row.date_start || null,
+            dateStop: row.date_stop || null,
           },
         });
       }
