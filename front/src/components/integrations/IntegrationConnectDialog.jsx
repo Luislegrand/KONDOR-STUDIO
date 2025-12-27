@@ -40,29 +40,77 @@ export default function IntegrationConnectDialog({
   onOpenChange,
   definition,
   existing,
+  integrations = [],
+  clients = [],
 }) {
   const queryClient = useQueryClient();
   const fields = definition?.fields || [];
+  const isClientScope = definition?.scope === "client";
+  const [selectedClientId, setSelectedClientId] = useState("");
+
+  const effectiveExisting = useMemo(() => {
+    if (!definition) return null;
+    if (!isClientScope) return existing || null;
+    if (!selectedClientId) return null;
+    return (
+      (integrations || []).find(
+        (item) =>
+          item.provider === definition.provider &&
+          item.ownerType === "CLIENT" &&
+          item.clientId === selectedClientId &&
+          (!definition.kind || item.settings?.kind === definition.kind)
+      ) || null
+    );
+  }, [definition, existing, integrations, isClientScope, selectedClientId]);
 
   const initialValues = useMemo(() => {
     const base = {};
     fields.forEach((field) => {
-      base[field.name] = normalizeValue(existing?.settings?.[field.name] ?? "");
+      base[field.name] = normalizeValue(effectiveExisting?.settings?.[field.name] ?? "");
     });
     return base;
-  }, [existing, fields]);
+  }, [effectiveExisting, fields]);
 
   const [formData, setFormData] = useState(initialValues);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (selectedClientId) setSelectedClientId("");
+      return;
+    }
+    if (isClientScope && !selectedClientId && clients.length === 1) {
+      setSelectedClientId(clients[0].id);
+    }
     setFormData(initialValues);
-  }, [open, initialValues]);
+  }, [open, initialValues, isClientScope, clients, selectedClientId]);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       if (!definition) throw new Error("Integração inválida.");
       const settings = buildSettings(fields, formData, definition.kind);
+      if (isClientScope) {
+        if (!selectedClientId) {
+          throw new Error("Selecione um cliente antes de salvar.");
+        }
+        if (effectiveExisting?.id) {
+          return base44.entities.Integration.update(effectiveExisting.id, {
+            status: "CONNECTED",
+            settings,
+          });
+        }
+        return base44.jsonFetch(
+          `/integrations/clients/${selectedClientId}/integrations/${definition.provider}/connect`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              providerName: definition.title,
+              status: "CONNECTED",
+              settings,
+            }),
+          }
+        );
+      }
+
       if (existing?.id) {
         return base44.entities.Integration.update(existing.id, {
           status: "CONNECTED",
@@ -135,6 +183,35 @@ export default function IntegrationConnectDialog({
             }}
             className="space-y-5"
           >
+            {isClientScope ? (
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <select
+                  value={selectedClientId}
+                  onChange={(event) => setSelectedClientId(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required
+                >
+                  <option value="">Selecione um cliente</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+                {clients.length === 0 ? (
+                  <p className="text-[11px] text-amber-600">
+                    Cadastre um cliente antes de conectar esta integração.
+                  </p>
+                ) : null}
+                {effectiveExisting ? (
+                  <p className="text-[11px] text-emerald-700">
+                    Já existe uma conexão para este cliente. Você pode atualizar os dados.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {fields.map((field) => (
               <div key={field.name} className="space-y-2">
                 <Label>{field.label}</Label>
@@ -183,7 +260,10 @@ export default function IntegrationConnectDialog({
               <Button
                 type="submit"
                 className="bg-purple-600 hover:bg-purple-700"
-                disabled={connectMutation.isPending}
+                disabled={
+                  connectMutation.isPending ||
+                  (isClientScope && (!selectedClientId || clients.length === 0))
+                }
               >
                 {connectMutation.isPending ? "Salvando..." : "Salvar conexão"}
               </Button>

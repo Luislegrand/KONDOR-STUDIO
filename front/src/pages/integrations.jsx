@@ -28,6 +28,7 @@ const INTEGRATION_CATALOG = [
     provider: "META",
     ownerKey: "META_BUSINESS",
     kind: "meta_business",
+    scope: "client",
     accentClass: "from-blue-500 to-indigo-500",
     icon: Briefcase,
     dialogDescription:
@@ -63,6 +64,7 @@ const INTEGRATION_CATALOG = [
     provider: "META",
     ownerKey: "META_ADS",
     kind: "meta_ads",
+    scope: "client",
     accentClass: "from-sky-500 to-cyan-500",
     icon: Megaphone,
     dialogDescription:
@@ -97,6 +99,7 @@ const INTEGRATION_CATALOG = [
     provider: "GOOGLE",
     ownerKey: "GA4",
     kind: "google_analytics",
+    scope: "client",
     accentClass: "from-amber-500 to-orange-500",
     icon: BarChart3,
     dialogDescription:
@@ -132,6 +135,7 @@ const INTEGRATION_CATALOG = [
     provider: "WHATSAPP_META_CLOUD",
     ownerKey: "AGENCY",
     kind: "whatsapp_business",
+    scope: "agency",
     accentClass: "from-emerald-500 to-lime-500",
     icon: MessageCircle,
     dialogDescription:
@@ -178,6 +182,7 @@ const INTEGRATION_CATALOG = [
     provider: "TIKTOK",
     ownerKey: "TIKTOK",
     kind: "tiktok",
+    scope: "client",
     accentClass: "from-fuchsia-500 to-rose-500",
     icon: Music,
     dialogDescription:
@@ -219,6 +224,7 @@ const INTEGRATION_CATALOG = [
     provider: "META",
     ownerKey: "INSTAGRAM",
     kind: "instagram_only",
+    scope: "client",
     accentClass: "from-pink-500 to-orange-500",
     icon: Camera,
     dialogDescription:
@@ -271,6 +277,11 @@ export default function Integrations() {
     queryFn: () => base44.entities.Integration.list(),
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => base44.entities.Client.list(),
+  });
+
   const integrationsByKey = useMemo(() => {
     const map = new Map();
     (integrations || []).forEach((integration) => {
@@ -284,12 +295,21 @@ export default function Integrations() {
 
   const connectedCount = useMemo(() => {
     return INTEGRATION_CATALOG.reduce((acc, item) => {
+      if (item.scope === "client") {
+        const matches = (integrations || []).filter(
+          (integration) =>
+            integration.ownerType === "CLIENT" &&
+            integration.provider === item.provider &&
+            (!item.kind || integration.settings?.kind === item.kind)
+        );
+        return acc + (matches.some((entry) => isConnectedStatus(entry.status)) ? 1 : 0);
+      }
       const record = integrationsByKey.get(
         buildIntegrationKey(item.provider, item.ownerKey)
       );
       return acc + (isConnectedStatus(record?.status) ? 1 : 0);
     }, 0);
-  }, [integrationsByKey]);
+  }, [integrations, integrationsByKey]);
 
   const activeDefinition = useMemo(() => {
     return INTEGRATION_CATALOG.find((item) => item.key === activeKey) || null;
@@ -364,9 +384,36 @@ export default function Integrations() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {INTEGRATION_CATALOG.map((integration) => {
-                const record = integrationsByKey.get(
-                  buildIntegrationKey(integration.provider, integration.ownerKey)
+                const record =
+                  integration.scope === "client"
+                    ? null
+                    : integrationsByKey.get(
+                        buildIntegrationKey(integration.provider, integration.ownerKey)
+                      );
+                const clientMatches =
+                  integration.scope === "client"
+                    ? (integrations || []).filter(
+                        (entry) =>
+                          entry.ownerType === "CLIENT" &&
+                          entry.provider === integration.provider &&
+                          (!integration.kind || entry.settings?.kind === integration.kind)
+                      )
+                    : [];
+                const connectedClients = clientMatches.filter((entry) =>
+                  isConnectedStatus(entry.status)
                 );
+                const tileStatus =
+                  integration.scope === "client"
+                    ? connectedClients.length
+                      ? "connected"
+                      : "disconnected"
+                    : record?.status;
+                const tileMeta =
+                  integration.scope === "client"
+                    ? connectedClients.length
+                      ? `${connectedClients.length} cliente(s) conectado(s)`
+                      : "Nenhum cliente conectado"
+                    : null;
                 const Icon = integration.icon;
                 return (
                   <IntegrationTile
@@ -374,11 +421,12 @@ export default function Integrations() {
                     title={integration.title}
                     subtitle={integration.subtitle}
                     description={integration.description}
-                    status={record?.status}
+                    status={tileStatus}
                     accentClass={integration.accentClass}
                     icon={<Icon className="w-5 h-5 text-white" />}
+                    meta={tileMeta}
                     actionLabel={
-                      isConnectedStatus(record?.status) ? "Gerenciar conexão" : "Conectar"
+                      isConnectedStatus(tileStatus) ? "Gerenciar conexão" : "Conectar"
                     }
                     onConnect={() => setActiveKey(integration.key)}
                   />
@@ -395,6 +443,8 @@ export default function Integrations() {
           }}
           definition={activeDefinition}
           existing={activeIntegration}
+          integrations={integrations}
+          clients={clients}
         />
       </div>
     </div>

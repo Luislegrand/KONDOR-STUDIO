@@ -28,6 +28,7 @@ export default function IntegrationTile({
   accentClass,
   onConnect,
   actionLabel,
+  meta,
 }) {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/60 transition-transform hover:-translate-y-1 hover:border-slate-300">
@@ -47,6 +48,9 @@ export default function IntegrationTile({
 
       {description ? (
         <p className="mt-3 text-xs leading-relaxed text-slate-500">{description}</p>
+      ) : null}
+      {meta ? (
+        <p className="mt-2 text-[11px] text-slate-400">{meta}</p>
       ) : null}
 
       <div className="mt-5">
