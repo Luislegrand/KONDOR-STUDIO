@@ -29,6 +29,7 @@ export default function IntegrationTile({
   onConnect,
   actionLabel,
   meta,
+  disabled = false,
 }) {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/60 transition-transform hover:-translate-y-1 hover:border-slate-300">
@@ -56,6 +57,7 @@ export default function IntegrationTile({
       <div className="mt-5">
         <Button
           onClick={onConnect}
+          disabled={disabled}
           className="w-full bg-purple-600 text-white hover:bg-purple-700"
         >
           {actionLabel}

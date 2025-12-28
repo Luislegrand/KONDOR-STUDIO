@@ -290,6 +290,7 @@ function resolveMetaKey(kind) {
 export default function Integrations() {
   const [activeKey, setActiveKey] = useState(null);
   const [initialClientId, setInitialClientId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
   const location = useLocation();
   const queryClient = useQueryClient();
 
@@ -337,6 +338,43 @@ export default function Integrations() {
     }, 0);
   }, [integrations, integrationsByKey]);
 
+  const agencyIntegrations = useMemo(
+    () => INTEGRATION_CATALOG.filter((item) => item.scope === "agency"),
+    []
+  );
+  const clientIntegrations = useMemo(
+    () => INTEGRATION_CATALOG.filter((item) => item.scope === "client"),
+    []
+  );
+
+  const selectedClient = useMemo(
+    () => clients.find((client) => client.id === selectedClientId) || null,
+    [clients, selectedClientId]
+  );
+
+  const agencyConnectedCount = useMemo(() => {
+    return agencyIntegrations.reduce((acc, item) => {
+      const record = integrationsByKey.get(
+        buildIntegrationKey(item.provider, item.ownerKey)
+      );
+      return acc + (isConnectedStatus(record?.status) ? 1 : 0);
+    }, 0);
+  }, [agencyIntegrations, integrationsByKey]);
+
+  const clientConnectedCount = useMemo(() => {
+    if (!selectedClientId) return 0;
+    return clientIntegrations.reduce((acc, item) => {
+      const matches = (integrations || []).filter(
+        (integration) =>
+          integration.ownerType === "CLIENT" &&
+          integration.clientId === selectedClientId &&
+          integration.provider === item.provider &&
+          (!item.kind || integration.settings?.kind === item.kind)
+      );
+      return acc + (matches.some((entry) => isConnectedStatus(entry.status)) ? 1 : 0);
+    }, 0);
+  }, [clientIntegrations, integrations, selectedClientId]);
+
   const activeDefinition = useMemo(() => {
     return INTEGRATION_CATALOG.find((item) => item.key === activeKey) || null;
   }, [activeKey]);
@@ -364,6 +402,19 @@ export default function Integrations() {
       setInitialClientId(clientId || "");
     }
   }, [location.search, queryClient]);
+
+  useEffect(() => {
+    if (selectedClientId) return;
+    if (clients.length === 1) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [clients, selectedClientId]);
+
+  useEffect(() => {
+    if (initialClientId) {
+      setSelectedClientId(initialClientId);
+    }
+  }, [initialClientId]);
 
   const metaBanner = useMemo(() => {
     const params = new URLSearchParams(location.search || "");
@@ -432,17 +483,19 @@ export default function Integrations() {
               Conexões da agência
             </p>
             <h2 className="text-2xl md:text-3xl font-semibold text-slate-900">
-              Adicionar produtos ao seu aplicativo
+              WhatsApp da agência
             </h2>
             <p className="text-sm text-slate-600 max-w-2xl">
-              Selecione a integração desejada para posts, métricas e aprovações. Cada conexão fica
-              vinculada à sua agência e pode ser refinada depois.
+              O WhatsApp é único para a agência e será usado para aprovações dos clientes.
+            </p>
+            <p className="text-xs text-slate-500">
+              {agencyConnectedCount} de {agencyIntegrations.length} integrações conectadas.
             </p>
           </div>
 
           {isLoading ? (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((item) => (
+              {[1].map((item) => (
                 <div
                   key={item}
                   className="h-56 rounded-2xl bg-slate-100 animate-pulse"
@@ -451,37 +504,15 @@ export default function Integrations() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {INTEGRATION_CATALOG.map((integration) => {
+              {agencyIntegrations.map((integration) => {
                 const record =
                   integration.scope === "client"
                     ? null
                     : integrationsByKey.get(
                         buildIntegrationKey(integration.provider, integration.ownerKey)
                       );
-                const clientMatches =
-                  integration.scope === "client"
-                    ? (integrations || []).filter(
-                        (entry) =>
-                          entry.ownerType === "CLIENT" &&
-                          entry.provider === integration.provider &&
-                          (!integration.kind || entry.settings?.kind === integration.kind)
-                      )
-                    : [];
-                const connectedClients = clientMatches.filter((entry) =>
-                  isConnectedStatus(entry.status)
-                );
                 const tileStatus =
-                  integration.scope === "client"
-                    ? connectedClients.length
-                      ? "connected"
-                      : "disconnected"
-                    : record?.status;
-                const tileMeta =
-                  integration.scope === "client"
-                    ? connectedClients.length
-                      ? `${connectedClients.length} cliente(s) conectado(s)`
-                      : "Nenhum cliente conectado"
-                    : null;
+                  integration.scope === "client" ? "disconnected" : record?.status;
                 const Icon = integration.icon;
                 return (
                   <IntegrationTile
@@ -492,7 +523,6 @@ export default function Integrations() {
                     status={tileStatus}
                     accentClass={integration.accentClass}
                     icon={<Icon className="w-5 h-5 text-white" />}
-                    meta={tileMeta}
                     actionLabel={
                       isConnectedStatus(tileStatus) ? "Gerenciar conexão" : "Conectar"
                     }
@@ -507,10 +537,110 @@ export default function Integrations() {
           )}
         </section>
 
+        <section className="rounded-3xl bg-white px-6 py-8 md:px-10 md:py-10 shadow-sm shadow-slate-200/70 border border-slate-200/70">
+          <div className="flex flex-col gap-4 mb-8">
+            <div className="flex flex-col gap-2">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                Conexões do cliente
+              </p>
+              <h2 className="text-2xl md:text-3xl font-semibold text-slate-900">
+                Redes sociais por cliente
+              </h2>
+              <p className="text-sm text-slate-600 max-w-2xl">
+                Cada cliente precisa de suas próprias redes conectadas para posts e métricas.
+              </p>
+              <p className="text-xs text-slate-500">
+                {selectedClientId
+                  ? `${clientConnectedCount} de ${clientIntegrations.length} integrações conectadas`
+                  : `Selecione um cliente para ver as integrações`}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 max-w-md">
+              <label className="text-xs font-semibold text-slate-700">
+                Cliente selecionado
+              </label>
+              <select
+                value={selectedClientId}
+                onChange={(event) => setSelectedClientId(event.target.value)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Selecione um cliente</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              {clients.length === 0 ? (
+                <p className="text-[11px] text-amber-600">
+                  Cadastre um cliente antes de conectar redes sociais.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-56 rounded-2xl bg-slate-100 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {clientIntegrations.map((integration) => {
+                const clientMatches = (integrations || []).filter(
+                  (entry) =>
+                    entry.ownerType === "CLIENT" &&
+                    entry.clientId === selectedClientId &&
+                    entry.provider === integration.provider &&
+                    (!integration.kind || entry.settings?.kind === integration.kind)
+                );
+                const connectedClients = clientMatches.filter((entry) =>
+                  isConnectedStatus(entry.status)
+                );
+                const tileStatus = connectedClients.length ? "connected" : "disconnected";
+                const tileMeta =
+                  selectedClient?.name && selectedClientId
+                    ? `Cliente: ${selectedClient.name}`
+                    : "Selecione um cliente para conectar";
+                const Icon = integration.icon;
+                return (
+                  <IntegrationTile
+                    key={integration.key}
+                    title={integration.title}
+                    subtitle={integration.subtitle}
+                    description={integration.description}
+                    status={tileStatus}
+                    accentClass={integration.accentClass}
+                    icon={<Icon className="w-5 h-5 text-white" />}
+                    meta={tileMeta}
+                    actionLabel={
+                      isConnectedStatus(tileStatus) ? "Gerenciar conexão" : "Conectar"
+                    }
+                    disabled={!selectedClientId}
+                    onConnect={() => {
+                      if (!selectedClientId) return;
+                      setActiveKey(integration.key);
+                      setInitialClientId(selectedClientId);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         <IntegrationConnectDialog
           open={Boolean(activeDefinition)}
           onOpenChange={(openState) => {
-            if (!openState) setActiveKey(null);
+            if (!openState) {
+              setActiveKey(null);
+              setInitialClientId("");
+            }
           }}
           definition={activeDefinition}
           existing={activeIntegration}
