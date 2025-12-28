@@ -16,6 +16,7 @@ function computeExpiry() {
 }
 
 function shouldRequireMfa(user) {
+  if (process.env.ADMIN_MFA_ENABLED === 'false') return false;
   if (!user) return false;
   const role = String(user.role || '').toUpperCase();
   const adminRoles = new Set(['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'TECH']);
