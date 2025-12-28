@@ -16,12 +16,7 @@ function computeExpiry() {
 }
 
 function shouldRequireMfa(user) {
-  if (process.env.ADMIN_MFA_ENABLED === 'false') return false;
-  if (!user) return false;
-  const role = String(user.role || '').toUpperCase();
-  const adminRoles = new Set(['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'TECH']);
-  if (!adminRoles.has(role)) return false;
-  return user.mfaEnabled === true || role === 'SUPER_ADMIN';
+  return false;
 }
 
 async function createChallenge(user, { purpose = 'admin_login', ip = null, userAgent = null } = {}) {
