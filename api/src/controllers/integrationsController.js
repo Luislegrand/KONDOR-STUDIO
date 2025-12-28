@@ -3,13 +3,14 @@ const integrationsService = require('../services/integrationsService');
 module.exports = {
   async list(req, res) {
     try {
-      const { provider, status, clientId, ownerType, ownerKey } = req.query;
+      const { provider, status, clientId, ownerType, ownerKey, kind } = req.query;
       const integrations = await integrationsService.list(req.tenantId, {
         provider,
         status,
         clientId,
         ownerType,
         ownerKey,
+        kind,
       });
       return res.json(integrations);
     } catch (err) {

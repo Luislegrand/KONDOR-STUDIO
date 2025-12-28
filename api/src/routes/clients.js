@@ -77,6 +77,41 @@ router.post('/:clientId/integrations/:provider/connect', async (req, res) => {
 });
 
 /**
+ * GET /clients/:clientId/integrations
+ * Lista integrações vinculadas a um cliente específico
+ * Query params opcionais:
+ *  ?provider=...
+ *  ?status=...
+ *  ?kind=...
+ *  ?page=1
+ *  ?perPage=50
+ */
+router.get('/:clientId/integrations', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { provider, status, kind, page, perPage } = req.query;
+
+    const client = await clientsService.getById(req.tenantId, clientId);
+    if (!client) return res.status(404).json({ error: 'Cliente não encontrado' });
+
+    const result = await integrationsService.list(req.tenantId, {
+      clientId,
+      provider,
+      status,
+      kind,
+      ownerType: 'CLIENT',
+      page: page ? Number(page) : undefined,
+      perPage: perPage ? Number(perPage) : undefined,
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error('GET /clients/:clientId/integrations error:', err);
+    return res.status(500).json({ error: 'Erro ao listar integrações do cliente' });
+  }
+});
+
+/**
  * GET /clients/:id
  * Busca cliente por ID dentro do tenant
  */

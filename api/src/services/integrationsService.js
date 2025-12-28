@@ -68,7 +68,16 @@ async function ensureIntegrationBelongsToTenant(tenantId, integrationId) {
 
 module.exports = {
   async list(tenantId, opts = {}) {
-    const { provider, status, ownerType, ownerKey, clientId, page = 1, perPage = 50 } = opts;
+    const {
+      provider,
+      status,
+      ownerType,
+      ownerKey,
+      clientId,
+      kind,
+      page = 1,
+      perPage = 50,
+    } = opts;
     const where = { tenantId };
 
     if (provider) where.provider = provider;
@@ -80,6 +89,12 @@ module.exports = {
         { clientId },
         { ownerKey: String(clientId), ownerType: 'CLIENT' },
       ];
+    }
+    if (kind) {
+      where.settings = {
+        path: ['kind'],
+        equals: String(kind),
+      };
     }
 
     const skip = (Math.max(1, page) - 1) * perPage;
