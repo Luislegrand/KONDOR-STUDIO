@@ -251,15 +251,8 @@ module.exports = {
    * Lista clientes do tenant com opções de paginação e filtros básicos.
    */
   async list(tenantId, opts = {}) {
-    const { q, page = 1, perPage = 50, tags, clientIds } = opts;
+    const { q, page = 1, perPage = 50, tags } = opts;
     const where = { tenantId };
-
-    if (Array.isArray(clientIds)) {
-      if (clientIds.length === 0) {
-        return { items: [], total: 0, page: 1, perPage, totalPages: 0 };
-      }
-      where.id = { in: clientIds };
-    }
 
     if (q) {
       where.OR = [
@@ -484,22 +477,17 @@ module.exports = {
   /**
    * Busca clientes por campo específico (útil para autosuggest)
    */
-  async suggest(tenantId, term, limit = 10, clientIds = null) {
+  async suggest(tenantId, term, limit = 10) {
     if (!term) return [];
-    const where = {
-      tenantId,
-      OR: [
-        { name: { contains: term, mode: 'insensitive' } },
-        { company: { contains: term, mode: 'insensitive' } },
-        { email: { contains: term, mode: 'insensitive' } },
-      ],
-    };
-    if (Array.isArray(clientIds)) {
-      if (clientIds.length === 0) return [];
-      where.id = { in: clientIds };
-    }
     const items = await prisma.client.findMany({
-      where,
+      where: {
+        tenantId,
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { company: { contains: term, mode: 'insensitive' } },
+          { email: { contains: term, mode: 'insensitive' } },
+        ],
+      },
       orderBy: { name: 'asc' },
       take: limit,
     });

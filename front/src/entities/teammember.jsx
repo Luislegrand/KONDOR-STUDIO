@@ -29,28 +29,29 @@
     "permissions": {
       "type": "object",
       "properties": {
-        "modules": {
-          "type": "object",
-          "properties": {
-            "dashboard": { "type": "boolean", "default": true },
-            "clients": { "type": "boolean", "default": true },
-            "posts": { "type": "boolean", "default": true },
-            "approvals": { "type": "boolean", "default": true },
-            "tasks": { "type": "boolean", "default": true },
-            "metrics": { "type": "boolean", "default": false },
-            "integrations": { "type": "boolean", "default": false },
-            "finance": { "type": "boolean", "default": false },
-            "library": { "type": "boolean", "default": true },
-            "team": { "type": "boolean", "default": false },
-            "settings": { "type": "boolean", "default": false }
-          }
+        "clients": {
+          "type": "boolean",
+          "default": true
         },
-        "clientAccess": {
-          "type": "object",
-          "properties": {
-            "scope": { "type": "string", "default": "all" },
-            "clientIds": { "type": "array", "items": { "type": "string" } }
-          }
+        "posts": {
+          "type": "boolean",
+          "default": true
+        },
+        "tasks": {
+          "type": "boolean",
+          "default": true
+        },
+        "metrics": {
+          "type": "boolean",
+          "default": false
+        },
+        "team": {
+          "type": "boolean",
+          "default": false
+        },
+        "settings": {
+          "type": "boolean",
+          "default": false
         }
       }
     },

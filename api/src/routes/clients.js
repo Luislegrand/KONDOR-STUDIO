@@ -4,20 +4,12 @@ const router = express.Router();
 
 const authMiddleware = require('../middleware/auth');
 const tenantMiddleware = require('../middleware/tenant');
-const {
-  loadTeamAccess,
-  requireTeamPermission,
-  getClientScope,
-  isClientAllowed,
-} = require('../middleware/teamAccess');
 const clientsService = require('../services/clientsService');
 const integrationsService = require('../services/integrationsService');
 
 // Todas as rotas exigem auth + tenant
 router.use(authMiddleware);
 router.use(tenantMiddleware);
-router.use(loadTeamAccess);
-router.use(requireTeamPermission('clients'));
 
 /**
  * GET /clients
@@ -31,7 +23,6 @@ router.use(requireTeamPermission('clients'));
 router.get('/', async (req, res) => {
   try {
     const { q, page, perPage, tags } = req.query;
-    const scope = getClientScope(req);
 
     const parsedTags = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : undefined;
 
@@ -40,7 +31,6 @@ router.get('/', async (req, res) => {
       page: page ? Number(page) : undefined,
       perPage: perPage ? Number(perPage) : undefined,
       tags: parsedTags,
-      clientIds: scope.all ? null : scope.clientIds,
     });
 
     return res.json(result);
@@ -57,12 +47,10 @@ router.get('/', async (req, res) => {
 router.get('/suggest', async (req, res) => {
   try {
     const { q, limit } = req.query;
-    const scope = getClientScope(req);
     const result = await clientsService.suggest(
       req.tenantId,
       q,
-      limit ? Number(limit) : undefined,
-      scope.all ? null : scope.clientIds
+      limit ? Number(limit) : undefined
     );
     return res.json(result);
   } catch (err) {
@@ -74,9 +62,6 @@ router.get('/suggest', async (req, res) => {
 // POST /clients/:clientId/integrations/:provider/connect (stub OAuth/connect)
 router.post('/:clientId/integrations/:provider/connect', async (req, res) => {
   try {
-    if (!isClientAllowed(req, req.params.clientId)) {
-      return res.status(403).json({ error: 'Sem acesso a este cliente' });
-    }
     const { clientId, provider } = req.params;
     const integration = await integrationsService.connectClientIntegration(
       req.tenantId,
@@ -104,9 +89,6 @@ router.post('/:clientId/integrations/:provider/connect', async (req, res) => {
 router.get('/:clientId/integrations', async (req, res) => {
   try {
     const { clientId } = req.params;
-    if (!isClientAllowed(req, clientId)) {
-      return res.status(403).json({ error: 'Sem acesso a este cliente' });
-    }
     const { provider, status, kind, page, perPage } = req.query;
 
     const client = await clientsService.getById(req.tenantId, clientId);
@@ -135,9 +117,6 @@ router.get('/:clientId/integrations', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    if (!isClientAllowed(req, req.params.id)) {
-      return res.status(403).json({ error: 'Sem acesso a este cliente' });
-    }
     const client = await clientsService.getById(req.tenantId, req.params.id);
     if (!client) return res.status(404).json({ error: 'Cliente não encontrado' });
     return res.json(client);
@@ -153,10 +132,6 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const scope = getClientScope(req);
-    if (!scope.all) {
-      return res.status(403).json({ error: 'Sem permissao para criar clientes' });
-    }
     const client = await clientsService.create(req.tenantId, req.body);
     return res.status(201).json(client);
   } catch (err) {
@@ -171,9 +146,6 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    if (!isClientAllowed(req, req.params.id)) {
-      return res.status(403).json({ error: 'Sem acesso a este cliente' });
-    }
     const updated = await clientsService.update(req.tenantId, req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Cliente não encontrado' });
     return res.json(updated);
@@ -189,9 +161,6 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
-    if (!isClientAllowed(req, req.params.id)) {
-      return res.status(403).json({ error: 'Sem acesso a este cliente' });
-    }
     const removed = await clientsService.remove(req.tenantId, req.params.id);
     if (!removed) return res.status(404).json({ error: 'Cliente não encontrado' });
     return res.json({ ok: true });

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.j
 import { Badge } from "@/components/ui/badge.jsx";
 import { Plus, UserCircle, Mail, Shield } from "lucide-react";
 import TeamFormDialog from "../components/team/teamformdialog.jsx";
-import { normalizeTeamAccess } from "@/utils/teamAccess";
 
 const roleLabels = {
   admin: "Administrador",
@@ -126,10 +125,6 @@ export default function Team() {
                 !member._raw ||
                 !member._raw.user ||
                 !member._raw.user.passwordHash;
-              const access = normalizeTeamAccess(
-                member.permissions || {},
-                member._raw?.user?.role || member.role
-              );
 
               return (
                 <Card
@@ -171,14 +166,14 @@ export default function Team() {
                       <span>{member.email}</span>
                     </div>
 
-                    {access && (
+                    {member.permissions && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Shield className="w-4 h-4" />
                           <span className="font-medium">Permissões:</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {Object.entries(access.modules || {})
+                          {Object.entries(member.permissions)
                             .filter(([_, value]) => value)
                             .map(([key]) => (
                               <Badge
@@ -190,11 +185,6 @@ export default function Team() {
                               </Badge>
                             ))}
                         </div>
-                        {access.clientAccess?.scope === "custom" && (
-                          <p className="text-xs text-gray-500">
-                            Acesso limitado a {access.clientAccess.clientIds?.length || 0} cliente(s)
-                          </p>
-                        )}
                       </div>
                     )}
 

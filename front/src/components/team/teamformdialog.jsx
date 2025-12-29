@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/apiClient/base44Client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -12,21 +12,16 @@ import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { ChevronDown } from "lucide-react";
-import { DEFAULT_MODULES, normalizeTeamAccess } from "@/utils/teamAccess";
 
-const MODULE_OPTIONS = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "clients", label: "Clientes" },
-  { key: "posts", label: "Posts" },
-  { key: "approvals", label: "Aprovações" },
-  { key: "tasks", label: "Tarefas" },
-  { key: "metrics", label: "Métricas" },
-  { key: "integrations", label: "Integrações" },
-  { key: "finance", label: "Financeiro" },
-  { key: "library", label: "Biblioteca" },
-  { key: "team", label: "Equipe" },
-  { key: "settings", label: "Configurações" },
-];
+const DEFAULT_PERMISSIONS = {
+  clients: true,
+  posts: true,
+  approvals: true,
+  tasks: true,
+  metrics: false,
+  team: false,
+  settings: false,
+};
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Administrador" },
@@ -98,39 +93,28 @@ function DropdownChip({ value, onChange, options, placeholder }) {
 
 export default function Teamformdialog({ open, onClose, member }) {
   const queryClient = useQueryClient();
-  const [clientSearch, setClientSearch] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     username: "",
     password: "",
     role: "social_media",
-    permissions: {
-      modules: { ...DEFAULT_MODULES },
-      clientAccess: { scope: "all", clientIds: [] },
-    },
+    permissions: { ...DEFAULT_PERMISSIONS },
     salary: "",
-  });
-
-  const { data: clients = [] } = useQuery({
-    queryKey: ["team-form-clients"],
-    queryFn: () => base44.entities.Clients?.list?.({ page: 1, perPage: 200 }),
-    enabled: open,
   });
 
   useEffect(() => {
     if (member) {
-      const normalized = normalizeTeamAccess(
-        member.permissions || {},
-        member._raw?.user?.role || member.role
-      );
       setFormData({
         name: member.name || "",
         email: member.email || "",
         username: member.username || "",
         password: "",
         role: member.role || "social_media",
-        permissions: normalized,
+        permissions: {
+          ...DEFAULT_PERMISSIONS,
+          ...(member.permissions || {}),
+        },
         salary:
           typeof member.salaryCents === "number"
             ? (member.salaryCents / 100).toString()
@@ -143,10 +127,7 @@ export default function Teamformdialog({ open, onClose, member }) {
         username: "",
         password: "",
         role: "social_media",
-        permissions: {
-          modules: { ...DEFAULT_MODULES },
-          clientAccess: { scope: "all", clientIds: [] },
-        },
+        permissions: { ...DEFAULT_PERMISSIONS },
         salary: "",
       });
     }
@@ -192,42 +173,10 @@ export default function Teamformdialog({ open, onClose, member }) {
       ...prev,
       permissions: {
         ...prev.permissions,
-        modules: {
-          ...prev.permissions.modules,
-          [key]: !prev.permissions.modules?.[key],
-        },
+        [key]: !prev.permissions[key],
       },
     }));
   };
-
-  const toggleClient = (clientId) => {
-    setFormData((prev) => {
-      const current = prev.permissions.clientAccess.clientIds || [];
-      const next = current.includes(clientId)
-        ? current.filter((id) => id !== clientId)
-        : [...current, clientId];
-      return {
-        ...prev,
-        permissions: {
-          ...prev.permissions,
-          clientAccess: {
-            ...prev.permissions.clientAccess,
-            clientIds: next,
-          },
-        },
-      };
-    });
-  };
-
-  const visibleClients = clients.filter((client) => {
-    if (!clientSearch) return true;
-    const term = clientSearch.toLowerCase();
-    return (
-      client.name?.toLowerCase().includes(term) ||
-      client.company?.toLowerCase().includes(term) ||
-      client.email?.toLowerCase().includes(term)
-    );
-  });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -334,106 +283,21 @@ export default function Teamformdialog({ open, onClose, member }) {
           <div>
             <Label className="mb-3 block text-gray-900">Permissões</Label>
             <div className="space-y-2 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-              {MODULE_OPTIONS.map((module) => (
-                <div key={module.key} className="flex items-center gap-2">
+              {Object.keys(formData.permissions).map((key) => (
+                <div key={key} className="flex items-center gap-2">
                   <Checkbox
-                    id={module.key}
-                    checked={!!formData.permissions.modules?.[module.key]}
-                    onCheckedChange={() => togglePermission(module.key)}
+                    id={key}
+                    checked={!!formData.permissions[key]}
+                    onCheckedChange={() => togglePermission(key)}
                   />
                   <label
-                    htmlFor={module.key}
+                    htmlFor={key}
                     className="text-sm capitalize cursor-pointer text-gray-900"
                   >
-                    {module.label}
+                    {key.replace("_", " ")}
                   </label>
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div>
-            <Label className="mb-3 block text-gray-900">Acesso aos clientes</Label>
-            <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                    formData.permissions.clientAccess.scope === "all"
-                      ? "bg-purple-600 text-white border-purple-600"
-                      : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      permissions: {
-                        ...prev.permissions,
-                        clientAccess: {
-                          ...prev.permissions.clientAccess,
-                          scope: "all",
-                          clientIds: [],
-                        },
-                      },
-                    }))
-                  }
-                >
-                  Todos os clientes
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                    formData.permissions.clientAccess.scope === "custom"
-                      ? "bg-purple-600 text-white border-purple-600"
-                      : "bg-white text-gray-600 border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      permissions: {
-                        ...prev.permissions,
-                        clientAccess: {
-                          ...prev.permissions.clientAccess,
-                          scope: "custom",
-                        },
-                      },
-                    }))
-                  }
-                >
-                  Selecionar clientes
-                </button>
-              </div>
-
-              {formData.permissions.clientAccess.scope === "custom" && (
-                <>
-                  <Input
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
-                    placeholder="Buscar cliente..."
-                    className="bg-white border-gray-300"
-                  />
-                  <div className="max-h-48 overflow-y-auto space-y-2">
-                    {visibleClients.map((client) => (
-                      <div key={client.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`client-${client.id}`}
-                          checked={formData.permissions.clientAccess.clientIds?.includes(client.id)}
-                          onCheckedChange={() => toggleClient(client.id)}
-                        />
-                        <label
-                          htmlFor={`client-${client.id}`}
-                          className="text-sm cursor-pointer text-gray-900"
-                        >
-                          {client.name}
-                          {client.company ? ` • ${client.company}` : ""}
-                        </label>
-                      </div>
-                    ))}
-                    {visibleClients.length === 0 && (
-                      <p className="text-xs text-gray-500">Nenhum cliente encontrado.</p>
-                    )}
-                  </div>
-                </>
-              )}
             </div>
           </div>
 

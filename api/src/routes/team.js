@@ -4,7 +4,6 @@
 const express = require('express');
 const router = express.Router();
 const teamMembersService = require('../services/teamMembersService');
-const { loadTeamAccess, requireTeamPermission } = require('../middleware/teamAccess');
 
 /**
  * Helper pra garantir tenantId
@@ -17,9 +16,6 @@ function getTenantIdOrFail(req, res) {
   }
   return tenantId;
 }
-
-router.use(loadTeamAccess);
-router.use(requireTeamPermission('team'));
 
 /**
  * GET /api/team

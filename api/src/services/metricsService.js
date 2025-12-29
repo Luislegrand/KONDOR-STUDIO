@@ -39,7 +39,6 @@ module.exports = {
   async list(tenantId, opts = {}) {
     const {
       clientId,
-      clientIds,
       integrationId,
       provider,
       key,
@@ -62,15 +61,6 @@ module.exports = {
         { clientId },
         { post: { clientId } },
         { integration: { clientId } },
-      ];
-    } else if (Array.isArray(clientIds)) {
-      if (clientIds.length === 0) {
-        return { items: [], total: 0, page, perPage, totalPages: 0 };
-      }
-      where.OR = [
-        { clientId: { in: clientIds } },
-        { post: { clientId: { in: clientIds } } },
-        { integration: { clientId: { in: clientIds } } },
       ];
     }
     if (integrationId) where.integrationId = integrationId;
@@ -213,7 +203,6 @@ module.exports = {
       groupBy = 'day',
       metricTypes = null,
       clientId = null,
-      clientIds = null,
       integrationId = null,
       provider = null,
       startDate = null,
@@ -237,14 +226,6 @@ module.exports = {
       joinSql = 'LEFT JOIN "posts" p ON p.id = m."postId" LEFT JOIN "integrations" i ON i.id = m."integrationId"';
       whereSql += ` AND (m."clientId" = $${idx} OR p."clientId" = $${idx} OR i."clientId" = $${idx})`;
       params.push(clientId);
-      idx += 1;
-    } else if (Array.isArray(clientIds)) {
-      if (clientIds.length === 0) {
-        return { buckets: [] };
-      }
-      joinSql = 'LEFT JOIN "posts" p ON p.id = m."postId" LEFT JOIN "integrations" i ON i.id = m."integrationId"';
-      whereSql += ` AND (m."clientId" = ANY($${idx}) OR p."clientId" = ANY($${idx}) OR i."clientId" = ANY($${idx}))`;
-      params.push(clientIds);
       idx += 1;
     }
     if (integrationId) {
@@ -306,7 +287,6 @@ module.exports = {
       days = 7,
       metricTypes = [],
       clientId = null,
-      clientIds = null,
       integrationId = null,
       provider = null,
       startDate = null,
@@ -338,15 +318,6 @@ module.exports = {
         { clientId },
         { post: { clientId } },
         { integration: { clientId } },
-      ];
-    } else if (Array.isArray(clientIds)) {
-      if (clientIds.length === 0) {
-        return { totals: {}, range: { start, end } };
-      }
-      where.OR = [
-        { clientId: { in: clientIds } },
-        { post: { clientId: { in: clientIds } } },
-        { integration: { clientId: { in: clientIds } } },
       ];
     }
     if (integrationId) {

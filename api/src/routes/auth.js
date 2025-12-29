@@ -13,7 +13,6 @@ const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 const { loginSchema, clientLoginSchema } = require('../validators/authValidator');
 const mfaService = require('../services/mfaService');
-const { normalizePermissions } = require('../utils/teamPermissions');
 
 /**
  * Helper: parse expires strings like "30d", "7d", "24h" into a Date
@@ -98,30 +97,6 @@ async function issueAuthTokens({ user, req }) {
   };
 }
 
-async function fetchTeamAccess(user) {
-  if (!user) return null;
-  const role = String(user.role || '').toUpperCase();
-  if (role === 'OWNER' || role === 'ADMIN') {
-    return normalizePermissions(null, role);
-  }
-
-  const teamMember = await prisma.teamMember.findFirst({
-    where: {
-      tenantId: user.tenantId,
-      userId: user.id,
-    },
-    select: {
-      permissions: true,
-      role: true,
-    },
-  });
-
-  return normalizePermissions(
-    teamMember ? teamMember.permissions : null,
-    teamMember?.role || role
-  );
-}
-
 /**
  * POST /auth/login
  */
@@ -137,36 +112,9 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     const { email, password, deviceName } = parseResult.data;
-    const loginInput = String(email || '').trim();
-    const normalizedEmail = loginInput.includes('@')
-      ? loginInput.toLowerCase()
-      : null;
 
     const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          normalizedEmail
-            ? {
-                email: {
-                  equals: normalizedEmail,
-                  mode: 'insensitive',
-                },
-              }
-            : null,
-          {
-            username: {
-              equals: loginInput,
-              mode: 'insensitive',
-            },
-          },
-          {
-            email: {
-              equals: loginInput,
-              mode: 'insensitive',
-            },
-          },
-        ].filter(Boolean),
-      },
+      where: { email },
       select: {
         id: true,
         email: true,
@@ -191,7 +139,6 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         ip: req.ip || null,
         userAgent: req.headers['user-agent'] || null,
       });
-      const teamAccess = await fetchTeamAccess(user);
       return res.json({
         mfaRequired: true,
         challengeId: challenge.challengeId,
@@ -203,13 +150,11 @@ router.post('/login', loginRateLimiter, async (req, res) => {
           name: user.name,
           role: user.role,
           tenantId: user.tenantId,
-          access: teamAccess,
         },
       });
     }
 
     const tokens = await issueAuthTokens({ user, req });
-    const teamAccess = await fetchTeamAccess(user);
 
     return res.json({
       ...tokens,
@@ -219,7 +164,6 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         name: user.name,
         role: user.role,
         tenantId: user.tenantId,
-        access: teamAccess,
       },
     });
   } catch (err) {
@@ -373,7 +317,6 @@ router.post('/mfa/verify', async (req, res) => {
     }
 
     const tokens = await issueAuthTokens({ user, req });
-    const teamAccess = await fetchTeamAccess(user);
 
     return res.json({
       ...tokens,
@@ -383,7 +326,6 @@ router.post('/mfa/verify', async (req, res) => {
         name: user.name,
         role: user.role,
         tenantId: user.tenantId,
-        access: teamAccess,
       },
     });
   } catch (err) {
