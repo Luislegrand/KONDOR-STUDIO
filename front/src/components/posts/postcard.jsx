@@ -10,20 +10,13 @@ import {
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import { Pencil, ChevronDown } from "lucide-react";
+import {
+  getWorkflowStatuses,
+  getWorkflowStatusConfig,
+  resolveWorkflowStatus,
+} from "@/utils/postStatus.js";
 
-const STATUS_OPTIONS = [
-  { value: "DRAFT", label: "Rascunho" },
-  { value: "PENDING_APPROVAL", label: "Aguardando aprovação" },
-  { value: "APPROVED", label: "Aprovado" },
-  { value: "SCHEDULED", label: "Programado" },
-  { value: "PUBLISHED", label: "Publicado" },
-  { value: "ARCHIVED", label: "Arquivado" },
-];
-
-function formatStatusLabel(value) {
-  const found = STATUS_OPTIONS.find((s) => s.value === value);
-  return found ? found.label : value;
-}
+const STATUS_OPTIONS = getWorkflowStatuses();
 
 function formatDate(dt) {
   if (!dt) return null;
@@ -67,7 +60,7 @@ function resolveNetworkLabel(post, integration) {
 
 export default function Postcard({ post, client, integration, onEdit, onStatusChange }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [localStatus, setLocalStatus] = React.useState(post.status);
+  const [localStatus, setLocalStatus] = React.useState(resolveWorkflowStatus(post));
   const triggerRef = React.useRef(null);
   const menuContentRef = React.useRef(null);
   const [menuPosition, setMenuPosition] = React.useState({
@@ -77,8 +70,8 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   });
   const clientFeedback = (post.clientFeedback || "").trim();
   const hasClientFeedback = Boolean(clientFeedback);
-  const awaitingCorrection = post.status === "DRAFT" && hasClientFeedback;
-  const statusLabel = awaitingCorrection ? "Aguardando correção" : formatStatusLabel(localStatus);
+  const statusConfig = getWorkflowStatusConfig(localStatus);
+  const statusLabel = statusConfig.label;
 
   const updateMenuPosition = React.useCallback(() => {
     if (!triggerRef.current) return;
@@ -91,8 +84,8 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   }, []);
 
   useEffect(() => {
-    setLocalStatus(post.status);
-  }, [post.status]);
+    setLocalStatus(resolveWorkflowStatus(post));
+  }, [post]);
 
   const handleStatusChange = (newStatus) => {
     if (!onStatusChange) return;
@@ -168,7 +161,7 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
               </p>
             )}
           </div>
-          <Badge className="text-[10px] bg-purple-50 text-purple-700 border border-purple-100">
+          <Badge className={`text-[10px] border border-transparent ${statusConfig.badge}`}>
             {statusLabel}
           </Badge>
         </div>
@@ -250,10 +243,10 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
             {STATUS_OPTIONS.map((opt) => (
               <button
                 type="button"
-                key={opt.value}
-                onClick={(event) => selectStatus(event, opt.value)}
+                key={opt.key}
+                onClick={(event) => selectStatus(event, opt.key)}
                 className={`w-full rounded-xl px-3 py-2 text-left text-xs transition ${
-                  opt.value === localStatus
+                  opt.key === localStatus
                     ? "bg-purple-50 text-purple-700 font-semibold"
                     : "text-slate-600 hover:bg-slate-50"
                 }`}

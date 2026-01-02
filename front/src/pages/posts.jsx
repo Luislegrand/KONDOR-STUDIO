@@ -8,6 +8,11 @@ import FilterBar from "@/components/ui/filter-bar.jsx";
 import EmptyState from "@/components/ui/empty-state.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
+import {
+  buildStatusPayload,
+  isClientApprovalStatus,
+  resolveWorkflowStatus,
+} from "@/utils/postStatus.js";
 import { Plus } from "lucide-react";
 import Postkanban from "../components/posts/postkanban.jsx";
 import Postformdialog from "../components/posts/postformdialog.jsx";
@@ -91,14 +96,26 @@ export default function Posts() {
     setDialogOpen(true);
   };
 
-  const handleStatusChange = (postId, newStatus) => {
-    if (newStatus === "PENDING_APPROVAL") {
-      sendToApprovalMutation.mutate(postId);
+  const handleStatusChange = async (postId, newStatus) => {
+    const statusPayload = buildStatusPayload(newStatus);
+    const data = {
+      status: statusPayload.status,
+      metadata: statusPayload.metadata,
+    };
+
+    if (isClientApprovalStatus(newStatus)) {
+      try {
+        await updateMutation.mutateAsync({ id: postId, data });
+        await sendToApprovalMutation.mutateAsync(postId);
+      } catch (error) {
+        showError(error);
+      }
       return;
     }
+
     updateMutation.mutate({
       id: postId,
-      data: { status: newStatus },
+      data,
     });
   };
 

@@ -12,6 +12,11 @@ import { Textarea } from "@/components/ui/textarea.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import { Video } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/media.js";
+import {
+  buildStatusPayload,
+  getWorkflowStatuses,
+  resolveWorkflowStatus,
+} from "@/utils/postStatus.js";
 
 function formatDateTimeInput(value) {
   if (!value) return "";
@@ -46,6 +51,7 @@ export default function Postformdialog({
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const workflowStatuses = React.useMemo(() => getWorkflowStatuses(), []);
 
   const resetState = () => {
     const payload = post
@@ -53,7 +59,7 @@ export default function Postformdialog({
           title: post.title || "",
           body: post.body || post.caption || "",
           clientId: post.clientId || "",
-          status: post.status || "DRAFT",
+          status: resolveWorkflowStatus(post) || "DRAFT",
           media_url: post.media_url || post.mediaUrl || "",
           media_type: post.media_type || post.mediaType || "image",
           integrationId:
@@ -263,9 +269,11 @@ export default function Postformdialog({
         mediaUrlToSave = url;
       }
 
+      const statusPayload = buildStatusPayload(formData.status);
       const payload = {
         ...formData,
         media_url: mediaUrlToSave,
+        status: statusPayload.status,
         integrationId: formData.integrationId || null,
         integrationKind: selectedIntegration?.settings?.kind || null,
         integrationProvider: selectedIntegration?.provider || null,
@@ -276,6 +284,10 @@ export default function Postformdialog({
           ? new Date(formData.scheduledDate).toISOString()
           : null,
       };
+
+      if (statusPayload.metadata) {
+        payload.metadata = statusPayload.metadata;
+      }
 
       if (onSubmit) {
         await onSubmit(payload);
@@ -376,15 +388,14 @@ export default function Postformdialog({
             <select
               value={formData.status}
               onChange={handleChange("status")}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
             >
               <option value="">Selecione o status</option>
-              <option value="DRAFT">Rascunho</option>
-              <option value="PENDING_APPROVAL">Aguardando aprovação</option>
-              <option value="APPROVED">Aprovado</option>
-              <option value="SCHEDULED">Programado</option>
-              <option value="PUBLISHED">Publicado</option>
-              <option value="ARCHIVED">Arquivado</option>
+              {workflowStatuses.map((status) => (
+                <option key={status.key} value={status.key}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </div>
 

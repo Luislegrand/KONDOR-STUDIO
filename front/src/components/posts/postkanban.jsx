@@ -1,45 +1,8 @@
 import React from "react";
 import Postcard from "./postcard.jsx";
+import { getWorkflowStatuses, resolveWorkflowStatus } from "@/utils/postStatus.js";
 
-const COLUMNS = [
-  {
-    key: "REVISION_REQUESTED",
-    title: "Aguardando correção",
-    description: "Posts com ajustes solicitados pelo cliente.",
-    filter: (post) => post.status === "DRAFT" && Boolean((post.clientFeedback || "").trim()),
-  },
-  {
-    status: "DRAFT",
-    title: "Rascunho",
-    description: "Ideias e conteúdos em rascunho.",
-    filter: (post) => post.status === "DRAFT" && !Boolean((post.clientFeedback || "").trim()),
-  },
-  {
-    status: "PENDING_APPROVAL",
-    title: "Aguardando aprovação",
-    description: "Posts enviados para o cliente revisar.",
-  },
-  {
-    status: "APPROVED",
-    title: "Aprovado",
-    description: "Pronto para programar ou publicar.",
-  },
-  {
-    status: "SCHEDULED",
-    title: "Programado",
-    description: "Agendado nas plataformas.",
-  },
-  {
-    status: "PUBLISHED",
-    title: "Publicado",
-    description: "Entrou no ar recentemente.",
-  },
-  {
-    status: "ARCHIVED",
-    title: "Arquivado",
-    description: "Itens antigos ou pausados.",
-  },
-];
+const COLUMNS = getWorkflowStatuses();
 
 export default function Postkanban({
   posts = [],
@@ -97,24 +60,25 @@ export default function Postkanban({
       {/* wrapper horizontal */}
       <div className="flex w-full gap-5 overflow-x-auto pb-2">
         {COLUMNS.map((col) => {
-          const columnPosts = (posts || []).filter((post) =>
-            typeof col.filter === "function" ? col.filter(post) : post.status === col.status,
+          const columnPosts = (posts || []).filter(
+            (post) => resolveWorkflowStatus(post) === col.key,
           );
+          const Icon = col.icon;
 
           return (
-            <div
-              key={col.status || col.key}
-              className="min-w-[360px] flex-shrink-0"
-            >
+            <div key={col.key} className="min-w-[360px] flex-shrink-0">
               <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-100 backdrop-blur-md">
                 <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 bg-white/90 pb-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {col.title}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {col.description}
-                    </p>
+                  <div className="flex items-start gap-2">
+                    {Icon ? <Icon className={`mt-0.5 h-4 w-4 ${col.tone}`} /> : null}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {col.label}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {col.description}
+                      </p>
+                    </div>
                   </div>
                   <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
                     {columnPosts.length}

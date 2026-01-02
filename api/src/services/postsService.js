@@ -148,21 +148,54 @@ const POST_STATUSES = new Set([
   'APPROVED',
 ]);
 
+const WORKFLOW_STATUS_ALIASES = {
+  CONTENT: 'IDEA',
+  INTERNAL_APPROVAL: 'IDEA',
+  CLIENT_APPROVAL: 'PENDING_APPROVAL',
+  CHANGES: 'DRAFT',
+  SCHEDULING: 'APPROVED',
+  DONE: 'PUBLISHED',
+  PRODUCTION: 'IDEA',
+  EDITING: 'IDEA',
+};
+
+const WORKFLOW_STATUS_KEYS = new Set([
+  'DRAFT',
+  'CONTENT',
+  'INTERNAL_APPROVAL',
+  'CLIENT_APPROVAL',
+  'CHANGES',
+  'SCHEDULING',
+  'SCHEDULED',
+  'DONE',
+]);
+
 function normalizePostStatusInput(inputStatus) {
   const raw = sanitizeString(inputStatus);
-  if (!raw) return { postStatus: 'DRAFT', approvalOverride: null };
+  if (!raw) return { postStatus: 'DRAFT', approvalOverride: null, workflowStatus: null };
+
+  const normalized = raw.replace(/\s+/g, '_').toUpperCase();
 
   // Se o front mandar "REJECTED", não existe no PostStatus -> vira DRAFT + override no approval
-  if (raw === 'REJECTED') {
-    return { postStatus: 'DRAFT', approvalOverride: 'REJECTED' };
+  if (normalized === 'REJECTED') {
+    return { postStatus: 'DRAFT', approvalOverride: 'REJECTED', workflowStatus: null };
   }
 
-  if (!POST_STATUSES.has(raw)) {
+  const mapped = WORKFLOW_STATUS_ALIASES[normalized] || normalized;
+  if (!POST_STATUSES.has(mapped)) {
     // Evita quebrar Prisma por enum inválido
-    return { postStatus: 'DRAFT', approvalOverride: null };
+    return { postStatus: 'DRAFT', approvalOverride: null, workflowStatus: null };
   }
 
-  return { postStatus: raw, approvalOverride: null };
+  const workflowStatus = WORKFLOW_STATUS_KEYS.has(normalized) ? normalized : null;
+  return { postStatus: mapped, approvalOverride: null, workflowStatus };
+}
+
+function mergeWorkflowStatus(metadata, workflowStatus) {
+  if (!workflowStatus) return metadata;
+  const base = isPlainObject(metadata) ? { ...metadata } : {};
+  base.workflowStatus = workflowStatus;
+  return base;
 }
 
 async function ensureApprovalRequest(tenantId, post, userId) {
@@ -343,7 +376,10 @@ module.exports = {
     if (!clientId) throw new PostValidationError('Selecione um cliente antes de salvar o post');
     if (!mediaUrl) throw new PostValidationError('Envie uma mídia antes de salvar o post');
 
-    const { postStatus, approvalOverride } = normalizePostStatusInput(data.status || 'DRAFT');
+    const { postStatus, approvalOverride, workflowStatus } = normalizePostStatusInput(
+      data.status || 'DRAFT',
+    );
+    const metadataWithStatus = mergeWorkflowStatus(metadata, workflowStatus);
 
     const payload = {
       tenantId,
@@ -358,7 +394,7 @@ module.exports = {
       scheduledDate: toDateOrNull(scheduledDate),
       publishedDate: toDateOrNull(publishedDate),
       platform,
-      metadata,
+      metadata: metadataWithStatus,
       clientFeedback: sanitizeString(data.clientFeedback || data.client_feedback),
       version: Number(data.version || 1),
       history: data.history || null,
@@ -410,6 +446,7 @@ module.exports = {
 
     const updateData = {};
     let approvalOverride = null;
+    let workflowStatus = null;
 
     if (data.title !== undefined) updateData.title = sanitizeString(data.title);
 
@@ -443,6 +480,7 @@ module.exports = {
       const norm = normalizePostStatusInput(data.status);
       updateData.status = norm.postStatus;
       approvalOverride = norm.approvalOverride;
+      workflowStatus = norm.workflowStatus;
       if (norm.postStatus === 'PENDING_APPROVAL') {
         updateData.clientFeedback = null;
       }
@@ -472,6 +510,12 @@ module.exports = {
     const metadataUpdate = buildMetadataForUpdate(existing.metadata, data);
     if (metadataUpdate.hasUpdate) {
       updateData.metadata = metadataUpdate.metadata;
+    }
+    if (workflowStatus) {
+      updateData.metadata = mergeWorkflowStatus(
+        metadataUpdate.hasUpdate ? metadataUpdate.metadata : existing.metadata,
+        workflowStatus,
+      );
     }
 
     const updated = await prisma.post.update({
@@ -546,13 +590,17 @@ module.exports = {
     const existing = await this.getById(tenantId, id);
     if (!existing) return null;
 
-    const { postStatus, approvalOverride } = normalizePostStatusInput(status);
+    const { postStatus, approvalOverride, workflowStatus } =
+      normalizePostStatusInput(status);
 
     if (existing.status === postStatus && !approvalOverride) return existing;
 
     const statusUpdate = {
       status: postStatus,
     };
+    if (workflowStatus) {
+      statusUpdate.metadata = mergeWorkflowStatus(existing.metadata, workflowStatus);
+    }
     if (postStatus === 'PENDING_APPROVAL') {
       statusUpdate.clientFeedback = null;
     }
