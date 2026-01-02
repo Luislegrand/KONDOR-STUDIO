@@ -2,13 +2,17 @@
 const { Queue } = require('bullmq');
 const Redis = require('ioredis');
 
-const connection = new Redis(process.env.REDIS_URL);
+const redisDisabled = process.env.REDIS_DISABLED === 'true' || process.env.NODE_ENV === 'test';
+
+const connection = redisDisabled ? null : new Redis(process.env.REDIS_URL);
+
+const createQueue = (name) => (redisDisabled ? null : new Queue(name, { connection }));
 
 // Filas principais do sistema
-const metricsSyncQueue = new Queue('metrics-sync', { connection });
-const reportsQueue = new Queue('reports-generation', { connection });
-const whatsappQueue = new Queue('whatsapp-automation', { connection });
-const publishingQueue = new Queue('posts-publish', { connection });
+const metricsSyncQueue = createQueue('metrics-sync');
+const reportsQueue = createQueue('reports-generation');
+const whatsappQueue = createQueue('whatsapp-automation');
+const publishingQueue = createQueue('posts-publish');
 
 module.exports = {
   metricsSyncQueue,

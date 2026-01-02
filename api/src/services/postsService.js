@@ -989,3 +989,12 @@ module.exports = {
 };
 
 module.exports.PostValidationError = PostValidationError;
+module.exports._internal = {
+  normalizeWorkflowStatus,
+  resolveWorkflowStatusFromPost,
+  normalizeStatusFilters,
+  applyWorkflowStatusFilter,
+  resolvePostDate,
+  buildDateRangeFilter,
+  mapPostSummary,
+};
