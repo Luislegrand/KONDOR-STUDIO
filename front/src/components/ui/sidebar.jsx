@@ -35,7 +35,7 @@ export function Sidebar({ className = "", children }) {
 
   return (
     <aside
-      className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-200 ${
+      className={`flex h-screen flex-col bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-200 ${
         collapsed ? "w-16" : "w-64"
       } ${className}`}
     >
@@ -46,7 +46,7 @@ export function Sidebar({ className = "", children }) {
 
 export function SidebarHeader({ className = "", children }) {
   return (
-    <div className={`border-b px-4 py-3 ${className}`}>
+    <div className={`border-b border-[var(--border)] px-4 py-3 ${className}`}>
       {children}
     </div>
   );
@@ -62,7 +62,7 @@ export function SidebarContent({ className = "", children }) {
 
 export function SidebarFooter({ className = "", children }) {
   return (
-    <div className={`border-t px-4 py-3 ${className}`}>
+    <div className={`border-t border-[var(--border)] px-4 py-3 ${className}`}>
       {children}
     </div>
   );
@@ -80,7 +80,9 @@ export function SidebarGroupContent({ className = "", children }) {
 
 export function SidebarGroupLabel({ className = "", children }) {
   return (
-    <div className={`px-3 pb-1 pt-3 text-xs font-semibold text-gray-500 ${className}`}>
+    <div
+      className={`px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)] ${className}`}
+    >
       {children}
     </div>
   );
@@ -100,7 +102,7 @@ export function SidebarMenuButton({ className = "", children, ...props }) {
   return (
     <button
       type="button"
-      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-100 text-sm ${className}`}
+      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-muted)] ${className}`}
       {...props}
     >
       {children}
@@ -117,7 +119,7 @@ export function SidebarTrigger({ className = "", children, ...props }) {
     <button
       type="button"
       onClick={toggleCollapsed}
-      className={`inline-flex items-center justify-center rounded-md border px-2 py-1 text-xs hover:bg-gray-100 ${className}`}
+      className={`inline-flex items-center justify-center rounded-[10px] border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-muted)] ${className}`}
       {...props}
     >
       {children}

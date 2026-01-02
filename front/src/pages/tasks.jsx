@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import { Button } from "@/components/ui/button.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import { Plus } from "lucide-react";
 import Taskboard from "../components/tasks/taskboard.jsx";
 import Taskformdialog from "../components/tasks/taskformdialog.jsx";
@@ -103,26 +105,18 @@ export default function Tasks() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Tarefas</h1>
-            <p className="text-gray-600">
-              Organize o fluxo de trabalho da sua agência
-            </p>
-          </div>
-
-          <Button
-            onClick={handleNew}
-            className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Tarefa
+    <PageShell>
+      <PageHeader
+        title="Tarefas"
+        subtitle="Organize o fluxo de trabalho da sua agencia."
+        actions={
+          <Button leftIcon={Plus} onClick={handleNew}>
+            Nova tarefa
           </Button>
-        </div>
+        }
+      />
 
-        {/* Taskboard */}
+      <div className="mt-6">
         <Taskboard
           tasks={tasks}
           clients={clients}
@@ -131,21 +125,20 @@ export default function Tasks() {
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
         />
-
-        {/* Dialog */}
-        <Taskformdialog
-          open={dialogOpen}
-          onClose={handleCloseDialog}
-          onSubmit={handleSubmitForm}
-          task={editingTask}
-          clients={clients}
-          isSaving={saveMutation.isPending}
-          onDelete={
-            editingTask ? () => handleDelete(editingTask.id) : undefined
-          }
-          isDeleting={deleteMutation.isPending}
-        />
       </div>
-    </div>
+
+      <Taskformdialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        onSubmit={handleSubmitForm}
+        task={editingTask}
+        clients={clients}
+        isSaving={saveMutation.isPending}
+        onDelete={
+          editingTask ? () => handleDelete(editingTask.id) : undefined
+        }
+        isDeleting={deleteMutation.isPending}
+      />
+    </PageShell>
   );
 }

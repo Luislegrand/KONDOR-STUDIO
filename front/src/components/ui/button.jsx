@@ -1,25 +1,62 @@
 // front/src/components/ui/button.jsx
 import React from "react";
-
-/**
- * Botão base usado em todo o painel
- * - Usa Tailwind
- * - Aceita className extra
- * - Repassa qualquer prop pro <button>
- */
-export function Button({ className = "", children, ...props }) {
+import { cn } from "@/utils/classnames.js";
+export function Button({
+  className = "",
+  variant = "primary",
+  size = "md",
+  isLoading = false,
+  disabled,
+  leftIcon: LeftIcon,
+  children,
+  ...props
+}) {
   const baseClasses =
-    "inline-flex items-center justify-center rounded-lg border border-transparent " +
-    "px-4 py-2 text-sm font-medium shadow-sm transition-colors " +
+    "inline-flex items-center justify-center gap-2 border text-sm font-semibold transition-colors " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " +
-    "focus-visible:ring-purple-500 disabled:opacity-60 disabled:cursor-not-allowed";
+    "focus-visible:ring-[rgba(109,40,217,0.35)] disabled:opacity-50 disabled:cursor-not-allowed";
+
+  const variantClasses = {
+    primary:
+      "bg-[var(--primary)] border-transparent text-white hover:bg-[var(--primary-dark)]",
+    default:
+      "bg-[var(--primary)] border-transparent text-white hover:bg-[var(--primary-dark)]",
+    secondary:
+      "bg-white border-[var(--border)] text-[var(--text)] hover:bg-slate-50",
+    outline:
+      "bg-white border-[var(--border)] text-[var(--text)] hover:bg-slate-50",
+    ghost:
+      "bg-transparent border-transparent text-[var(--text-muted)] hover:bg-slate-100 hover:text-[var(--text)]",
+    danger: "bg-red-600 border-transparent text-white hover:bg-red-700",
+    link: "bg-transparent border-transparent text-[var(--primary)] underline-offset-4 hover:underline",
+  };
+
+  const sizeClasses = {
+    sm: "h-8 px-3 rounded-[10px] text-xs",
+    md: "h-10 px-4 rounded-[12px]",
+    lg: "h-12 px-5 rounded-[12px] text-base",
+  };
+
+  const isDisabled = disabled || isLoading;
 
   return (
     <button
-      className={`${baseClasses} bg-purple-600 text-white hover:bg-purple-700 ${className}`}
+      className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+      disabled={isDisabled}
+      aria-busy={isLoading}
       {...props}
     >
-      {children}
+      {isLoading ? (
+        <span className="flex items-center gap-2">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span>{children}</span>
+        </span>
+      ) : (
+        <>
+          {LeftIcon ? <LeftIcon className="h-4 w-4" /> : null}
+          {children}
+        </>
+      )}
     </button>
   );
 }

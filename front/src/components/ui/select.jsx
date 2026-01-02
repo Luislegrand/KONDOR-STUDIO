@@ -119,7 +119,7 @@ export function SelectTrigger({ children, className = "", onClick, ...props }) {
     <button
       type="button"
       className={
-        "flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 " +
+        "flex h-10 w-full items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)] " +
         className
       }
       {...props}
@@ -147,7 +147,7 @@ export function SelectContent({ children, className = "", ...props }) {
   return (
     <div
       className={
-        "absolute left-0 right-0 mt-1 z-50 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg " +
+        "absolute left-0 right-0 mt-1 z-50 max-h-60 w-full overflow-auto rounded-[10px] border border-[var(--border)] bg-white p-1 shadow-lg " +
         className
       }
       {...props}
@@ -183,8 +183,8 @@ export function SelectItem({ children, value, className = "", onClick, ...props 
       data-value={value}
       onClick={handleClick}
       className={
-        "cursor-pointer rounded-sm px-2 py-1.5 text-sm hover:bg-purple-50 " +
-        (isSelected ? "bg-purple-50 text-purple-700" : "text-gray-800") +
+        "cursor-pointer rounded-[8px] px-2 py-1.5 text-sm hover:bg-[var(--primary-light)] " +
+        (isSelected ? "bg-[var(--primary-light)] text-[var(--primary)]" : "text-gray-800") +
         " " +
         className
       }

@@ -4,6 +4,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
+import EmptyState from "@/components/ui/empty-state.jsx";
 import { Plus, UserCircle, Mail, Shield } from "lucide-react";
 import TeamFormDialog from "../components/team/teamformdialog.jsx";
 
@@ -78,22 +81,18 @@ export default function Team() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Equipe</h1>
-            <p className="text-gray-600">Gerencie os membros da sua agência</p>
-          </div>
-          <Button
-            onClick={() => setDialogOpen(true)}
-            className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Membro
+    <PageShell>
+      <PageHeader
+        title="Equipe"
+        subtitle="Gerencie os membros da sua agencia."
+        actions={
+          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+            Adicionar membro
           </Button>
-        </div>
+        }
+      />
 
+      <div className="mt-6">
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(3)].map((_, i) => (
@@ -103,21 +102,16 @@ export default function Team() {
             ))}
           </div>
         ) : team.length === 0 ? (
-          <Card className="border-2 border-dashed border-gray-300">
-            <CardContent className="py-16 text-center">
-              <UserCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Nenhum membro cadastrado
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Adicione membros da sua equipe
-              </p>
-              <Button onClick={() => setDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Primeiro Membro
+          <EmptyState
+            title="Nenhum membro cadastrado"
+            description="Adicione membros da sua equipe para colaborar no fluxo."
+            icon={UserCircle}
+            action={
+              <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+                Adicionar primeiro membro
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {team.map((member) => {
@@ -127,11 +121,8 @@ export default function Team() {
                 !member._raw.user.passwordHash;
 
               return (
-                <Card
-                  key={member.id}
-                  className="hover:shadow-lg transition-shadow"
-                >
-                  <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100">
+                <Card key={member.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="bg-[var(--surface-muted)]">
                     <div className="flex items-center gap-4">
                       {member.avatar_url ? (
                         <img
@@ -140,19 +131,17 @@ export default function Team() {
                           className="w-16 h-16 rounded-full"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-[var(--primary)] flex items-center justify-center">
                           <span className="text-white font-bold text-2xl">
                             {member.name[0]}
                           </span>
                         </div>
                       )}
                       <div className="flex-1">
-                        <CardTitle className="text-lg">
-                          {member.name}
-                        </CardTitle>
+                        <CardTitle className="text-lg">{member.name}</CardTitle>
                         <Badge
                           className={`${roleColors[member.role]} mt-2`}
-                          variant="secondary"
+                          variant="default"
                         >
                           {roleLabels[member.role] || member.role}
                         </Badge>
@@ -170,17 +159,13 @@ export default function Team() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Shield className="w-4 h-4" />
-                          <span className="font-medium">Permissões:</span>
+                          <span className="font-medium">Permissoes:</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(member.permissions)
                             .filter(([_, value]) => value)
                             .map(([key]) => (
-                              <Badge
-                                key={key}
-                                variant="outline"
-                                className="text-xs"
-                              >
+                              <Badge key={key} variant="outline" className="text-xs">
                                 {key}
                               </Badge>
                             ))}
@@ -201,7 +186,7 @@ export default function Team() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-red-600 hover:bg-red-50"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDelete(member.id)}
                         >
                           Remover
@@ -210,7 +195,6 @@ export default function Team() {
                       {canSendInvite && (
                         <Button
                           size="sm"
-                          className="w-full bg-purple-600 hover:bg-purple-700"
                           disabled={inviteMutation.isPending}
                           onClick={() => handleSendInvite(member)}
                         >
@@ -226,13 +210,13 @@ export default function Team() {
             })}
           </div>
         )}
-
-        <TeamFormDialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          member={editingMember}
-        />
       </div>
-    </div>
+
+      <TeamFormDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        member={editingMember}
+      />
+    </PageShell>
   );
 }

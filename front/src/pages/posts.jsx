@@ -2,6 +2,12 @@ import React, { useMemo, useState } from "react";
 import { base44 } from "@/apiClient/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
+import FilterBar from "@/components/ui/filter-bar.jsx";
+import EmptyState from "@/components/ui/empty-state.jsx";
+import { Label } from "@/components/ui/label.jsx";
+import { Input } from "@/components/ui/input.jsx";
 import { Plus } from "lucide-react";
 import Postkanban from "../components/posts/postkanban.jsx";
 import Postformdialog from "../components/posts/postformdialog.jsx";
@@ -128,81 +134,66 @@ export default function Posts() {
   }, [posts, selectedClientId, dateStart, dateEnd]);
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-[1600px] mx-auto">
-        <div className="flex flex-col gap-4 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Posts</h1>
-              <p className="text-gray-600">
-                Gerencie o fluxo de criação e aprovação
-              </p>
-            </div>
-            <Button
-              onClick={() => setDialogOpen(true)}
-              className="self-start md:self-auto bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Post
-            </Button>
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Posts"
+        subtitle="Gerencie o fluxo de criacao e aprovacao."
+        actions={
+          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+            Novo post
+          </Button>
+        }
+      />
 
-          <div className="grid gap-4 md:grid-cols-[minmax(260px,360px)_minmax(160px,200px)_minmax(160px,200px)] items-end">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-700">
-                Cliente
-              </label>
-              <select
-                value={selectedClientId}
-                onChange={(event) => setSelectedClientId(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">Selecione um cliente</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-              {clients.length === 0 ? (
-                <p className="text-[11px] text-amber-600">
-                  Cadastre um cliente antes de visualizar posts.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-700">
-                Data inicial
-              </label>
-              <input
-                type="date"
-                value={dateStart}
-                onChange={(event) => setDateStart(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                disabled={!selectedClientId}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-700">
-                Data final
-              </label>
-              <input
-                type="date"
-                value={dateEnd}
-                onChange={(event) => setDateEnd(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                disabled={!selectedClientId}
-              />
-            </div>
-          </div>
+      <FilterBar className="mt-6">
+        <div className="min-w-[220px] flex-1">
+          <Label>Cliente</Label>
+          <select
+            value={selectedClientId}
+            onChange={(event) => setSelectedClientId(event.target.value)}
+            className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
+          >
+            <option value="">Selecione um cliente</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+          {clients.length === 0 ? (
+            <p className="text-[11px] text-amber-600 mt-1">
+              Cadastre um cliente antes de visualizar posts.
+            </p>
+          ) : null}
         </div>
 
+        <div className="min-w-[160px]">
+          <Label>Data inicial</Label>
+          <Input
+            type="date"
+            value={dateStart}
+            onChange={(event) => setDateStart(event.target.value)}
+            disabled={!selectedClientId}
+          />
+        </div>
+
+        <div className="min-w-[160px]">
+          <Label>Data final</Label>
+          <Input
+            type="date"
+            value={dateEnd}
+            onChange={(event) => setDateEnd(event.target.value)}
+            disabled={!selectedClientId}
+          />
+        </div>
+      </FilterBar>
+
+      <div className="mt-6">
         {!selectedClientId ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center text-sm text-slate-500">
-            Selecione um cliente para visualizar os posts.
-          </div>
+          <EmptyState
+            title="Selecione um cliente"
+            description="Escolha um cliente para visualizar os posts."
+          />
         ) : (
           <Postkanban
             posts={filteredPosts}
@@ -213,23 +204,21 @@ export default function Posts() {
             isLoading={isLoading}
           />
         )}
-
-        <Postformdialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          post={editingPost}
-          clients={clients}
-          integrations={integrations}
-          onSubmit={handleSubmit}
-          isSaving={isSaving}
-          onDelete={
-            editingPost
-              ? () => deleteMutation.mutate(editingPost.id)
-              : undefined
-          }
-          isDeleting={deleteMutation.isPending}
-        />
       </div>
-    </div>
+
+      <Postformdialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        post={editingPost}
+        clients={clients}
+        integrations={integrations}
+        onSubmit={handleSubmit}
+        isSaving={isSaving}
+        onDelete={
+          editingPost ? () => deleteMutation.mutate(editingPost.id) : undefined
+        }
+        isDeleting={deleteMutation.isPending}
+      />
+    </PageShell>
   );
 }

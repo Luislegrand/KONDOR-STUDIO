@@ -8,6 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
+import EmptyState from "@/components/ui/empty-state.jsx";
 import { Plus, Building2 } from "lucide-react";
 import ClientFormDialog from "../components/clients/clientformdialog.jsx";
 import ClientCard from "../components/clients/clientcard.jsx";
@@ -81,26 +84,18 @@ export default function Clients() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Clientes
-            </h1>
-            <p className="text-gray-600">
-              Gerencie sua carteira de clientes
-            </p>
-          </div>
-          <Button
-            onClick={() => setDialogOpen(true)}
-            className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Cliente
+    <PageShell>
+      <PageHeader
+        title="Clientes"
+        subtitle="Gerencie sua carteira de clientes."
+        actions={
+          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+            Novo cliente
           </Button>
-        </div>
+        }
+      />
 
+      <div className="mt-6">
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -117,25 +112,16 @@ export default function Clients() {
             ))}
           </div>
         ) : clients.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-dashed border-purple-200">
-            <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 mb-4">
-              <Building2 className="w-8 h-8 text-purple-500" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Nenhum cliente cadastrado
-            </h2>
-            <p className="text-gray-500 mb-6">
-              Comece adicionando seu primeiro cliente para organizar sua
-              operação.
-            </p>
-            <Button
-              onClick={() => setDialogOpen(true)}
-              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Cliente
-            </Button>
-          </div>
+          <EmptyState
+            title="Nenhum cliente cadastrado"
+            description="Adicione seu primeiro cliente para organizar a operacao."
+            icon={Building2}
+            action={
+              <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+                Adicionar cliente
+              </Button>
+            }
+          />
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {clients.map((client) => (
@@ -148,15 +134,15 @@ export default function Clients() {
             ))}
           </div>
         )}
-
-        <ClientFormDialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          client={editingClient}
-          onSubmit={handleFormSubmit}
-          submitting={saveMutation.isLoading}
-        />
       </div>
-    </div>
+
+      <ClientFormDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        client={editingClient}
+        onSubmit={handleFormSubmit}
+        submitting={saveMutation.isLoading}
+      />
+    </PageShell>
   );
 }

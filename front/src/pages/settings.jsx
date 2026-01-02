@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.j
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import { Upload, Palette, Building2, CreditCard, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -75,48 +77,46 @@ export default function Settings() {
   const currentLimits = planLimits[tenant?.plan] || planLimits.starter;
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Configurações</h1>
-          <p className="text-gray-600">Personalize sua agência e plano</p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Configuracoes"
+        subtitle="Personalize sua agencia e plano."
+      />
 
-        {/* Plano Atual */}
-        <Card className="mb-6 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+      <div className="mt-6 max-w-4xl">
+        <Card className="mb-6 bg-[var(--surface-muted)] border-[var(--border)]">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Zap className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-[var(--primary-light)] flex items-center justify-center text-[var(--primary)]">
+                  <Zap className="w-6 h-6" />
                 </div>
                 <div>
-                  <CardTitle className="text-purple-900">
+                  <CardTitle className="text-[var(--text)]">
                     Plano {tenant?.plan ? tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1) : 'Starter'}
                   </CardTitle>
-                  <p className="text-sm text-purple-700">
+                  <p className="text-sm text-[var(--text-muted)]">
                     {tenant?.subscription_status === 'trial' ? '🎉 Período de teste ativo' : 'Assinatura ativa'}
                   </p>
                 </div>
               </div>
               <Button
                 onClick={() => navigate(createPageUrl("Pricing"))}
-                className="bg-purple-600 hover:bg-purple-700"
+                leftIcon={CreditCard}
               >
-                <CreditCard className="w-4 h-4 mr-2" />
                 Ver Planos
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/60 rounded-lg p-3">
-                <p className="text-sm text-purple-700">Limite de Clientes</p>
-                <p className="text-2xl font-bold text-purple-900">{currentLimits.clients}</p>
+              <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
+                <p className="text-sm text-gray-600">Limite de Clientes</p>
+                <p className="text-2xl font-bold text-gray-900">{currentLimits.clients}</p>
               </div>
-              <div className="bg-white/60 rounded-lg p-3">
-                <p className="text-sm text-purple-700">Usuários Internos</p>
-                <p className="text-2xl font-bold text-purple-900">{currentLimits.users}</p>
+              <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
+                <p className="text-sm text-gray-600">Usuarios Internos</p>
+                <p className="text-2xl font-bold text-gray-900">{currentLimits.users}</p>
               </div>
             </div>
           </CardContent>
@@ -126,7 +126,7 @@ export default function Settings() {
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-600" />
+              <Building2 className="w-5 h-5 text-[var(--primary)]" />
               <CardTitle>Identidade da Agência</CardTitle>
             </div>
             <p className="text-sm text-gray-600">
@@ -235,7 +235,6 @@ export default function Settings() {
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  className="bg-purple-600 hover:bg-purple-700"
                   disabled={updateMutation.isPending || uploading}
                 >
                   {updateMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
@@ -245,6 +244,6 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageShell>
   );
 }

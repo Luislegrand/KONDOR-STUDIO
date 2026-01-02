@@ -22,7 +22,7 @@ export function Checkbox({
     <input
       type="checkbox"
       className={
-        "h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 " +
+        "h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[rgba(109,40,217,0.2)] " +
         className
       }
       checked={checked}

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "../apiClient/base44Client";
 import { Button } from "@/components/ui/button.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import { Plus } from "lucide-react";
 import Financeformdialog from "../components/finance/financeformdialog.jsx";
 import Financetable from "../components/finance/financetable.jsx";
@@ -101,39 +103,25 @@ export default function Financeiro() {
   const balance = totalIncome - totalCosts;
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Financeiro
-            </h1>
-            <p className="text-gray-600">
-              Acompanhe os lançamentos financeiros por cliente.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Financeiro"
+        subtitle="Acompanhe os lancamentos financeiros por cliente."
+        actions={
           <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={handleNewCost}
-              variant="outline"
-              className="rounded-full border-purple-200 text-purple-700 hover:bg-purple-50"
-            >
-              <Plus className="w-4 h-4 mr-2" />
+            <Button variant="secondary" leftIcon={Plus} onClick={handleNewCost}>
               Novo custo
             </Button>
-            <Button
-              onClick={handleNew}
-              className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo lançamento
+            <Button leftIcon={Plus} onClick={handleNew}>
+              Novo lancamento
             </Button>
           </div>
-        </div>
+        }
+      />
 
-        {/* Cards de resumo */}
+      <div className="mt-6 space-y-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <Card className="border border-purple-100">
+          <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
                 Receitas (income)
@@ -146,7 +134,7 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
-          <Card className="border border-purple-100">
+          <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
                 Custos (expense)
@@ -158,7 +146,7 @@ export default function Financeiro() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-purple-100">
+          <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
                 Outros lançamentos
@@ -171,7 +159,7 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
-          <Card className="border border-purple-100">
+          <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
                 Total de lançamentos
@@ -184,7 +172,7 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
-          <Card className="border border-purple-100">
+          <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-gray-500">
                 Saldo (receitas - custos)
@@ -219,6 +207,6 @@ export default function Financeiro() {
           initialType={defaultType}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

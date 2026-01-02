@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import {
   TrendingUp,
   DollarSign,
@@ -530,16 +532,14 @@ export default function Metrics() {
   }, [metricIntegrations, clientMap, selectedClient]);
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Métricas</h1>
-          <p className="text-gray-600">
-            Selecione o cliente, a integração e as métricas para gerar relatórios completos.
-          </p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Métricas"
+        subtitle="Selecione o cliente, a integracao e as metricas para gerar relatorios completos."
+      />
 
-        <Card className="border border-purple-100 mb-8">
+      <div className="mt-6">
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-base font-semibold text-gray-900">
               Configurar métricas e relatórios
@@ -815,6 +815,6 @@ export default function Metrics() {
           </Card>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

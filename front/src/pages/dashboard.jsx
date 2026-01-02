@@ -1,9 +1,11 @@
-                                                                 import React from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import {
   Activity,
   Users,
@@ -73,47 +75,40 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Visão geral
-            </h1>
-            <p className="text-gray-600">
-              Acompanhe rapidamente o desempenho da sua agência.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Visão geral"
+        subtitle="Acompanhe rapidamente o desempenho da sua agência."
+        actions={
           <div className="flex items-center gap-3">
-            {isLoading && (
+            {isLoading ? (
               <Badge
                 variant="outline"
-                className="flex items-center gap-2 text-xs text-gray-600"
+                className="flex items-center gap-2 text-xs"
               >
                 <Clock className="w-3 h-3" />
                 Atualizando dados...
               </Badge>
-            )}
+            ) : null}
             <Button
-              variant="outline"
-              className="flex items-center gap-2"
+              variant="secondary"
+              leftIcon={RefreshCw}
               onClick={handleGlobalRefresh}
             >
-              <RefreshCw className="w-4 h-4" />
               Atualizar
             </Button>
           </div>
-        </div>
+        }
+      />
 
-        {/* Cards principais */}
+      <div className="mt-6 space-y-8">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
                 Clientes
               </CardTitle>
-              <Users className="w-5 h-5 text-purple-500" />
+              <Users className="w-5 h-5 text-[var(--primary)]" />
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-gray-900">
@@ -130,7 +125,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">
                 Posts
               </CardTitle>
-              <FileText className="w-5 h-5 text-purple-500" />
+              <FileText className="w-5 h-5 text-[var(--primary)]" />
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-gray-900">
@@ -149,7 +144,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">
                 Tarefas
               </CardTitle>
-              <CheckSquare className="w-5 h-5 text-purple-500" />
+              <CheckSquare className="w-5 h-5 text-[var(--primary)]" />
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-gray-900">
@@ -168,7 +163,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">
                 Equipe
               </CardTitle>
-              <Activity className="w-5 h-5 text-purple-500" />
+              <Activity className="w-5 h-5 text-[var(--primary)]" />
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-gray-900">
@@ -181,7 +176,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Placeholder de próximas seções */}
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="h-full">
             <CardHeader>
@@ -221,6 +215,6 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

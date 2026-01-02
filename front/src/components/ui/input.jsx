@@ -1,15 +1,11 @@
 // front/src/components/ui/input.jsx
 import React from "react";
 
-/**
- * Input base usado nos formulários
- */
-
 export function Input({ className = "", ...props }) {
   const baseClasses =
-    "block w-full rounded-lg border border-gray-300 bg-white " +
-    "px-3 py-2 text-sm text-gray-900 shadow-sm " +
-    "focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 " +
+    "block w-full h-10 rounded-[10px] border border-[var(--border)] bg-white " +
+    "px-3 text-sm text-[var(--text)] shadow-sm " +
+    "focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)] focus:border-[var(--primary)] " +
     "placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed";
 
   return <input className={`${baseClasses} ${className}`} {...props} />;

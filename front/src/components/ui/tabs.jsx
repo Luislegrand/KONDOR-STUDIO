@@ -32,7 +32,7 @@ export function TabsList({ children, className = "" }) {
   return (
     <div
       className={
-        "inline-flex items-center rounded-lg bg-gray-100 p-1 text-gray-500 " +
+        "inline-flex items-center rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-1 text-[var(--text-muted)] " +
         className
       }
     >
@@ -56,10 +56,10 @@ export function TabsTrigger({ value, children, className = "" }) {
       type="button"
       onClick={() => ctx.setValue(value)}
       className={
-        "px-3 py-1.5 text-sm font-medium rounded-md transition-colors " +
+        "px-3 py-1.5 text-sm font-medium rounded-[10px] transition-colors " +
         (isActive
-          ? "bg-white text-purple-600 shadow-sm"
-          : "text-gray-500 hover:text-gray-800 hover:bg-gray-200") +
+          ? "bg-white text-[var(--primary)] shadow-[var(--shadow-sm)]"
+          : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-white/70") +
         " " +
         className
       }

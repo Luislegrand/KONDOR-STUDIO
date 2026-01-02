@@ -1,28 +1,21 @@
 // front/src/components/ui/badge.jsx
 import React from "react";
-import clsx from "clsx";
-
-/**
- * Badge simples no estilo shadcn/ui
- * uso:
- *  <Badge>Ativo</Badge>
- *  <Badge variant="outline">Em análise</Badge>
- */
+import { cn } from "@/utils/classnames.js";
 export function Badge({ className, variant = "default", ...props }) {
   const baseClasses =
     "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors";
 
   const variants = {
-    default: "bg-purple-100 text-purple-800 border-transparent",
-    outline: "bg-transparent text-gray-700 border-gray-300",
-    success: "bg-emerald-100 text-emerald-800 border-transparent",
-    warning: "bg-amber-100 text-amber-800 border-transparent",
-    danger: "bg-red-100 text-red-800 border-transparent",
+    default: "bg-[var(--primary-light)] text-[var(--primary)] border-transparent",
+    outline: "bg-transparent text-[var(--text-muted)] border-[var(--border)]",
+    success: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    warning: "bg-amber-50 text-amber-700 border-amber-100",
+    danger: "bg-red-50 text-red-700 border-red-100",
   };
 
   return (
     <span
-      className={clsx(baseClasses, variants[variant] || variants.default, className)}
+      className={cn(baseClasses, variants[variant] || variants.default, className)}
       {...props}
     />
   );

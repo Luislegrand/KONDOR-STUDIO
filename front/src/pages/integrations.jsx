@@ -4,6 +4,8 @@ import { useLocation } from "react-router-dom";
 import { base44 } from "../apiClient/base44Client";
 
 import { Button } from "@/components/ui/button.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 import {
   RefreshCw,
   Briefcase,
@@ -438,35 +440,31 @@ export default function Integrations() {
   }, [location.search]);
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-10">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Integrações</h1>
-            <p className="text-gray-600">
-              Conecte os canais essenciais da agência e mantenha todo o fluxo automatizado.
-            </p>
-            <p className="text-xs text-gray-500 mt-2">
-              {connectedCount} de {INTEGRATION_CATALOG.length} integrações conectadas.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Integracoes"
+        subtitle="Conecte os canais essenciais da agencia e mantenha o fluxo automatizado."
+        actions={
+          <Button
+            variant="secondary"
+            leftIcon={RefreshCw}
+            onClick={() => refetch()}
+            disabled={isFetching}
+            isLoading={isFetching}
+          >
+            Atualizar
+          </Button>
+        }
+      />
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
-          </div>
-        </div>
+      <div className="mt-2 text-xs text-[var(--text-muted)]">
+        {connectedCount} de {INTEGRATION_CATALOG.length} integracoes conectadas.
+      </div>
 
+      <div className="mt-6 space-y-10">
         {metaBanner ? (
           <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
+            className={`rounded-[12px] border px-4 py-3 text-sm ${
               metaBanner.tone === "success"
                 ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                 : "border-rose-200 bg-rose-50 text-rose-900"
@@ -477,7 +475,7 @@ export default function Integrations() {
           </div>
         ) : null}
 
-        <section className="rounded-3xl bg-white px-6 py-8 md:px-10 md:py-10 shadow-sm shadow-slate-200/70 border border-slate-200/70">
+        <section className="rounded-[24px] bg-white px-6 py-8 md:px-10 md:py-10 shadow-[var(--shadow-sm)] border border-[var(--border)]">
           <div className="flex flex-col gap-2 mb-8">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
               Conexões da agência
@@ -537,7 +535,7 @@ export default function Integrations() {
           )}
         </section>
 
-        <section className="rounded-3xl bg-white px-6 py-8 md:px-10 md:py-10 shadow-sm shadow-slate-200/70 border border-slate-200/70">
+        <section className="rounded-[24px] bg-white px-6 py-8 md:px-10 md:py-10 shadow-[var(--shadow-sm)] border border-[var(--border)]">
           <div className="flex flex-col gap-4 mb-8">
             <div className="flex flex-col gap-2">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
@@ -557,13 +555,13 @@ export default function Integrations() {
             </div>
 
             <div className="flex flex-col gap-2 max-w-md">
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">
                 Cliente selecionado
               </label>
               <select
                 value={selectedClientId}
                 onChange={(event) => setSelectedClientId(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
               >
                 <option value="">Selecione um cliente</option>
                 {clients.map((client) => (
@@ -649,6 +647,6 @@ export default function Integrations() {
           initialClientId={initialClientId}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

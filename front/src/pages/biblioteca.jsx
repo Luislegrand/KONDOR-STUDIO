@@ -5,6 +5,8 @@ import FiltersBar from "@/components/creatives/filtersBar.jsx";
 import CreativeGrid from "@/components/creatives/creativeGrid.jsx";
 import CreativeEmptyState from "@/components/creatives/creativeEmptyState.jsx";
 import CreativeDetailsDrawer from "@/components/creatives/creativeDetailsDrawer.jsx";
+import PageShell from "@/components/ui/page-shell.jsx";
+import PageHeader from "@/components/ui/page-header.jsx";
 
 export default function Biblioteca() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,22 +97,14 @@ export default function Biblioteca() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400 font-semibold">
-              Biblioteca
-            </p>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Biblioteca de Criativos
-            </h1>
-            <p className="text-slate-500 mt-1">
-              Gerencie seus assets e encontre o criativo ideal para cada post.
-            </p>
-          </div>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Biblioteca de criativos"
+        subtitle="Gerencie seus assets e encontre o criativo ideal para cada post."
+        kicker="Biblioteca"
+      />
 
+      <div className="mt-6 space-y-6">
         <FiltersBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -135,22 +129,22 @@ export default function Biblioteca() {
             onDownloadCreative={handleDownloadCreative}
           />
         )}
-
-        <CreativeDetailsDrawer
-          creative={selectedCreative}
-          open={drawerOpen}
-          onClose={handleCloseDrawer}
-          clientName={
-            selectedCreative
-              ? clients.find((c) => c.id === selectedCreative.client_id)?.name
-              : ""
-          }
-          onUseInPost={handleUseInPost}
-          onDownload={handleDownloadCreative}
-          onDelete={handleDeleteCreative}
-          onArchive={handleArchiveCreative}
-        />
       </div>
-    </div>
+
+      <CreativeDetailsDrawer
+        creative={selectedCreative}
+        open={drawerOpen}
+        onClose={handleCloseDrawer}
+        clientName={
+          selectedCreative
+            ? clients.find((c) => c.id === selectedCreative.client_id)?.name
+            : ""
+        }
+        onUseInPost={handleUseInPost}
+        onDownload={handleDownloadCreative}
+        onDelete={handleDeleteCreative}
+        onArchive={handleArchiveCreative}
+      />
+    </PageShell>
   );
 }
