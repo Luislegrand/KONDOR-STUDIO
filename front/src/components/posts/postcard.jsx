@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
-import { Pencil, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   getWorkflowStatuses,
   getWorkflowStatusConfig,
@@ -58,6 +58,13 @@ function resolveNetworkLabel(post, integration) {
   return null;
 }
 
+function resolvePostType(post) {
+  const mediaType = post?.mediaType || post?.media_type;
+  if (mediaType === "video") return "Video";
+  if (mediaType === "carousel") return "Carrossel";
+  return "Imagem";
+}
+
 export default function Postcard({ post, client, integration, onEdit, onStatusChange }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState(resolveWorkflowStatus(post));
@@ -71,7 +78,6 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   const clientFeedback = (post.clientFeedback || "").trim();
   const hasClientFeedback = Boolean(clientFeedback);
   const statusConfig = getWorkflowStatusConfig(localStatus);
-  const statusLabel = statusConfig.label;
 
   const updateMenuPosition = React.useCallback(() => {
     if (!triggerRef.current) return;
@@ -93,10 +99,11 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   };
 
   const scheduledLabel = formatDate(
-    post.scheduledAt || post.scheduled_at || post.scheduledDate
+    post.scheduledAt || post.scheduled_at || post.scheduledDate || post.publishedDate
   );
   const networkLabel = resolveNetworkLabel(post, integration);
   const description = post.body || post.caption;
+  const typeLabel = resolvePostType(post);
 
   React.useEffect(() => {
     function handleClickOutside(event) {
@@ -143,41 +150,40 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
 
   return (
     <Card
-      className="group relative w-full max-w-none overflow-visible border border-transparent bg-white/90 shadow-lg shadow-purple-100 transition-transform hover:-translate-y-1 hover:shadow-xl cursor-pointer rounded-2xl"
+      className="group relative w-full border border-[var(--border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
       onClick={() => onEdit && onEdit(post)}
       role="button"
       tabIndex={0}
     >
-      <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-purple-400/90 to-purple-600/90 opacity-70" />
-      <CardHeader className="pb-2 pr-3">
-        <div className="flex justify-between items-start gap-2">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-sm font-semibold text-gray-900 line-clamp-2">
-              {post.title || "Post sem título"}
+            <CardTitle className="text-sm font-semibold text-[var(--text)] line-clamp-2">
+              {post.title || "Post sem titulo"}
             </CardTitle>
             {client && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-[var(--text-muted)] mt-1">
                 {client.name}
               </p>
             )}
           </div>
           <Badge className={`text-[10px] border border-transparent ${statusConfig.badge}`}>
-            {statusLabel}
+            {statusConfig.label}
           </Badge>
         </div>
       </CardHeader>
 
-      {(description || clientFeedback) && (
-        <CardContent className="pb-2 pr-3 space-y-3">
+      {(description || hasClientFeedback) && (
+        <CardContent className="pt-0 pb-2 space-y-3">
           {description && (
-            <p className="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">
+            <p className="text-xs text-[var(--text-muted)] line-clamp-2 whitespace-pre-line">
               {description}
             </p>
           )}
           {hasClientFeedback && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                Correção solicitada
+                Ajustes solicitados
               </p>
               <p className="text-xs text-amber-800 line-clamp-2 whitespace-pre-line">
                 {clientFeedback}
@@ -187,52 +193,54 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
         </CardContent>
       )}
 
-      <CardFooter className="pt-2 flex flex-col gap-3 pr-3">
-        {networkLabel && (
-          <div className="w-full text-[11px] text-gray-500">
-            Rede: <span className="font-medium">{networkLabel}</span>
-          </div>
-        )}
-        {scheduledLabel && (
-          <div className="w-full text-[11px] text-gray-500">
-            Programado para: <span className="font-medium">{scheduledLabel}</span>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={triggerStatusMenu}
-              ref={triggerRef}
-              className="w-full sm:w-[170px] inline-flex items-center justify-between rounded-full border border-purple-200 bg-white px-3 py-2 text-xs font-medium text-purple-700 transition hover:border-purple-300 hover:bg-purple-50"
-            >
-              <span>{statusLabel}</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <Button
-            type="button"
-            size="sm"
-            className="w-full sm:w-auto border border-transparent bg-purple-500 text-white hover:bg-purple-600 focus-visible:ring-2 focus-visible:ring-purple-400"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit && onEdit(post);
-            }}
-          >
-            <Pencil className="w-4 h-4 mr-1.5" />
-            Editar
-          </Button>
+      <CardContent className="pt-0 pb-2">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="text-[10px]">
+            {typeLabel}
+          </Badge>
+          {networkLabel ? (
+            <Badge variant="outline" className="text-[10px]">
+              {networkLabel}
+            </Badge>
+          ) : null}
+          {scheduledLabel ? (
+            <Badge variant="outline" className="text-[10px]">
+              {scheduledLabel}
+            </Badge>
+          ) : null}
         </div>
+      </CardContent>
+
+      <CardFooter className="pt-2 flex items-center justify-between gap-2">
+        <div className="relative w-full">
+          <button
+            type="button"
+            onClick={triggerStatusMenu}
+            ref={triggerRef}
+            className="w-full inline-flex items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-muted)]"
+          >
+            <span>{statusConfig.label}</span>
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit && onEdit(post);
+          }}
+        >
+          Detalhes
+        </Button>
       </CardFooter>
       {menuOpen &&
         typeof document !== "undefined" &&
         createPortal(
-          // Dropdown usa portal + z-50 para ficar acima das demais colunas/cards.
           <div
             ref={menuContentRef}
-            className="fixed z-50 rounded-2xl border border-slate-100 bg-white p-1 shadow-2xl shadow-purple-200/70"
+            className="fixed z-50 rounded-[12px] border border-[var(--border)] bg-white p-1 shadow-[var(--shadow-md)]"
             style={{
               top: menuPosition.top,
               left: menuPosition.left,
@@ -245,10 +253,10 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
                 type="button"
                 key={opt.key}
                 onClick={(event) => selectStatus(event, opt.key)}
-                className={`w-full rounded-xl px-3 py-2 text-left text-xs transition ${
+                className={`w-full rounded-[10px] px-3 py-2 text-left text-xs transition ${
                   opt.key === localStatus
-                    ? "bg-purple-50 text-purple-700 font-semibold"
-                    : "text-slate-600 hover:bg-slate-50"
+                    ? "bg-[var(--primary-light)] text-[var(--primary)] font-semibold"
+                    : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
                 {opt.label}
