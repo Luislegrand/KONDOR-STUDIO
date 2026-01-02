@@ -15,7 +15,6 @@ import {
   buildStatusPayload,
   getWorkflowStatuses,
   isClientApprovalStatus,
-  resolveWorkflowStatus,
 } from "@/utils/postStatus.js";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import Postkanban from "../components/posts/postkanban.jsx";
@@ -88,11 +87,6 @@ export default function Posts() {
     setEditingPost(null);
   }, []);
 
-  const { data: posts = [], isLoading } = useQuery({
-    queryKey: ["posts"],
-    queryFn: () => base44.entities.Post.list(),
-  });
-
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
     queryFn: () => base44.entities.Client.list(),
@@ -163,9 +157,15 @@ export default function Posts() {
     },
   });
 
-  const handleEdit = (post) => {
-    setEditingPost(post);
-    setDialogOpen(true);
+  const handleEdit = async (post) => {
+    if (!post?.id) return;
+    try {
+      const fullPost = await base44.entities.Post.get(post.id);
+      setEditingPost(fullPost);
+      setDialogOpen(true);
+    } catch (error) {
+      showToast("Erro ao carregar detalhes do post.", "error");
+    }
   };
 
   const handleStatusChange = async (postId, newStatus) => {
@@ -363,70 +363,43 @@ export default function Posts() {
     };
   }, [preferencesHydrated, preferencesPayload, preferencesMutation]);
 
-  const clientMap = useMemo(() => {
-    const map = new Map();
-    (clients || []).forEach((client) => {
-      if (client?.id) map.set(client.id, client);
-    });
-    return map;
-  }, [clients]);
+  const filters = useMemo(() => {
+    const trimmedSearch = searchTerm.trim();
+    return {
+      clientId: selectedClientId || undefined,
+      startDate: dateStart || undefined,
+      endDate: dateEnd || undefined,
+      status: selectedStatuses.length ? selectedStatuses.join(",") : undefined,
+      q: trimmedSearch || undefined,
+    };
+  }, [selectedClientId, dateStart, dateEnd, selectedStatuses, searchTerm]);
 
-  const filteredPosts = useMemo(() => {
-    const start = dateStart ? new Date(`${dateStart}T00:00:00`) : null;
-    const end = dateEnd ? new Date(`${dateEnd}T23:59:59`) : null;
-    const query = searchTerm.trim().toLowerCase();
-    const statusSet = selectedStatuses.length ? new Set(selectedStatuses) : null;
-
-    return (posts || []).filter((post) => {
-      const postClientId = post.clientId || post.client_id;
-      if (selectedClientId && postClientId !== selectedClientId) return false;
-
-      if (statusSet) {
-        const statusKey = resolveWorkflowStatus(post);
-        if (!statusSet.has(statusKey)) return false;
+  const postsQuery = useQuery({
+    queryKey: ["posts", viewMode, filters],
+    queryFn: () => {
+      if (viewMode === "calendar") {
+        return base44.entities.Post.listCalendar(filters);
       }
+      return base44.entities.Post.listKanban(filters);
+    },
+  });
 
-      if (query) {
-        const clientName = clientMap.get(postClientId)?.name || "";
-        const haystack = [
-          post.title,
-          post.body,
-          post.caption,
-          post.clientFeedback,
-          post.client_feedback,
-          clientName,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
+  const isLoading = postsQuery.isLoading;
 
-      if (!start && !end) return true;
+  const kanbanPosts = useMemo(() => {
+    const columns = postsQuery.data?.columns || {};
+    return Object.values(columns).flatMap((column) => column.items || []);
+  }, [postsQuery.data]);
 
-      const postDateValue =
-        post.scheduledDate ||
-        post.scheduledAt ||
-        post.scheduled_at ||
-        post.publishedDate ||
-        post.published_at ||
-        post.createdAt;
-      if (!postDateValue) return false;
-      const postDate = new Date(postDateValue);
-      if (isNaN(postDate.getTime())) return false;
-      if (start && postDate < start) return false;
-      if (end && postDate > end) return false;
-      return true;
-    });
-  }, [
-    posts,
-    selectedClientId,
-    dateStart,
-    dateEnd,
-    searchTerm,
-    selectedStatuses,
-    clientMap,
-  ]);
+  const calendarPosts = useMemo(() => postsQuery.data?.items || [], [postsQuery.data]);
+
+  React.useEffect(() => {
+    if (!postsQuery.isError) return;
+    const message =
+      postsQuery.error?.message ||
+      "Erro ao carregar posts. Tente novamente.";
+    showToast(message, "error");
+  }, [postsQuery.isError, postsQuery.error, showToast]);
 
   const hasFilters = Boolean(
     selectedClientId ||
@@ -435,6 +408,10 @@ export default function Posts() {
       searchTerm.trim() ||
       selectedStatuses.length
   );
+  const hasResults =
+    viewMode === "calendar"
+      ? calendarPosts.length > 0
+      : kanbanPosts.length > 0;
 
   return (
     <PageShell>
@@ -582,7 +559,7 @@ export default function Posts() {
               title="Carregando posts"
               description="Aguarde enquanto carregamos o calendario."
             />
-          ) : filteredPosts.length === 0 ? (
+          ) : !hasResults ? (
             <EmptyState
               title={hasFilters ? "Nenhum post encontrado" : "Nenhum post criado"}
               description={
@@ -598,14 +575,14 @@ export default function Posts() {
             />
           ) : (
             <Postcalendar
-              posts={filteredPosts}
+              posts={calendarPosts}
               onPostClick={handleEdit}
               isLoading={isLoading}
             />
           )
         ) : (
           <Postkanban
-            posts={filteredPosts}
+            posts={kanbanPosts}
             clients={clients}
             integrations={integrations}
             onEdit={handleEdit}

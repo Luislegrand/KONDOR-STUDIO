@@ -536,6 +536,16 @@ const Client = Clients;
 const Posts = {
   ...createEntityClient("/posts"),
 
+  async listKanban(params) {
+    const qs = buildQuery({ ...(params || {}), view: "kanban" });
+    return jsonFetch(`/posts${qs}`, { method: "GET" });
+  },
+
+  async listCalendar(params) {
+    const qs = buildQuery({ ...(params || {}), view: "calendar" });
+    return jsonFetch(`/posts${qs}`, { method: "GET" });
+  },
+
   async sendToApproval(id) {
     return jsonFetch(`/posts/${id}/send-to-approval`, { method: "POST" });
   },

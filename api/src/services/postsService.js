@@ -315,6 +315,7 @@ function buildPostsWhere(tenantId, opts = {}) {
         { title: { contains: opts.q, mode: 'insensitive' } },
         { caption: { contains: opts.q, mode: 'insensitive' } },
         { content: { contains: opts.q, mode: 'insensitive' } },
+        { client: { name: { contains: opts.q, mode: 'insensitive' } } },
       ],
     });
   }

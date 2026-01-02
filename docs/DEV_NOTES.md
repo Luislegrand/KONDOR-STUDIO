@@ -28,6 +28,18 @@ Example payload:
 }
 ```
 
+## Status model (workflow)
+- Workflow statuses (UI): `DRAFT`, `CONTENT`, `INTERNAL_APPROVAL`, `CLIENT_APPROVAL`, `CHANGES`, `SCHEDULING`, `SCHEDULED`, `DONE`.
+- Mapeamento para `PostStatus`:
+  - `DRAFT` -> `DRAFT`
+  - `CONTENT` / `INTERNAL_APPROVAL` -> `IDEA`
+  - `CLIENT_APPROVAL` -> `PENDING_APPROVAL`
+  - `CHANGES` -> `DRAFT` (quando ha `clientFeedback`)
+  - `SCHEDULING` -> `APPROVED`
+  - `SCHEDULED` -> `SCHEDULED`
+  - `DONE` -> `PUBLISHED` (tambem agrupa `ARCHIVED`, `FAILED`, `CANCELLED`)
+- Persistencia do workflow ocorre em `post.metadata.workflowStatus`.
+
 ## Migrations
 - Aplicar `api/prisma/migrations/20260102130415_add_user_preferences/migration.sql` com `npm run prisma:migrate:deploy`.
 - O arquivo foi gerado manualmente por timeout ao conectar no banco remoto.
