@@ -35,7 +35,8 @@ export function Sidebar({ className = "", children }) {
 
   return (
     <aside
-      className={`flex h-screen flex-col bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-200 ${
+      data-collapsed={collapsed ? "true" : "false"}
+      className={`flex h-screen flex-col overflow-hidden bg-[var(--surface)] border-r border-[var(--border)] transition-[width] duration-200 ${
         collapsed ? "w-16" : "w-64"
       } ${className}`}
     >

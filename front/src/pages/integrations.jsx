@@ -6,45 +6,52 @@ import { base44 } from "../apiClient/base44Client";
 import { Button } from "@/components/ui/button.jsx";
 import PageShell from "@/components/ui/page-shell.jsx";
 import PageHeader from "@/components/ui/page-header.jsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.jsx";
 import {
   RefreshCw,
-  Briefcase,
   Megaphone,
   BarChart3,
   MessageCircle,
   Music,
-  Camera,
+  Facebook,
+  Instagram,
+  Linkedin,
+  Youtube,
+  Twitter,
+  MapPin,
+  Pin,
 } from "lucide-react";
 
 import IntegrationTile from "@/components/integrations/IntegrationTile.jsx";
 import IntegrationConnectDialog from "@/components/integrations/IntegrationConnectDialog.jsx";
+import { useActiveClient } from "@/hooks/useActiveClient.js";
 
 const DEFAULT_OWNER_KEY = "AGENCY";
 
 const INTEGRATION_CATALOG = [
   {
-    key: "meta-business",
-    title: "Meta Business",
-    subtitle: "Publicações orgânicas",
-    description: "Conecte páginas e contas para publicar posts automaticamente.",
+    key: "facebook",
+    title: "Facebook",
+    subtitle: "Paginas e publicacoes",
+    description: "Conecte paginas para publicar posts automaticamente.",
     provider: "META",
     ownerKey: "META_BUSINESS",
     kind: "meta_business",
     scope: "client",
     accentClass: "from-blue-500 to-indigo-500",
-    icon: Briefcase,
+    icon: Facebook,
     dialogDescription:
-      "Informe os dados da conta Meta Business que será usada para publicar.",
+      "Informe os dados da pagina do Facebook usada para publicar.",
     oauth: {
-      title: "Conexão oficial via Meta",
-      subtitle: "Recomendado para páginas e Instagram Business.",
+      title: "Conexao oficial via Meta",
+      subtitle: "Recomendado para paginas e Instagram Business.",
       label: "Conectar via Meta",
       endpoint: "/integrations/meta/connect-url",
     },
     fields: [
       {
         name: "pageId",
-        label: "ID da Página do Facebook",
+        label: "ID da Pagina do Facebook",
         placeholder: "1234567890",
         required: true,
       },
@@ -60,35 +67,41 @@ const INTEGRATION_CATALOG = [
         type: "password",
         placeholder: "EAAB...",
         required: true,
-        helper: "Permissões: pages_manage_posts, instagram_content_publish.",
+        helper: "Permissoes: pages_manage_posts, instagram_content_publish.",
       },
     ],
   },
   {
-    key: "meta-ads",
-    title: "Meta Ads",
-    subtitle: "Métricas e relatórios",
-    description: "Importe resultados de campanhas para dashboards e relatórios.",
+    key: "instagram",
+    title: "Instagram",
+    subtitle: "Somente Instagram",
+    description: "Ideal quando o cliente quer postar apenas no Instagram.",
     provider: "META",
-    ownerKey: "META_ADS",
-    kind: "meta_ads",
+    ownerKey: "INSTAGRAM",
+    kind: "instagram_only",
     scope: "client",
-    accentClass: "from-sky-500 to-cyan-500",
-    icon: Megaphone,
+    accentClass: "from-pink-500 to-orange-500",
+    icon: Instagram,
     dialogDescription:
-      "Configure a conta de anúncios usada para coletar métricas.",
+      "Conecte uma conta Instagram Business para publicar.",
     oauth: {
-      title: "Conexão oficial via Meta Ads",
-      subtitle: "Recomendado para acesso contínuo às campanhas.",
+      title: "Conexao oficial via Meta",
+      subtitle: "Use o login Meta para conectar o Instagram Business.",
       label: "Conectar via Meta",
       endpoint: "/integrations/meta/connect-url",
     },
     fields: [
       {
-        name: "adAccountId",
-        label: "Ad Account ID",
-        placeholder: "act_1234567890",
+        name: "igBusinessId",
+        label: "Instagram Business ID",
+        placeholder: "17841400000000000",
         required: true,
+      },
+      {
+        name: "pageId",
+        label: "ID da Pagina do Facebook (opcional)",
+        placeholder: "1234567890",
+        required: false,
       },
       {
         name: "accessToken",
@@ -97,102 +110,26 @@ const INTEGRATION_CATALOG = [
         placeholder: "EAAB...",
         required: true,
       },
-      {
-        name: "fields",
-        label: "Métricas (opcional)",
-        placeholder: "impressions,clicks,spend",
-        required: false,
-      },
     ],
   },
   {
-    key: "google-analytics",
-    title: "Google Analytics",
-    subtitle: "GA4 + relatórios",
-    description: "Extraia métricas do site e exporte relatórios automatizados.",
-    provider: "GOOGLE",
-    ownerKey: "GA4",
-    kind: "google_analytics",
+    key: "linkedin",
+    title: "LinkedIn",
+    subtitle: "Conteudos profissionais",
+    description: "Publique e acompanhe metricas do LinkedIn.",
+    provider: "LINKEDIN",
+    ownerKey: "LINKEDIN",
+    kind: "linkedin",
     scope: "client",
-    accentClass: "from-amber-500 to-orange-500",
-    icon: BarChart3,
-    dialogDescription:
-      "Cadastre a propriedade GA4 e as credenciais de acesso.",
-    fields: [
-      {
-        name: "propertyId",
-        label: "GA4 Property ID",
-        placeholder: "123456789",
-        required: true,
-      },
-      {
-        name: "measurementId",
-        label: "Measurement ID (opcional)",
-        placeholder: "G-XXXXXXX",
-        required: false,
-      },
-      {
-        name: "serviceAccountJson",
-        label: "Service Account JSON",
-        type: "textarea",
-        placeholder: "{\n  \"type\": \"service_account\"\n}",
-        required: true,
-        format: "json",
-      },
-    ],
-  },
-  {
-    key: "whatsapp-business",
-    title: "WhatsApp Business",
-    subtitle: "Aprovações via WhatsApp",
-    description: "Envio automático de aprovações e respostas do cliente.",
-    provider: "WHATSAPP_META_CLOUD",
-    ownerKey: "AGENCY",
-    kind: "whatsapp_business",
-    scope: "agency",
-    accentClass: "from-emerald-500 to-lime-500",
-    icon: MessageCircle,
-    dialogDescription:
-      "Preencha os dados do WhatsApp Business Cloud API para envio.",
-    oauth: {
-      title: "Conexão oficial via Meta",
-      subtitle: "Recomendado para webhooks e envio automático.",
-      label: "Conectar via Meta",
-      endpoint: "/integrations/whatsapp/connect-url",
-    },
-    fields: [
-      {
-        name: "wabaId",
-        label: "WABA ID",
-        placeholder: "104857600000000",
-        required: true,
-      },
-      {
-        name: "phoneNumberId",
-        label: "Phone Number ID",
-        placeholder: "106907000000000",
-        required: true,
-      },
-      {
-        name: "accessToken",
-        label: "Access Token",
-        type: "password",
-        placeholder: "EAAB...",
-        required: true,
-      },
-      {
-        name: "verifyToken",
-        label: "Verify Token (webhook)",
-        placeholder: "defina-um-token",
-        required: false,
-      },
-    ],
+    accentClass: "from-sky-500 to-blue-500",
+    icon: Linkedin,
+    comingSoon: true,
   },
   {
     key: "tiktok",
     title: "TikTok",
-    subtitle: "Publicações automáticas",
-    description: "Publique vídeos e acompanhe a agenda do cliente.",
+    subtitle: "Publicacoes automaticas",
+    description: "Publique videos e acompanhe a agenda do cliente.",
     provider: "TIKTOK",
     ownerKey: "TIKTOK",
     kind: "tiktok",
@@ -231,36 +168,131 @@ const INTEGRATION_CATALOG = [
     ],
   },
   {
-    key: "instagram",
-    title: "Instagram",
-    subtitle: "Somente Instagram",
-    description: "Ideal quando o cliente quer postar apenas no Instagram.",
-    provider: "META",
-    ownerKey: "INSTAGRAM",
-    kind: "instagram_only",
+    key: "google-business",
+    title: "Google Meu Negocio",
+    subtitle: "Perfil da empresa",
+    description: "Gerencie posts e visibilidade no Google.",
+    provider: "GOOGLE",
+    ownerKey: "GOOGLE_BUSINESS",
+    kind: "google_business",
     scope: "client",
-    accentClass: "from-pink-500 to-orange-500",
-    icon: Camera,
+    accentClass: "from-amber-500 to-orange-500",
+    icon: MapPin,
+    comingSoon: true,
+  },
+  {
+    key: "pinterest",
+    title: "Pinterest",
+    subtitle: "Conteudos visuais",
+    description: "Conecte pins e acompanhe performance.",
+    provider: "PINTEREST",
+    ownerKey: "PINTEREST",
+    kind: "pinterest",
+    scope: "client",
+    accentClass: "from-rose-500 to-red-500",
+    icon: Pin,
+    comingSoon: true,
+  },
+  {
+    key: "youtube",
+    title: "YouTube",
+    subtitle: "Videos e shorts",
+    description: "Publique videos e acompanhe metricas.",
+    provider: "GOOGLE",
+    ownerKey: "YOUTUBE",
+    kind: "youtube",
+    scope: "client",
+    accentClass: "from-red-500 to-rose-500",
+    icon: Youtube,
+    comingSoon: true,
+  },
+  {
+    key: "threads",
+    title: "Threads",
+    subtitle: "Conteudos rapidos",
+    description: "Integre o Threads para posts e insights.",
+    provider: "META",
+    ownerKey: "THREADS",
+    kind: "threads",
+    scope: "client",
+    accentClass: "from-slate-600 to-slate-900",
+    icon: MessageCircle,
+    comingSoon: true,
+  },
+  {
+    key: "google-analytics",
+    title: "Google Analytics 4",
+    subtitle: "GA4 + relatorios",
+    description: "Extraia metricas do site e exporte relatorios automatizados.",
+    provider: "GOOGLE",
+    ownerKey: "GA4",
+    kind: "google_analytics",
+    scope: "client",
+    accentClass: "from-amber-500 to-orange-500",
+    icon: BarChart3,
     dialogDescription:
-      "Conecte uma conta Instagram Business para publicar.",
+      "Cadastre a propriedade GA4 e as credenciais de acesso.",
+    fields: [
+      {
+        name: "propertyId",
+        label: "GA4 Property ID",
+        placeholder: "123456789",
+        required: true,
+      },
+      {
+        name: "measurementId",
+        label: "Measurement ID (opcional)",
+        placeholder: "G-XXXXXXX",
+        required: false,
+      },
+      {
+        name: "serviceAccountJson",
+        label: "Service Account JSON",
+        type: "textarea",
+        placeholder: "{\n  \"type\": \"service_account\"\n}",
+        required: true,
+        format: "json",
+      },
+    ],
+  },
+  {
+    key: "x",
+    title: "X",
+    subtitle: "Atualizacoes rapidas",
+    description: "Gerencie posts e acompanhamento no X.",
+    provider: "X",
+    ownerKey: "X",
+    kind: "x",
+    scope: "client",
+    accentClass: "from-slate-500 to-slate-700",
+    icon: Twitter,
+    comingSoon: true,
+  },
+  {
+    key: "meta-ads",
+    title: "Meta Ads",
+    subtitle: "Metricas e relatorios",
+    description: "Importe resultados de campanhas para dashboards.",
+    provider: "META",
+    ownerKey: "META_ADS",
+    kind: "meta_ads",
+    scope: "client",
+    accentClass: "from-sky-500 to-cyan-500",
+    icon: Megaphone,
+    dialogDescription:
+      "Configure a conta de anuncios usada para coletar metricas.",
     oauth: {
-      title: "Conexão oficial via Meta",
-      subtitle: "Use o login Meta para conectar o Instagram Business.",
+      title: "Conexao oficial via Meta Ads",
+      subtitle: "Recomendado para acesso continuo as campanhas.",
       label: "Conectar via Meta",
       endpoint: "/integrations/meta/connect-url",
     },
     fields: [
       {
-        name: "igBusinessId",
-        label: "Instagram Business ID",
-        placeholder: "17841400000000000",
+        name: "adAccountId",
+        label: "Ad Account ID",
+        placeholder: "act_1234567890",
         required: true,
-      },
-      {
-        name: "pageId",
-        label: "ID da Página do Facebook (opcional)",
-        placeholder: "1234567890",
-        required: false,
       },
       {
         name: "accessToken",
@@ -268,6 +300,98 @@ const INTEGRATION_CATALOG = [
         type: "password",
         placeholder: "EAAB...",
         required: true,
+      },
+      {
+        name: "fields",
+        label: "Metricas (opcional)",
+        placeholder: "impressions,clicks,spend",
+        required: false,
+      },
+    ],
+  },
+  {
+    key: "google-ads",
+    title: "Google Ads",
+    subtitle: "Metricas e campanhas",
+    description: "Acompanhe campanhas e conversoes.",
+    provider: "GOOGLE_ADS",
+    ownerKey: "GOOGLE_ADS",
+    kind: "google_ads",
+    scope: "client",
+    accentClass: "from-yellow-500 to-orange-500",
+    icon: Megaphone,
+    comingSoon: true,
+  },
+  {
+    key: "linkedin-ads",
+    title: "LinkedIn Ads",
+    subtitle: "Campanhas B2B",
+    description: "Relatorios e desempenho no LinkedIn.",
+    provider: "LINKEDIN",
+    ownerKey: "LINKEDIN_ADS",
+    kind: "linkedin_ads",
+    scope: "client",
+    accentClass: "from-sky-500 to-blue-600",
+    icon: Megaphone,
+    comingSoon: true,
+  },
+  {
+    key: "tiktok-ads",
+    title: "TikTok Ads",
+    subtitle: "Campanhas e anuncios",
+    description: "Dados de campanhas e criativos.",
+    provider: "TIKTOK",
+    ownerKey: "TIKTOK_ADS",
+    kind: "tiktok_ads",
+    scope: "client",
+    accentClass: "from-fuchsia-500 to-rose-600",
+    icon: Megaphone,
+    comingSoon: true,
+  },
+  {
+    key: "whatsapp-business",
+    title: "WhatsApp Business",
+    subtitle: "Aprovacoes via WhatsApp",
+    description: "Envio automatico de aprovacoes e respostas do cliente.",
+    provider: "WHATSAPP_META_CLOUD",
+    ownerKey: "AGENCY",
+    kind: "whatsapp_business",
+    scope: "agency",
+    accentClass: "from-emerald-500 to-lime-500",
+    icon: MessageCircle,
+    dialogDescription:
+      "Preencha os dados do WhatsApp Business Cloud API para envio.",
+    oauth: {
+      title: "Conexao oficial via Meta",
+      subtitle: "Recomendado para webhooks e envio automatico.",
+      label: "Conectar via Meta",
+      endpoint: "/integrations/whatsapp/connect-url",
+    },
+    fields: [
+      {
+        name: "wabaId",
+        label: "WABA ID",
+        placeholder: "104857600000000",
+        required: true,
+      },
+      {
+        name: "phoneNumberId",
+        label: "Phone Number ID",
+        placeholder: "106907000000000",
+        required: true,
+      },
+      {
+        name: "accessToken",
+        label: "Access Token",
+        type: "password",
+        placeholder: "EAAB...",
+        required: true,
+      },
+      {
+        name: "verifyToken",
+        label: "Verify Token (webhook)",
+        placeholder: "defina-um-token",
+        required: false,
       },
     ],
   },
@@ -286,13 +410,15 @@ function resolveMetaKey(kind) {
   const normalized = String(kind || "").toLowerCase();
   if (normalized === "meta_ads") return "meta-ads";
   if (normalized === "instagram_only") return "instagram";
-  return "meta-business";
+  return "facebook";
 }
 
 export default function Integrations() {
   const [activeKey, setActiveKey] = useState(null);
+  const [comingSoonDefinition, setComingSoonDefinition] = useState(null);
   const [initialClientId, setInitialClientId] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [activeClientId, setActiveClientId] = useActiveClient();
+  const [selectedClientId, setSelectedClientId] = useState(activeClientId || "");
   const location = useLocation();
   const queryClient = useQueryClient();
 
@@ -322,8 +448,13 @@ export default function Integrations() {
     return map;
   }, [integrations]);
 
+  const connectableCatalog = useMemo(
+    () => INTEGRATION_CATALOG.filter((item) => !item.comingSoon),
+    []
+  );
+
   const connectedCount = useMemo(() => {
-    return INTEGRATION_CATALOG.reduce((acc, item) => {
+    return connectableCatalog.reduce((acc, item) => {
       if (item.scope === "client") {
         const matches = (integrations || []).filter(
           (integration) =>
@@ -338,7 +469,7 @@ export default function Integrations() {
       );
       return acc + (isConnectedStatus(record?.status) ? 1 : 0);
     }, 0);
-  }, [integrations, integrationsByKey]);
+  }, [connectableCatalog, integrations, integrationsByKey]);
 
   const agencyIntegrations = useMemo(
     () => INTEGRATION_CATALOG.filter((item) => item.scope === "agency"),
@@ -347,6 +478,10 @@ export default function Integrations() {
   const clientIntegrations = useMemo(
     () => INTEGRATION_CATALOG.filter((item) => item.scope === "client"),
     []
+  );
+  const connectableClientIntegrations = useMemo(
+    () => clientIntegrations.filter((item) => !item.comingSoon),
+    [clientIntegrations]
   );
 
   const selectedClient = useMemo(
@@ -365,7 +500,7 @@ export default function Integrations() {
 
   const clientConnectedCount = useMemo(() => {
     if (!selectedClientId) return 0;
-    return clientIntegrations.reduce((acc, item) => {
+    return connectableClientIntegrations.reduce((acc, item) => {
       const matches = (integrations || []).filter(
         (integration) =>
           integration.ownerType === "CLIENT" &&
@@ -375,7 +510,7 @@ export default function Integrations() {
       );
       return acc + (matches.some((entry) => isConnectedStatus(entry.status)) ? 1 : 0);
     }, 0);
-  }, [clientIntegrations, integrations, selectedClientId]);
+  }, [connectableClientIntegrations, integrations, selectedClientId]);
 
   const activeDefinition = useMemo(() => {
     return INTEGRATION_CATALOG.find((item) => item.key === activeKey) || null;
@@ -406,15 +541,22 @@ export default function Integrations() {
   }, [location.search, queryClient]);
 
   useEffect(() => {
+    if (activeClientId === selectedClientId) return;
+    setSelectedClientId(activeClientId || "");
+  }, [activeClientId, selectedClientId]);
+
+  useEffect(() => {
     if (selectedClientId) return;
     if (clients.length === 1) {
       setSelectedClientId(clients[0].id);
+      setActiveClientId(clients[0].id);
     }
   }, [clients, selectedClientId]);
 
   useEffect(() => {
     if (initialClientId) {
       setSelectedClientId(initialClientId);
+      setActiveClientId(initialClientId);
     }
   }, [initialClientId]);
 
@@ -458,7 +600,7 @@ export default function Integrations() {
       />
 
       <div className="mt-2 text-xs text-[var(--text-muted)]">
-        {connectedCount} de {INTEGRATION_CATALOG.length} integracoes conectadas.
+        {connectedCount} de {connectableCatalog.length} integracoes conectadas.
       </div>
 
       <div className="mt-6 space-y-10">
@@ -549,7 +691,7 @@ export default function Integrations() {
               </p>
               <p className="text-xs text-slate-500">
                 {selectedClientId
-                  ? `${clientConnectedCount} de ${clientIntegrations.length} integrações conectadas`
+                  ? `${clientConnectedCount} de ${connectableClientIntegrations.length} integrações conectadas`
                   : `Selecione um cliente para ver as integrações`}
               </p>
             </div>
@@ -560,7 +702,11 @@ export default function Integrations() {
               </label>
               <select
                 value={selectedClientId}
-                onChange={(event) => setSelectedClientId(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedClientId(value);
+                  setActiveClientId(value);
+                }}
                 className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
               >
                 <option value="">Selecione um cliente</option>
@@ -600,10 +746,17 @@ export default function Integrations() {
                 const connectedClients = clientMatches.filter((entry) =>
                   isConnectedStatus(entry.status)
                 );
-                const tileStatus = connectedClients.length ? "connected" : "disconnected";
+                const isSoon = Boolean(integration.comingSoon);
+                const tileStatus = isSoon
+                  ? "soon"
+                  : connectedClients.length
+                  ? "connected"
+                  : "disconnected";
                 const tileMeta =
                   selectedClient?.name && selectedClientId
                     ? `Cliente: ${selectedClient.name}`
+                    : isSoon
+                    ? "Disponivel em breve"
                     : "Selecione um cliente para conectar";
                 const Icon = integration.icon;
                 return (
@@ -617,10 +770,18 @@ export default function Integrations() {
                     icon={<Icon className="w-5 h-5 text-white" />}
                     meta={tileMeta}
                     actionLabel={
-                      isConnectedStatus(tileStatus) ? "Gerenciar conexão" : "Conectar"
+                      isSoon
+                        ? "Saiba mais"
+                        : isConnectedStatus(tileStatus)
+                        ? "Gerenciar conexão"
+                        : "Conectar"
                     }
-                    disabled={!selectedClientId}
+                    disabled={!selectedClientId && !isSoon}
                     onConnect={() => {
+                      if (isSoon) {
+                        setComingSoonDefinition(integration);
+                        return;
+                      }
                       if (!selectedClientId) return;
                       setActiveKey(integration.key);
                       setInitialClientId(selectedClientId);
@@ -646,6 +807,28 @@ export default function Integrations() {
           clients={clients}
           initialClientId={initialClientId}
         />
+
+        <Dialog
+          open={Boolean(comingSoonDefinition)}
+          onOpenChange={(openState) => {
+            if (!openState) setComingSoonDefinition(null);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{comingSoonDefinition?.title || "Integracao"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm text-[var(--text-muted)]">
+              <p>
+                Esta integracao esta em desenvolvimento. Avisaremos quando estiver
+                disponivel para conexao.
+              </p>
+              <Button type="button" onClick={() => setComingSoonDefinition(null)}>
+                Entendi
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageShell>
   );

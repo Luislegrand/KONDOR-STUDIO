@@ -5,6 +5,7 @@ function statusLabel(status) {
   const value = String(status || "").toLowerCase();
   if (value === "connected" || value === "active") return "Conectado";
   if (value === "error") return "Erro";
+  if (value === "soon") return "Em breve";
   return "Desconectado";
 }
 
@@ -15,6 +16,9 @@ function statusClass(status) {
   }
   if (value === "error") {
     return "border-red-200 text-red-600 bg-red-50";
+  }
+  if (value === "soon") {
+    return "border-slate-200 text-slate-500 bg-slate-50";
   }
   return "border-amber-200 text-amber-700 bg-amber-50";
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import { Button } from "@/components/ui/button.jsx";
@@ -7,10 +7,39 @@ import PageHeader from "@/components/ui/page-header.jsx";
 import { Plus } from "lucide-react";
 import Taskboard from "../components/tasks/taskboard.jsx";
 import Taskformdialog from "../components/tasks/taskformdialog.jsx";
+import { useActiveClient } from "@/hooks/useActiveClient.js";
+
+const TASKS_COLLAPSE_KEY = "kondor_tasks_kanban_collapsed";
+
+const loadCollapsedColumns = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(TASKS_COLLAPSE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    return {};
+  }
+};
+
+const persistCollapsedColumns = (value) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      TASKS_COLLAPSE_KEY,
+      JSON.stringify(value || {})
+    );
+  } catch (err) {
+    return;
+  }
+};
 
 export default function Tasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [collapsedColumns, setCollapsedColumns] = useState(() =>
+    loadCollapsedColumns()
+  );
+  const [activeClientId] = useActiveClient();
   const queryClient = useQueryClient();
 
   const showError = (error, fallback = "Erro ao processar a tarefa. Tente novamente.") => {
@@ -31,6 +60,10 @@ export default function Tasks() {
     queryKey: ["clients"],
     queryFn: () => base44.entities.Client.list(),
   });
+
+  useEffect(() => {
+    persistCollapsedColumns(collapsedColumns);
+  }, [collapsedColumns]);
 
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) =>
@@ -104,6 +137,10 @@ export default function Tasks() {
     setEditingTask(null);
   };
 
+  const filteredTasks = activeClientId
+    ? tasks.filter((task) => task.clientId === activeClientId)
+    : tasks;
+
   return (
     <PageShell>
       <PageHeader
@@ -118,12 +155,14 @@ export default function Tasks() {
 
       <div className="mt-6">
         <Taskboard
-          tasks={tasks}
+          tasks={filteredTasks}
           clients={clients}
           isLoading={isLoading}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
+          collapsedColumns={collapsedColumns}
+          onCollapsedChange={setCollapsedColumns}
         />
       </div>
 

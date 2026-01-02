@@ -39,7 +39,12 @@ function buildMonthGrid(current) {
   return weeks;
 }
 
-export default function Postcalendar({ posts = [], onPostClick, isLoading = false }) {
+export default function Postcalendar({
+  posts = [],
+  onPostClick,
+  onDateClick,
+  isLoading = false,
+}) {
   const [currentDate, setCurrentDate] = React.useState(() => new Date());
 
   const weeks = React.useMemo(() => buildMonthGrid(currentDate), [currentDate]);
@@ -139,10 +144,24 @@ export default function Postcalendar({ posts = [], onPostClick, isLoading = fals
           const key = toDateKey(day);
           const dayPosts = postsByDate.get(key) || [];
 
+          const handleDateClick = () => {
+            if (onDateClick) onDateClick(day);
+          };
+
           return (
             <div
               key={key}
-              className={`min-h-[120px] rounded-[12px] border border-[var(--border)] p-2 text-xs ${
+              role="button"
+              tabIndex={0}
+              onClick={handleDateClick}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleDateClick();
+                }
+              }}
+              aria-label={`Criar post em ${day.toLocaleDateString("pt-BR")}`}
+              className={`min-h-[120px] rounded-[12px] border border-[var(--border)] p-2 text-xs transition hover:border-[var(--primary)] ${
                 isCurrentMonth ? "bg-white" : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
               }`}
             >
@@ -155,7 +174,10 @@ export default function Postcalendar({ posts = [], onPostClick, isLoading = fals
                     <button
                       key={post.id}
                       type="button"
-                      onClick={() => onPostClick && onPostClick(post)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (onPostClick) onPostClick(post);
+                      }}
                       className={`w-full truncate rounded-[8px] px-2 py-1 text-left text-[10px] ${config.badge}`}
                     >
                       {post.title || "Post sem titulo"}

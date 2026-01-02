@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import Toast from "@/components/ui/toast.jsx";
 import useToast from "@/hooks/useToast.js";
+import { useActiveClient } from "@/hooks/useActiveClient.js";
 import {
   buildStatusPayload,
   getWorkflowStatuses,
@@ -64,7 +65,9 @@ const serializePreferences = (payload) => {
 export default function Posts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [prefillDate, setPrefillDate] = useState(null);
+  const [activeClientId, setActiveClientId] = useActiveClient();
+  const [selectedClientId, setSelectedClientId] = useState(activeClientId || "");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,9 +85,21 @@ export default function Posts() {
   const statusOptions = React.useMemo(() => getWorkflowStatuses(), []);
   const { toast, showToast } = useToast();
 
+  React.useEffect(() => {
+    if (activeClientId === selectedClientId) return;
+    setSelectedClientId(activeClientId || "");
+  }, [activeClientId, selectedClientId]);
+
   const handleDialogClose = React.useCallback(() => {
     setDialogOpen(false);
     setEditingPost(null);
+    setPrefillDate(null);
+  }, []);
+
+  const handleNewPost = React.useCallback((date) => {
+    setEditingPost(null);
+    setPrefillDate(date || null);
+    setDialogOpen(true);
   }, []);
 
   const { data: clients = [] } = useQuery({
@@ -162,6 +177,7 @@ export default function Posts() {
     try {
       const fullPost = await base44.entities.Post.get(post.id);
       setEditingPost(fullPost);
+      setPrefillDate(null);
       setDialogOpen(true);
     } catch (error) {
       showToast("Erro ao carregar detalhes do post.", "error");
@@ -241,6 +257,7 @@ export default function Posts() {
     if (hasSavedFilters && filtersEmpty) {
       if (typeof lastFilters.clientId === "string") {
         setSelectedClientId(lastFilters.clientId);
+        setActiveClientId(lastFilters.clientId);
       }
       if (typeof lastFilters.dateStart === "string") {
         setDateStart(lastFilters.dateStart);
@@ -425,7 +442,11 @@ export default function Posts() {
           <Label>Perfil/cliente</Label>
           <select
             value={selectedClientId}
-            onChange={(event) => setSelectedClientId(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelectedClientId(value);
+              setActiveClientId(value);
+            }}
             className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
           >
             <option value="">Todos os clientes</option>
@@ -546,7 +567,7 @@ export default function Posts() {
               </button>
             ))}
           </div>
-          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+          <Button leftIcon={Plus} onClick={() => handleNewPost()}>
             Novo post
           </Button>
         </div>
@@ -568,7 +589,7 @@ export default function Posts() {
                   : "Crie seu primeiro post para iniciar o fluxo."
               }
               action={
-                <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+                <Button leftIcon={Plus} onClick={() => handleNewPost()}>
                   Novo post
                 </Button>
               }
@@ -577,6 +598,7 @@ export default function Posts() {
             <Postcalendar
               posts={calendarPosts}
               onPostClick={handleEdit}
+              onDateClick={handleNewPost}
               isLoading={isLoading}
             />
           )
@@ -598,6 +620,8 @@ export default function Posts() {
         open={dialogOpen}
         onClose={handleDialogClose}
         post={editingPost}
+        initialScheduleDate={prefillDate}
+        defaultClientId={selectedClientId}
         clients={clients}
         integrations={integrations}
         onSubmit={handleSubmit}
