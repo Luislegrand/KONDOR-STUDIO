@@ -39,7 +39,7 @@ function buildMonthGrid(current) {
   return weeks;
 }
 
-export default function Postcalendar({ posts = [], onPostClick }) {
+export default function Postcalendar({ posts = [], onPostClick, isLoading = false }) {
   const [currentDate, setCurrentDate] = React.useState(() => new Date());
 
   const weeks = React.useMemo(() => buildMonthGrid(currentDate), [currentDate]);
@@ -71,6 +71,32 @@ export default function Postcalendar({ posts = [], onPostClick }) {
   const goNext = () => {
     setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-4 w-36 rounded bg-slate-100 animate-pulse" />
+            <div className="mt-2 h-3 w-28 rounded bg-slate-100 animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-[10px] border border-[var(--border)] bg-slate-100 animate-pulse" />
+            <div className="h-9 w-9 rounded-[10px] border border-[var(--border)] bg-slate-100 animate-pulse" />
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-2">
+          {Array.from({ length: 42 }).map((_, index) => (
+            <div
+              key={`skeleton-${index}`}
+              className="min-h-[120px] rounded-[12px] border border-[var(--border)] bg-slate-50 animate-pulse"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4">

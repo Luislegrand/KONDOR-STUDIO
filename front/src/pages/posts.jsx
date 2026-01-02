@@ -9,6 +9,8 @@ import EmptyState from "@/components/ui/empty-state.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
+import Toast from "@/components/ui/toast.jsx";
+import useToast from "@/hooks/useToast.js";
 import {
   buildStatusPayload,
   getWorkflowStatuses,
@@ -79,6 +81,7 @@ export default function Posts() {
   const saveTimeoutRef = React.useRef(null);
   const queryClient = useQueryClient();
   const statusOptions = React.useMemo(() => getWorkflowStatuses(), []);
+  const { toast, showToast } = useToast();
 
   const handleDialogClose = React.useCallback(() => {
     setDialogOpen(false);
@@ -115,7 +118,7 @@ export default function Posts() {
       error?.data?.error ||
       error?.message ||
       "Erro ao salvar o post. Tente novamente.";
-    alert(message);
+    showToast(message, "error");
   };
 
   const createMutation = useMutation({
@@ -594,7 +597,11 @@ export default function Posts() {
               }
             />
           ) : (
-            <Postcalendar posts={filteredPosts} onPostClick={handleEdit} />
+            <Postcalendar
+              posts={filteredPosts}
+              onPostClick={handleEdit}
+              isLoading={isLoading}
+            />
           )
         ) : (
           <Postkanban
@@ -623,6 +630,8 @@ export default function Posts() {
         }
         isDeleting={deleteMutation.isPending}
       />
+
+      <Toast toast={toast} />
     </PageShell>
   );
 }
