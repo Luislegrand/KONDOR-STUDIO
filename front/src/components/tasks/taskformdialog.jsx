@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
+import { FormGrid, FormSection } from "@/components/ui/form.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import { ChevronDown } from "lucide-react";
 
 const STATUS_OPTIONS = [
@@ -111,122 +113,127 @@ export default function Taskformdialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label>Título</Label>
-            <Input
-              value={formData.title}
-              onChange={handleChange("title")}
-              placeholder="Ex: Criar criativos da campanha X"
-              required
-            />
-          </div>
+          <FormSection title="Detalhes da tarefa" description="Defina escopo e contexto.">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Titulo</Label>
+                <Input
+                  value={formData.title}
+                  onChange={handleChange("title")}
+                  placeholder="Ex: Criar criativos da campanha X"
+                  required
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Textarea
-              value={formData.description}
-              onChange={handleChange("description")}
-              placeholder="Detalhes da tarefa, contexto, links..."
-              rows={4}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <div className="relative" ref={clientMenuRef}>
-                <button
-                  type="button"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-900 shadow-sm hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
-                  onClick={() => setClientMenuOpen((prev) => !prev)}
-                >
-                  <span>
-                    {formData.clientId
-                      ? clients.find((c) => c.id === formData.clientId)?.name ||
-                        "Cliente indefinido"
-                      : "Selecione um cliente"}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </button>
-                {clientMenuOpen && (
-                  <div className="absolute mt-2 w-full max-h-48 overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-xl z-20">
-                    {clients.length === 0 && (
-                      <p className="text-xs text-gray-400 p-3">
-                        Nenhum cliente cadastrado.
-                      </p>
-                    )}
-                    {clients.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 ${
-                          formData.clientId === c.id
-                            ? "bg-purple-50 text-purple-700"
-                            : "text-gray-700"
-                        }`}
-                        onClick={() => {
-                          setFormData((prev) => ({ ...prev, clientId: c.id }));
-                          setClientMenuOpen(false);
-                        }}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label>Descricao</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={handleChange("description")}
+                  placeholder="Detalhes da tarefa, contexto, links..."
+                  rows={4}
+                />
               </div>
             </div>
+          </FormSection>
 
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <div className="relative" ref={statusMenuRef}>
-                <button
-                  type="button"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-900 shadow-sm hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
-                  onClick={() => setStatusMenuOpen((prev) => !prev)}
-                >
-                  <span>
-                    {STATUS_OPTIONS.find((s) => s.value === formData.status)
-                      ?.label || "Selecione o status"}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </button>
-                {statusMenuOpen && (
-                  <div className="absolute mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl z-20">
-                    {STATUS_OPTIONS.map((status) => (
-                      <button
-                        key={status.value}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 ${
-                          formData.status === status.value
-                            ? "bg-purple-50 text-purple-700"
-                            : "text-gray-700"
-                        }`}
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            status: status.value,
-                          }));
-                          setStatusMenuOpen(false);
-                        }}
-                      >
-                        {status.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+          <FormSection title="Planejamento" description="Cliente, status e prazo.">
+            <FormGrid>
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <div className="relative" ref={clientMenuRef}>
+                  <button
+                    type="button"
+                    className="w-full rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-left text-sm text-[var(--text)] shadow-sm transition-[border-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:border-slate-200/80 hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)] flex items-center justify-between"
+                    onClick={() => setClientMenuOpen((prev) => !prev)}
+                  >
+                    <span>
+                      {formData.clientId
+                        ? clients.find((c) => c.id === formData.clientId)?.name ||
+                          "Cliente indefinido"
+                        : "Selecione um cliente"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                  </button>
+                  {clientMenuOpen && (
+                    <div className="absolute mt-2 w-full max-h-48 overflow-y-auto rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] z-20 animate-fade-in-up">
+                      {clients.length === 0 && (
+                        <p className="text-xs text-[var(--text-muted)] p-3">
+                          Nenhum cliente cadastrado.
+                        </p>
+                      )}
+                      {clients.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--primary-light)] ${
+                            formData.clientId === c.id
+                              ? "bg-[var(--primary-light)] text-[var(--primary)]"
+                              : "text-[var(--text)]"
+                          }`}
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, clientId: c.id }));
+                            setClientMenuOpen(false);
+                          }}
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Prazo</Label>
-              <Input
-                type="date"
-                value={formData.dueDate}
-                onChange={handleChange("dueDate")}
-              />
-            </div>
-          </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <div className="relative" ref={statusMenuRef}>
+                  <button
+                    type="button"
+                    className="w-full rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-left text-sm text-[var(--text)] shadow-sm transition-[border-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:border-slate-200/80 hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)] flex items-center justify-between"
+                    onClick={() => setStatusMenuOpen((prev) => !prev)}
+                  >
+                    <span>
+                      {STATUS_OPTIONS.find((s) => s.value === formData.status)
+                        ?.label || "Selecione o status"}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                  </button>
+                  {statusMenuOpen && (
+                    <div className="absolute mt-2 w-full rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] z-20 animate-fade-in-up">
+                      {STATUS_OPTIONS.map((status) => (
+                        <button
+                          key={status.value}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--primary-light)] ${
+                            formData.status === status.value
+                              ? "bg-[var(--primary-light)] text-[var(--primary)]"
+                              : "text-[var(--text)]"
+                          }`}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              status: status.value,
+                            }));
+                            setStatusMenuOpen(false);
+                          }}
+                        >
+                          {status.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Prazo</Label>
+                <DateField
+                  value={formData.dueDate}
+                  onChange={handleChange("dueDate")}
+                />
+              </div>
+            </FormGrid>
+          </FormSection>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
             {task && onDelete && (

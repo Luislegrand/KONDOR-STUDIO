@@ -8,6 +8,7 @@ import EmptyState from "@/components/ui/empty-state.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import StatPill from "@/components/ui/stat-pill.jsx";
 import Toast from "@/components/ui/toast.jsx";
@@ -196,14 +197,13 @@ export default function Competitors() {
       <FilterBar className="mt-6">
         <div className="min-w-[220px] flex-1">
           <Label>Cliente</Label>
-          <select
+          <SelectNative
             value={selectedClientId}
             onChange={(event) => {
               const value = event.target.value;
               setSelectedClientId(value);
               setActiveClientId(value);
             }}
-            className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
           >
             <option value="">Todos os clientes</option>
             {clients.map((client) => (
@@ -211,22 +211,21 @@ export default function Competitors() {
                 {client.name}
               </option>
             ))}
-          </select>
+          </SelectNative>
         </div>
 
         <div className="min-w-[180px]">
           <Label>Rede</Label>
-          <select
+          <SelectNative
             value={platform}
             onChange={(event) => setPlatform(event.target.value)}
-            className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
           >
             {PLATFORM_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </SelectNative>
         </div>
 
         <div className="min-w-[240px] flex-1">

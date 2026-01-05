@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { getWorkflowStatusConfig, resolveWorkflowStatus } from "@/utils/postStatus.js";
 
 const WEEK_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
@@ -46,6 +46,7 @@ export default function Postcalendar({
   isLoading = false,
 }) {
   const [currentDate, setCurrentDate] = React.useState(() => new Date());
+  const todayKey = React.useMemo(() => toDateKey(new Date()), []);
 
   const weeks = React.useMemo(() => buildMonthGrid(currentDate), [currentDate]);
 
@@ -114,7 +115,7 @@ export default function Postcalendar({
           <button
             type="button"
             onClick={goPrev}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--surface-muted)] hover:shadow-[var(--shadow-sm)]"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -122,7 +123,7 @@ export default function Postcalendar({
           <button
             type="button"
             onClick={goNext}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--surface-muted)] hover:shadow-[var(--shadow-sm)]"
             aria-label="Proximo mes"
           >
             <ChevronRight className="h-4 w-4" />
@@ -143,6 +144,7 @@ export default function Postcalendar({
           const isCurrentMonth = day.getMonth() === currentDate.getMonth();
           const key = toDateKey(day);
           const dayPosts = postsByDate.get(key) || [];
+          const isToday = key === todayKey;
 
           const handleDateClick = () => {
             if (onDateClick) onDateClick(day);
@@ -161,11 +163,26 @@ export default function Postcalendar({
                 }
               }}
               aria-label={`Criar post em ${day.toLocaleDateString("pt-BR")}`}
-              className={`min-h-[120px] rounded-[12px] border border-[var(--border)] p-2 text-xs transition hover:border-[var(--primary)] ${
+              className={`group min-h-[120px] rounded-[12px] border border-[var(--border)] p-2 text-xs transition-[border-color,box-shadow,transform] duration-[var(--motion-base)] ease-[var(--ease-standard)] hover:border-[var(--primary)] hover:shadow-[var(--shadow-sm)] ${
                 isCurrentMonth ? "bg-white" : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
-              }`}
+              } ${isToday ? "border-[var(--primary)] bg-[var(--primary-light)]" : ""}`}
             >
-              <div className="text-[11px] font-semibold text-[var(--text)]">{day.getDate()}</div>
+              <div className="flex items-center justify-between">
+                <div className={`text-[11px] font-semibold ${isCurrentMonth ? "text-[var(--text)]" : "text-[var(--text-muted)]"}`}>
+                  {day.getDate()}
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDateClick();
+                  }}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-[var(--text-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-white/80"
+                  aria-label="Criar post"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
               <div className="mt-2 space-y-1">
                 {dayPosts.slice(0, 3).map((post) => {
                   const status = resolveWorkflowStatus(post);

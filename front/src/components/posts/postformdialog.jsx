@@ -10,12 +10,12 @@ import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
+import { DateField, TimeField } from "@/components/ui/date-field.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import {
-  Calendar,
   ChevronDown,
   ChevronUp,
-  Clock,
   Image as ImageIcon,
   Plus,
   Sparkles,
@@ -462,7 +462,7 @@ export function PostForm({
 
   const effectivePreview = previewUrl;
   const StepCard = ({ step, title, subtitle, children }) => (
-    <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
+    <div className="rounded-[16px] border border-[var(--border)] bg-white/90 p-4 shadow-[var(--shadow-sm)] backdrop-blur-sm transition-[box-shadow,border-color] duration-[var(--motion-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-md)] hover:border-slate-200/80">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary-light)] text-xs font-semibold text-[var(--primary)]">
@@ -501,26 +501,25 @@ export function PostForm({
               title="Selecione perfis"
               subtitle="Escolha o perfil e um grupo (opcional)."
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="space-y-2">
-                  <Label>Perfil</Label>
-                  <select
-                    value={formData.clientId}
-                    onChange={handleChange("clientId")}
-                    className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
-                  >
-                    <option value="">Selecione um cliente</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="space-y-2">
+                    <Label>Perfil</Label>
+                    <SelectNative
+                      value={formData.clientId}
+                      onChange={handleChange("clientId")}
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </SelectNative>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="self-end">
+                    Selecionar um grupo
+                  </Button>
                 </div>
-                <Button type="button" variant="outline" size="sm" className="self-end">
-                  Selecionar um grupo
-                </Button>
-              </div>
             </StepCard>
 
               <StepCard
@@ -531,10 +530,9 @@ export function PostForm({
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Rede social</Label>
-                    <select
+                    <SelectNative
                       value={formData.integrationId}
                       onChange={handleChange("integrationId")}
-                      className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
                       disabled={!formData.clientId || postingIntegrations.length === 0}
                     >
                       <option value="">
@@ -549,7 +547,7 @@ export function PostForm({
                           {resolveIntegrationLabel(integration)}
                         </option>
                       ))}
-                    </select>
+                    </SelectNative>
                     {formData.clientId && postingIntegrations.length === 0 ? (
                       <p className="text-[11px] text-amber-600">
                         Cadastre uma integracao deste cliente antes de publicar.
@@ -722,28 +720,20 @@ export function PostForm({
                       key={`slot-${index}`}
                       className="flex flex-wrap items-center gap-2"
                     >
-                      <div className="relative flex-1 min-w-[160px]">
-                        <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-                        <Input
-                          type="date"
-                          value={slot.date}
-                          onChange={(event) =>
-                            updateScheduleSlot(index, "date", event.target.value)
-                          }
-                          className="pl-9"
-                        />
-                      </div>
-                      <div className="relative w-[140px]">
-                        <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-                        <Input
-                          type="time"
-                          value={slot.time}
-                          onChange={(event) =>
-                            updateScheduleSlot(index, "time", event.target.value)
-                          }
-                          className="pl-9"
-                        />
-                      </div>
+                      <DateField
+                        className="flex-1 min-w-[160px]"
+                        value={slot.date}
+                        onChange={(event) =>
+                          updateScheduleSlot(index, "date", event.target.value)
+                        }
+                      />
+                      <TimeField
+                        className="w-[140px]"
+                        value={slot.time}
+                        onChange={(event) =>
+                          updateScheduleSlot(index, "time", event.target.value)
+                        }
+                      />
                       {scheduleSlots.length > 1 ? (
                         <button
                           type="button"

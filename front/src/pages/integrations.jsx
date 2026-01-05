@@ -25,6 +25,7 @@ import {
 import IntegrationTile from "@/components/integrations/IntegrationTile.jsx";
 import IntegrationConnectDialog from "@/components/integrations/IntegrationConnectDialog.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
+import { SelectNative } from "@/components/ui/select-native.jsx";
 
 const DEFAULT_OWNER_KEY = "AGENCY";
 
@@ -700,14 +701,13 @@ export default function Integrations() {
               <label className="text-xs font-semibold text-[var(--text-muted)]">
                 Cliente selecionado
               </label>
-              <select
+              <SelectNative
                 value={selectedClientId}
                 onChange={(event) => {
                   const value = event.target.value;
                   setSelectedClientId(value);
                   setActiveClientId(value);
                 }}
-                className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
               >
                 <option value="">Selecione um cliente</option>
                 {clients.map((client) => (
@@ -715,7 +715,7 @@ export default function Integrations() {
                     {client.name}
                   </option>
                 ))}
-              </select>
+              </SelectNative>
               {clients.length === 0 ? (
                 <p className="text-[11px] text-amber-600">
                   Cadastre um cliente antes de conectar redes sociais.

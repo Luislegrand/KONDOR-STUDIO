@@ -36,6 +36,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
 
 const navGroups = [
@@ -294,10 +295,11 @@ function LayoutContent() {
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
                 Perfil
               </span>
-              <select
+              <SelectNative
+                className="min-w-[180px]"
+                selectClassName="h-8 w-full border-0 bg-transparent shadow-none px-0 pr-6 text-sm font-semibold text-[var(--text)]"
                 value={activeClientId || ""}
                 onChange={(event) => setActiveClientId(event.target.value || "")}
-                className="w-auto border-0 bg-transparent p-0 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-0"
               >
                 <option value="">Todos os clientes</option>
                 {clients.map((client) => (
@@ -305,7 +307,7 @@ function LayoutContent() {
                     {client.name}
                   </option>
                 ))}
-              </select>
+              </SelectNative>
             </div>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)]">
               {currentUserName || "Usuario"}

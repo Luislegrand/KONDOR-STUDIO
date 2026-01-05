@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
+import { FormGrid, FormHint, FormSection } from "@/components/ui/form.jsx";
 import { ChevronDown } from "lucide-react";
 
 const DEFAULT_PERMISSIONS = {
@@ -55,27 +56,27 @@ function DropdownChip({ value, onChange, options, placeholder }) {
     <div className="relative" ref={containerRef}>
       <button
         type="button"
-        className={`w-full h-11 px-4 rounded-2xl border text-left text-sm font-medium flex items-center justify-between transition ${
+        className={`w-full h-11 px-4 rounded-[14px] border text-left text-sm font-medium flex items-center justify-between transition ${
           open
-            ? "border-purple-300 bg-purple-50 text-purple-700"
-            : "border-gray-200 bg-white text-gray-700 hover:border-purple-200"
+            ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+            : "border-[var(--border)] bg-white text-[var(--text)] hover:bg-[var(--surface-muted)]"
         }`}
         onClick={() => setOpen((prev) => !prev)}
       >
         <span>{currentLabel}</span>
-        <ChevronDown className="w-4 h-4" />
+        <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
       </button>
 
       {open && (
-        <div className="absolute z-40 mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl py-2">
+        <div className="absolute z-40 mt-2 w-full rounded-[14px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] py-2 animate-fade-in-up">
           {options.map((option) => (
             <button
               key={option.value}
               type="button"
               className={`w-full text-left px-4 py-2 text-sm font-medium transition ${
                 option.value === value
-                  ? "text-purple-700 bg-purple-50"
-                  : "text-gray-600 hover:bg-gray-50"
+                  ? "text-[var(--primary)] bg-[var(--primary-light)]"
+                  : "text-[var(--text)] hover:bg-[var(--surface-muted)]"
               }`}
               onClick={() => {
                 onChange(option.value);
@@ -187,102 +188,93 @@ export default function Teamformdialog({ open, onClose, member }) {
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-gray-900">Nome *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-                className="bg-white border-gray-300"
-              />
-            </div>
-            <div>
-              <Label className="text-gray-900">Email *</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                required
-                className="bg-white border-gray-300"
-              />
-            </div>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection title="Dados do membro" description="Identificacao e acesso.">
+            <FormGrid>
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email *</Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Login do membro</Label>
+                <Input
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
+                  placeholder="ex: joaosilva"
+                />
+                <FormHint>
+                  Caso deixe em branco, o e-mail sera usado como login.
+                </FormHint>
+              </div>
+              <div className="space-y-2">
+                <Label>{member ? "Atualizar senha" : "Senha de acesso"}</Label>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  placeholder="Defina uma senha segura"
+                  required={!member}
+                />
+                {member ? (
+                  <FormHint>Deixe vazio se nao quiser alterar a senha.</FormHint>
+                ) : null}
+              </div>
+            </FormGrid>
+          </FormSection>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-gray-900">Login do membro</Label>
-              <Input
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                placeholder="ex: joaosilva"
-                className="bg-white border-gray-300"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Caso deixe em branco, o e-mail será usado como login.
-              </p>
-            </div>
-            <div>
-              <Label className="text-gray-900">
-                {member ? "Atualizar senha" : "Senha de acesso"}
-              </Label>
-              <Input
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                placeholder="Defina uma senha segura"
-                className="bg-white border-gray-300"
-                required={!member}
-              />
-              {member && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Deixe vazio se não quiser alterar a senha.
-                </p>
-              )}
-            </div>
-          </div>
+          <FormSection title="Perfil e custos" description="Funcao e custos associados.">
+            <FormGrid>
+              <div className="space-y-2">
+                <Label>Funcao</Label>
+                <DropdownChip
+                  value={formData.role}
+                  onChange={(value) => setFormData({ ...formData, role: value })}
+                  options={ROLE_OPTIONS}
+                  placeholder="Selecione..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Salario mensal (opcional)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.salary}
+                  onChange={(e) =>
+                    setFormData({ ...formData, salary: e.target.value })
+                  }
+                  placeholder="Ex: 3500.00"
+                />
+                <FormHint>
+                  Ao informar, sera criado um custo automatico no financeiro.
+                </FormHint>
+              </div>
+            </FormGrid>
+          </FormSection>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-gray-900">Função</Label>
-              <DropdownChip
-                value={formData.role}
-                onChange={(value) => setFormData({ ...formData, role: value })}
-                options={ROLE_OPTIONS}
-                placeholder="Selecione..."
-              />
-            </div>
-            <div>
-              <Label className="text-gray-900">Salário mensal (opcional)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.salary}
-                onChange={(e) =>
-                  setFormData({ ...formData, salary: e.target.value })
-                }
-                placeholder="Ex: 3500.00"
-                className="bg-white border-gray-300"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Ao informar, será criado um custo automático no financeiro.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <Label className="mb-3 block text-gray-900">Permissões</Label>
-            <div className="space-y-2 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+          <FormSection title="Permissoes" description="Defina o acesso do membro.">
+            <div className="space-y-2 bg-[var(--surface-muted)] p-4 rounded-[14px] border border-[var(--border)]">
               {Object.keys(formData.permissions).map((key) => (
                 <div key={key} className="flex items-center gap-2">
                   <Checkbox
@@ -292,14 +284,14 @@ export default function Teamformdialog({ open, onClose, member }) {
                   />
                   <label
                     htmlFor={key}
-                    className="text-sm capitalize cursor-pointer text-gray-900"
+                    className="text-sm capitalize cursor-pointer text-[var(--text)]"
                   >
                     {key.replace("_", " ")}
                   </label>
                 </div>
               ))}
             </div>
-          </div>
+          </FormSection>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>

@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import PageShell from "@/components/ui/page-shell.jsx";
-import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import EmptyState from "@/components/ui/empty-state.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
 import {
   BarChart3,
@@ -263,10 +264,10 @@ export default function Metrics() {
                 <Label className="text-[10px] uppercase tracking-[0.3em] text-white/70">
                   Cliente
                 </Label>
-                <select
+                <SelectNative
+                  selectClassName="h-9 border border-white/30 bg-white/90 text-slate-900 shadow-none"
                   value={activeClientId || ""}
                   onChange={(event) => setActiveClientId(event.target.value || "")}
-                  className="h-9 rounded-[10px] border border-white/30 bg-white/90 px-3 text-sm font-semibold text-slate-900"
                 >
                   <option value="">Todos os clientes</option>
                   {clients.map((client) => (
@@ -274,23 +275,23 @@ export default function Metrics() {
                       {client.name}
                     </option>
                   ))}
-                </select>
+                </SelectNative>
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] uppercase tracking-[0.3em] text-white/70">
                   Periodo
                 </Label>
-                <select
+                <SelectNative
+                  selectClassName="h-9 border border-white/30 bg-white/90 text-slate-900 shadow-none"
                   value={periodPreset}
                   onChange={(event) => setPeriodPreset(event.target.value)}
-                  className="h-9 rounded-[10px] border border-white/30 bg-white/90 px-3 text-sm font-semibold text-slate-900"
                 >
                   {PERIOD_PRESETS.map((preset) => (
                     <option key={preset.value} value={preset.value}>
                       {preset.label}
                     </option>
                   ))}
-                </select>
+                </SelectNative>
               </div>
             </div>
           </div>
@@ -343,16 +344,14 @@ export default function Metrics() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Data inicial</Label>
-            <Input
-              type="date"
+            <DateField
               value={customFrom}
               onChange={(event) => setCustomFrom(event.target.value)}
             />
           </div>
           <div className="space-y-2">
             <Label>Data final</Label>
-            <Input
-              type="date"
+            <DateField
               value={customTo}
               onChange={(event) => setCustomTo(event.target.value)}
             />

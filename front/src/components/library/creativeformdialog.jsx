@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
+import { FormGrid, FormHint, FormSection } from "@/components/ui/form.jsx";
 
 import {
   Select,
@@ -91,76 +92,79 @@ export default function Creativeformdialog({ open, onClose, clients }) {
           <DialogTitle className="text-gray-900">Novo Criativo</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label className="text-gray-900">Nome *</Label>
-            <Input
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              required
-              className="bg-white border-gray-300"
-            />
-          </div>
-
-          <div>
-            <Label className="text-gray-900">Upload de Arquivo *</Label>
-            <div className="mt-2">
-              <input
-                type="file"
-                accept="image/*,video/*"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="creative-upload"
-              />
-              <label htmlFor="creative-upload">
-                <Button type="button" variant="outline" className="w-full bg-white" asChild disabled={uploading}>
-                  <span>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploading ? 'Enviando...' : formData.file_url ? 'Arquivo enviado ✓' : 'Upload de Arquivo'}
-                  </span>
-                </Button>
-              </label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection title="Arquivo" description="Envie o criativo que sera usado nas pecas.">
+            <div className="space-y-2">
+              <Label>Upload de Arquivo *</Label>
+              <div className="mt-2">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="creative-upload"
+                />
+                <label htmlFor="creative-upload">
+                  <Button type="button" variant="outline" className="w-full bg-white" asChild disabled={uploading}>
+                    <span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploading ? "Enviando..." : formData.file_url ? "Arquivo enviado ✓" : "Upload de Arquivo"}
+                    </span>
+                  </Button>
+                </label>
+                <FormHint>PNG, JPG ou MP4. Recomendado até 50MB.</FormHint>
+              </div>
             </div>
-          </div>
+          </FormSection>
 
-          <div>
-            <Label className="text-gray-900">Cliente</Label>
-            <Select
-              value={formData.client_id}
-              onValueChange={(value) => setFormData({...formData, client_id: value})}
-            >
-              <SelectTrigger className="bg-white border-gray-300">
-                <SelectValue placeholder="Selecione (opcional)" />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                {clients.map(client => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormSection title="Detalhes" description="Organize o criativo por cliente e tags.">
+            <FormGrid>
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  required
+                />
+              </div>
 
-          <div>
-            <Label className="text-gray-900">Tags (separadas por vírgula)</Label>
-            <Input
-              value={formData.tags}
-              onChange={(e) => setFormData({...formData, tags: e.target.value})}
-              placeholder="ex: feed, story, produto"
-              className="bg-white border-gray-300"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <Select
+                  value={formData.client_id}
+                  onValueChange={(value) => setFormData({...formData, client_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {clients.map(client => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Tags (separadas por virgula)</Label>
+                <Input
+                  value={formData.tags}
+                  onChange={(e) => setFormData({...formData, tags: e.target.value})}
+                  placeholder="ex: feed, story, produto"
+                />
+              </div>
+            </FormGrid>
 
-          <div>
-            <Label className="text-gray-900">Observações</Label>
-            <Textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              rows={3}
-              className="bg-white border-gray-300"
-            />
-          </div>
+            <div className="mt-4 space-y-2">
+              <Label>Observacoes</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                rows={3}
+              />
+            </div>
+          </FormSection>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
+import { FormGrid, FormSection } from "@/components/ui/form.jsx";
 
 const PLATFORM_OPTIONS = [
   { value: "instagram", label: "Instagram" },
@@ -72,66 +74,65 @@ export default function CompetitorFormDialog({
           <DialogTitle>{competitor ? "Editar concorrente" : "Novo concorrente"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Cliente</Label>
-            <select
-              value={formData.clientId}
-              onChange={handleChange("clientId")}
-              className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
-            >
-              <option value="">Todos os clientes</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection
+            title="Dados do concorrente"
+            description="Informe rede, cliente e detalhes do perfil."
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <SelectNative value={formData.clientId} onChange={handleChange("clientId")}>
+                  <option value="">Todos os clientes</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </SelectNative>
+              </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Rede</Label>
-              <select
-                value={formData.platform}
-                onChange={handleChange("platform")}
-                className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
-              >
-                {PLATFORM_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <FormGrid>
+                <div className="space-y-2">
+                  <Label>Rede</Label>
+                  <SelectNative value={formData.platform} onChange={handleChange("platform")}>
+                    {PLATFORM_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </SelectNative>
+                </div>
+                <div className="space-y-2">
+                  <Label>@ do concorrente</Label>
+                  <Input
+                    value={formData.username}
+                    onChange={handleChange("username")}
+                    placeholder="@concorrente"
+                  />
+                </div>
+              </FormGrid>
+
+              <div className="space-y-2">
+                <Label>Nome exibido</Label>
+                <Input
+                  value={formData.name}
+                  onChange={handleChange("name")}
+                  placeholder="Nome do concorrente"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Observacoes</Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={handleChange("notes")}
+                  placeholder="Notas internas sobre o concorrente"
+                  rows={3}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>@ do concorrente</Label>
-              <Input
-                value={formData.username}
-                onChange={handleChange("username")}
-                placeholder="@concorrente"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Nome exibido</Label>
-            <Input
-              value={formData.name}
-              onChange={handleChange("name")}
-              placeholder="Nome do concorrente"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Observacoes</Label>
-            <Textarea
-              value={formData.notes}
-              onChange={handleChange("notes")}
-              placeholder="Notas internas sobre o concorrente"
-              rows={3}
-            />
-          </div>
+          </FormSection>
 
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="ghost" onClick={onClose}>

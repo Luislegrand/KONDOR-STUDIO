@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import { Input } from "@/components/ui/input.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import {
   Select,
   SelectContent,
@@ -132,8 +133,7 @@ export default function AdminJobs() {
 
           <div>
             <label className="text-sm font-medium text-gray-600 mb-1 block">Desde</label>
-            <Input
-              type="date"
+            <DateField
               value={filters.since}
               onChange={(e) => updateFilter("since", e.target.value)}
             />

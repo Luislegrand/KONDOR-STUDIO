@@ -9,6 +9,8 @@ import FilterBar from "@/components/ui/filter-bar.jsx";
 import EmptyState from "@/components/ui/empty-state.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import Toast from "@/components/ui/toast.jsx";
 import useToast from "@/hooks/useToast.js";
@@ -449,14 +451,13 @@ export default function Posts() {
       <FilterBar className="mt-6">
         <div className="min-w-[220px] flex-1">
           <Label>Perfil/cliente</Label>
-          <select
+          <SelectNative
             value={selectedClientId}
             onChange={(event) => {
               const value = event.target.value;
               setSelectedClientId(value);
               setActiveClientId(value);
             }}
-            className="w-full h-10 rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[rgba(109,40,217,0.2)]"
           >
             <option value="">Todos os clientes</option>
             {clients.map((client) => (
@@ -464,7 +465,7 @@ export default function Posts() {
                 {client.name}
               </option>
             ))}
-          </select>
+          </SelectNative>
           {clients.length === 0 ? (
             <p className="text-[11px] text-amber-600 mt-1">
               Cadastre um cliente antes de visualizar posts.
@@ -474,8 +475,7 @@ export default function Posts() {
 
         <div className="min-w-[160px]">
           <Label>Periodo inicial</Label>
-          <Input
-            type="date"
+          <DateField
             value={dateStart}
             onChange={(event) => setDateStart(event.target.value)}
           />
@@ -483,8 +483,7 @@ export default function Posts() {
 
         <div className="min-w-[160px]">
           <Label>Periodo final</Label>
-          <Input
-            type="date"
+          <DateField
             value={dateEnd}
             onChange={(event) => setDateEnd(event.target.value)}
           />
@@ -495,14 +494,14 @@ export default function Posts() {
           <button
             type="button"
             onClick={() => setStatusMenuOpen((prev) => !prev)}
-            className="flex h-10 w-full items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm hover:bg-gray-50"
+            className="flex h-10 w-full items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm transition-[border-color,box-shadow,background-color] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--surface-muted)] hover:shadow-[var(--shadow-sm)]"
             aria-expanded={statusMenuOpen}
           >
             <span className="text-[var(--text-muted)]">{statusLabel}</span>
             <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
           </button>
           {statusMenuOpen ? (
-            <div className="absolute z-40 mt-2 w-[260px] rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)]">
+            <div className="absolute z-40 mt-2 w-[260px] rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] animate-fade-in-up">
               <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
                 <span className="text-xs font-semibold text-[var(--text-muted)]">
                   Selecionar status

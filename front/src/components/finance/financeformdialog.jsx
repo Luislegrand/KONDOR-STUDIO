@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
+import { FormGrid, FormSection } from "@/components/ui/form.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import { ChevronDown } from "lucide-react";
 
 const TYPE_OPTIONS = [
@@ -44,26 +46,26 @@ function MiniSelect({ value, onChange, options = [], placeholder }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`w-full h-11 px-4 rounded-2xl border text-left text-sm font-medium flex items-center justify-between transition ${
+        className={`w-full h-11 px-4 rounded-[14px] border text-left text-sm font-medium flex items-center justify-between transition ${
           open
-            ? "border-purple-300 bg-purple-50 text-purple-700"
-            : "border-gray-200 bg-white text-gray-700 hover:border-purple-200"
+            ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+            : "border-[var(--border)] bg-white text-[var(--text)] hover:bg-[var(--surface-muted)]"
         }`}
       >
         <span>{current}</span>
-        <ChevronDown className="w-4 h-4" />
+        <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
       </button>
 
       {open && (
-        <div className="absolute z-40 mt-2 w-full rounded-2xl border border-gray-100 bg-white shadow-xl py-2">
+        <div className="absolute z-40 mt-2 w-full rounded-[14px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] py-2 animate-fade-in-up">
           {options.map((option) => (
             <button
               key={option.value}
               type="button"
               className={`w-full text-left px-4 py-2 text-sm transition ${
                 option.value === value
-                  ? "text-purple-700 bg-purple-50"
-                  : "text-gray-600 hover:bg-gray-50"
+                  ? "text-[var(--primary)] bg-[var(--primary-light)]"
+                  : "text-[var(--text)] hover:bg-[var(--surface-muted)]"
               }`}
               onClick={() => {
                 onChange(option.value);
@@ -190,74 +192,72 @@ export default function Financeformdialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Cliente + Tipo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormSection title="Detalhes do lancamento" description="Cliente, tipo e valores.">
+            <FormGrid>
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <MiniSelect
+                  value={formData.clientId}
+                  onChange={handleChange("clientId")}
+                  options={clients.map((c) => ({ value: c.id, label: c.name }))}
+                  placeholder="Selecione um cliente"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de lancamento</Label>
+                <MiniSelect
+                  value={formData.type}
+                  onChange={handleChange("type")}
+                  options={TYPE_OPTIONS}
+                  placeholder="Selecione o tipo"
+                />
+              </div>
+
+              {formData.type !== "income" ? (
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Nome do custo</Label>
+                  <Input
+                    value={formData.costName}
+                    onChange={handleChange("costName")}
+                    placeholder="Ex: Assinatura Canva"
+                  />
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={handleChange("amount")}
+                  placeholder="Ex: 1500.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Data do lancamento</Label>
+                <DateField
+                  value={formData.occurredAt}
+                  onChange={handleChange("occurredAt")}
+                />
+              </div>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Observacoes" description="Notas internas do lancamento.">
             <div className="space-y-2">
-              <Label>Cliente</Label>
-              <MiniSelect
-                value={formData.clientId}
-                onChange={handleChange("clientId")}
-                options={clients.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Selecione um cliente"
+              <Label>Observacoes</Label>
+              <Textarea
+                value={formData.note}
+                onChange={handleChange("note")}
+                placeholder="Detalhes sobre o lancamento..."
+                rows={3}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de lançamento</Label>
-              <MiniSelect
-                value={formData.type}
-                onChange={handleChange("type")}
-                options={TYPE_OPTIONS}
-                placeholder="Selecione o tipo"
-              />
-            </div>
-          </div>
-
-          {formData.type !== "income" && (
-            <div className="space-y-2">
-              <Label>Nome do custo</Label>
-              <Input
-                value={formData.costName}
-                onChange={handleChange("costName")}
-                placeholder="Ex: Assinatura Canva"
-              />
-            </div>
-          )}
-
-          {/* Valor + Data */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={handleChange("amount")}
-                placeholder="Ex: 1500.00"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data do lançamento</Label>
-              <Input
-                type="date"
-                value={formData.occurredAt}
-                onChange={handleChange("occurredAt")}
-              />
-            </div>
-          </div>
-
-          {/* Observação */}
-          <div className="space-y-2">
-            <Label>Observações</Label>
-            <Textarea
-              value={formData.note}
-              onChange={handleChange("note")}
-              placeholder="Detalhes sobre o lançamento..."
-              rows={3}
-            />
-          </div>
+          </FormSection>
 
           {/* Botões */}
           <div className="flex justify-end gap-3">

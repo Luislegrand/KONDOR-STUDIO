@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
+import { SelectNative } from "@/components/ui/select-native.jsx";
 
 function normalizeValue(value) {
   if (value === undefined || value === null) return "";
@@ -374,17 +375,16 @@ export default function IntegrationConnectDialog({
               {isMetaAds ? (
                 <div className="space-y-2">
                   <Label>Conta de anúncios</Label>
-                  <select
+                  <SelectNative
                     value={selectedMetaAccountId}
                     onChange={(event) => setSelectedMetaAccountId(event.target.value)}
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {metaAdOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectNative>
                   {metaAdOptions.length === 0 ? (
                     <p className="text-[11px] text-amber-600">
                       Nenhuma conta de anúncios disponível para este usuário.
@@ -394,17 +394,16 @@ export default function IntegrationConnectDialog({
               ) : (
                 <div className="space-y-2">
                   <Label>Página do Facebook</Label>
-                  <select
+                  <SelectNative
                     value={selectedMetaPageId}
                     onChange={(event) => setSelectedMetaPageId(event.target.value)}
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {metaPageOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectNative>
                   {metaPageOptions.length === 0 ? (
                     <p className="text-[11px] text-amber-600">
                       Nenhuma página com Instagram Business vinculada.
@@ -445,10 +444,9 @@ export default function IntegrationConnectDialog({
             {isClientScope ? (
               <div className="space-y-2">
                 <Label>Cliente</Label>
-                <select
+                <SelectNative
                   value={selectedClientId}
                   onChange={(event) => setSelectedClientId(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   required
                 >
                   <option value="">Selecione um cliente</option>
@@ -457,7 +455,7 @@ export default function IntegrationConnectDialog({
                       {client.name}
                     </option>
                   ))}
-                </select>
+                </SelectNative>
                 {clients.length === 0 ? (
                   <p className="text-[11px] text-amber-600">
                     Cadastre um cliente antes de conectar esta integração.
