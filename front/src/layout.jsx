@@ -190,7 +190,7 @@ function LayoutContent() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--text)] flex">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--text)]">
       <Sidebar className="hidden lg:flex">
         <SidebarHeader className={`border-[var(--border)] bg-white/80 backdrop-blur ${collapsed ? "px-3" : "px-4"}`}>
           <div className="flex items-center justify-between gap-2">
@@ -270,7 +270,7 @@ function LayoutContent() {
         </SidebarFooter>
       </Sidebar>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex min-h-0 flex-col">
         <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] bg-white/90 px-6 py-4 shadow-[var(--shadow-sm)] backdrop-blur">
           <div className="flex items-center gap-3">
             <button
@@ -318,7 +318,7 @@ function LayoutContent() {
           </div>
         </header>
 
-          <main className="flex-1">
+          <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>
         </div>

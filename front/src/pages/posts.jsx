@@ -11,16 +11,14 @@ import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
 import { DateField } from "@/components/ui/date-field.jsx";
-import { Checkbox } from "@/components/ui/checkbox.jsx";
 import Toast from "@/components/ui/toast.jsx";
 import useToast from "@/hooks/useToast.js";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
 import {
   buildStatusPayload,
-  getWorkflowStatuses,
   isClientApprovalStatus,
 } from "@/utils/postStatus.js";
-import { ChevronDown, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import Postkanban from "../components/posts/postkanban.jsx";
 import Postcalendar from "../components/posts/postcalendar.jsx";
 import Postformdialog from "../components/posts/postformdialog.jsx";
@@ -74,18 +72,14 @@ export default function Posts() {
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState([]);
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState(() => loadViewMode());
   const [collapsedColumns, setCollapsedColumns] = useState(() =>
     loadCollapsedColumns()
   );
   const [preferencesHydrated, setPreferencesHydrated] = useState(false);
-  const statusMenuRef = React.useRef(null);
   const lastSavedRef = React.useRef("");
   const saveTimeoutRef = React.useRef(null);
   const queryClient = useQueryClient();
-  const statusOptions = React.useMemo(() => getWorkflowStatuses(), []);
   const { toast, showToast } = useToast();
 
   React.useEffect(() => {
@@ -188,7 +182,6 @@ export default function Posts() {
     try {
       const fullPost = await base44.entities.Post.get(post.id);
       setEditingPost(fullPost);
-      setPrefillDate(null);
       setDialogOpen(true);
     } catch (error) {
       showToast("Erro ao carregar detalhes do post.", "error");
@@ -258,8 +251,7 @@ export default function Posts() {
       !selectedClientId &&
       !dateStart &&
       !dateEnd &&
-      !searchTerm.trim() &&
-      selectedStatuses.length === 0;
+      !searchTerm.trim();
 
     const lastFilters = preferences?.lastFilters;
     const hasSavedFilters =
@@ -279,9 +271,6 @@ export default function Posts() {
       if (typeof lastFilters.search === "string") {
         setSearchTerm(lastFilters.search);
       }
-      if (Array.isArray(lastFilters.status)) {
-        setSelectedStatuses(lastFilters.status);
-      }
     }
 
     const seedFilters = hasSavedFilters && filtersEmpty
@@ -290,7 +279,6 @@ export default function Posts() {
           clientId: selectedClientId || null,
           dateStart: dateStart || null,
           dateEnd: dateEnd || null,
-          status: selectedStatuses,
           search: searchTerm.trim() || null,
         };
 
@@ -310,41 +298,7 @@ export default function Posts() {
     dateStart,
     dateEnd,
     searchTerm,
-    selectedStatuses,
   ]);
-
-  React.useEffect(() => {
-    if (!statusMenuOpen) return;
-
-    const handleClickOutside = (event) => {
-      if (!statusMenuRef.current) return;
-      if (!statusMenuRef.current.contains(event.target)) {
-        setStatusMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [statusMenuOpen]);
-
-  const toggleStatus = (key) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
-    );
-  };
-
-  const clearStatuses = () => {
-    setSelectedStatuses([]);
-  };
-
-  const statusLabel = React.useMemo(() => {
-    if (selectedStatuses.length === 0) return "Todos os status";
-    if (selectedStatuses.length === 1) {
-      const option = statusOptions.find((item) => item.key === selectedStatuses[0]);
-      return option?.label || "1 status";
-    }
-    return `${selectedStatuses.length} status`;
-  }, [selectedStatuses, statusOptions]);
 
   const preferencesPayload = useMemo(() => {
     const trimmedSearch = searchTerm.trim();
@@ -355,7 +309,6 @@ export default function Posts() {
         clientId: selectedClientId || null,
         dateStart: dateStart || null,
         dateEnd: dateEnd || null,
-        status: selectedStatuses,
         search: trimmedSearch || null,
       },
     };
@@ -365,7 +318,6 @@ export default function Posts() {
     selectedClientId,
     dateStart,
     dateEnd,
-    selectedStatuses,
     searchTerm,
   ]);
 
@@ -397,10 +349,9 @@ export default function Posts() {
       clientId: selectedClientId || undefined,
       startDate: dateStart || undefined,
       endDate: dateEnd || undefined,
-      status: selectedStatuses.length ? selectedStatuses.join(",") : undefined,
       q: trimmedSearch || undefined,
     };
-  }, [selectedClientId, dateStart, dateEnd, selectedStatuses, searchTerm]);
+  }, [selectedClientId, dateStart, dateEnd, searchTerm]);
 
   const postsQuery = useQuery({
     queryKey: ["posts", viewMode, filters],
@@ -433,8 +384,7 @@ export default function Posts() {
     selectedClientId ||
       dateStart ||
       dateEnd ||
-      searchTerm.trim() ||
-      selectedStatuses.length
+      searchTerm.trim()
   );
   const hasResults =
     viewMode === "calendar"
@@ -487,58 +437,6 @@ export default function Posts() {
             value={dateEnd}
             onChange={(event) => setDateEnd(event.target.value)}
           />
-        </div>
-
-        <div className="relative min-w-[200px]" ref={statusMenuRef}>
-          <Label>Status</Label>
-          <button
-            type="button"
-            onClick={() => setStatusMenuOpen((prev) => !prev)}
-            className="flex h-10 w-full items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 text-sm text-[var(--text)] shadow-sm transition-[border-color,box-shadow,background-color] duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--surface-muted)] hover:shadow-[var(--shadow-sm)]"
-            aria-expanded={statusMenuOpen}
-          >
-            <span className="text-[var(--text-muted)]">{statusLabel}</span>
-            <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-          </button>
-          {statusMenuOpen ? (
-            <div className="absolute z-40 mt-2 w-[260px] rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] animate-fade-in-up">
-              <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
-                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  Selecionar status
-                </span>
-                {selectedStatuses.length ? (
-                  <button
-                    type="button"
-                    onClick={clearStatuses}
-                    className="text-xs font-semibold text-[var(--primary)] hover:underline"
-                  >
-                    Limpar
-                  </button>
-                ) : null}
-              </div>
-              <div className="max-h-56 overflow-auto p-2">
-                {statusOptions.map((option) => {
-                  const Icon = option.icon;
-                  const checked = selectedStatuses.includes(option.key);
-                  return (
-                    <label
-                      key={option.key}
-                      className="flex cursor-pointer items-center gap-2 rounded-[10px] px-2 py-2 text-sm text-[var(--text)] hover:bg-[var(--surface-muted)]"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={() => toggleStatus(option.key)}
-                      />
-                      {Icon ? (
-                        <Icon className={`h-4 w-4 ${option.tone || "text-slate-500"}`} />
-                      ) : null}
-                      <span>{option.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="min-w-[220px] flex-1">

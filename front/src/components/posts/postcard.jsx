@@ -78,6 +78,72 @@ function resolvePostType(post) {
   return "Imagem";
 }
 
+const POST_KIND_LABELS = {
+  feed: "Feed",
+  story: "Story",
+  reel: "Reel",
+};
+
+function normalizePostKinds(value) {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  const normalized = list
+    .map((item) => (item ? String(item).trim().toLowerCase() : ""))
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+function resolvePostTypeLabels(post) {
+  const rawKinds =
+    post?.postKinds ||
+    post?.post_kinds ||
+    post?.metadata?.postKinds ||
+    post?.metadata?.post_kinds ||
+    post?.postKind ||
+    post?.post_kind ||
+    post?.metadata?.postKind ||
+    post?.metadata?.post_kind ||
+    null;
+  const normalizedKinds = normalizePostKinds(rawKinds);
+  if (normalizedKinds.length > 0) {
+    return normalizedKinds.map((kind) => POST_KIND_LABELS[kind] || kind);
+  }
+  const fallback = resolvePostType(post);
+  return fallback ? [fallback] : [];
+}
+
+function normalizePlatforms(value) {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  const normalized = list
+    .map((item) => (item ? String(item).trim().toLowerCase() : ""))
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+function resolvePlatformLabel(value) {
+  if (value === "instagram") return "Instagram";
+  if (value === "facebook") return "Facebook";
+  if (value === "tiktok") return "TikTok";
+  if (value === "meta_business") return "Meta Business";
+  return value;
+}
+
+function resolveNetworkLabels(post, integration) {
+  const rawPlatforms =
+    post?.platforms ||
+    post?.platform_list ||
+    post?.metadata?.platforms ||
+    post?.metadata?.platform_list ||
+    post?.platform ||
+    post?.metadata?.platform ||
+    null;
+  const platforms = normalizePlatforms(rawPlatforms);
+  if (platforms.length > 0) {
+    return platforms.map(resolvePlatformLabel);
+  }
+  const fallback = resolveNetworkLabel(post, integration);
+  return fallback ? [fallback] : [];
+}
+
 export default function Postcard({ post, client, integration, onEdit, onStatusChange }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState(resolveWorkflowStatus(post));
@@ -114,9 +180,9 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   const scheduledLabel = formatDate(
     post.scheduledAt || post.scheduled_at || post.scheduledDate || post.publishedDate
   );
-  const networkLabel = resolveNetworkLabel(post, integration);
+  const networkLabels = resolveNetworkLabels(post, integration);
   const description = post.body || post.caption;
-  const typeLabel = resolvePostType(post);
+  const typeLabels = resolvePostTypeLabels(post);
 
   React.useEffect(() => {
     function handleClickOutside(event) {
@@ -208,14 +274,16 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
 
       <CardContent className="pt-0 pb-2">
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="text-[10px]">
-            {typeLabel}
-          </Badge>
-          {networkLabel ? (
-            <Badge variant="outline" className="text-[10px]">
-              {networkLabel}
+          {typeLabels.map((label) => (
+            <Badge key={`type-${label}`} variant="outline" className="text-[10px]">
+              {label}
             </Badge>
-          ) : null}
+          ))}
+          {networkLabels.map((label) => (
+            <Badge key={`network-${label}`} variant="outline" className="text-[10px]">
+              {label}
+            </Badge>
+          ))}
           {scheduledLabel ? (
             <Badge variant="outline" className="text-[10px]">
               {scheduledLabel}
