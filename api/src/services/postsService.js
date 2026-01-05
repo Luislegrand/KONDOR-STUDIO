@@ -73,6 +73,63 @@ function applyIntegrationMetadata(base, data = {}) {
   return Object.keys(next).length ? next : null;
 }
 
+const POST_KIND_VALUES = new Set(['feed', 'story', 'reel']);
+
+function normalizePostKind(value) {
+  const normalized = sanitizeString(value);
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  return POST_KIND_VALUES.has(lower) ? lower : null;
+}
+
+function normalizeStorySchedule(value) {
+  if (!isPlainObject(value)) return null;
+  const next = {};
+
+  if (value.enabled !== undefined) next.enabled = Boolean(value.enabled);
+  if (value.startDate !== undefined) next.startDate = sanitizeString(value.startDate);
+  if (value.endDate !== undefined) next.endDate = sanitizeString(value.endDate);
+  if (value.time !== undefined) next.time = sanitizeString(value.time);
+  if (value.timezone !== undefined) next.timezone = sanitizeString(value.timezone);
+  if (Array.isArray(value.weekdays)) {
+    const weekdays = value.weekdays
+      .map((day) => Number(day))
+      .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+    if (weekdays.length) next.weekdays = Array.from(new Set(weekdays));
+  }
+
+  return Object.keys(next).length ? next : null;
+}
+
+function applyPostContentMetadata(base, data = {}) {
+  const next = base ? { ...base } : {};
+  const hasPostKind = data.postKind !== undefined || data.post_kind !== undefined;
+  const hasStorySchedule =
+    data.storySchedule !== undefined ||
+    data.story_schedule !== undefined ||
+    data.storyRecurrence !== undefined ||
+    data.story_recurrence !== undefined;
+
+  if (hasPostKind) {
+    const value = normalizePostKind(data.postKind || data.post_kind);
+    if (value) next.postKind = value;
+    else delete next.postKind;
+  }
+
+  if (hasStorySchedule) {
+    const raw =
+      data.storySchedule ||
+      data.story_schedule ||
+      data.storyRecurrence ||
+      data.story_recurrence;
+    const value = normalizeStorySchedule(raw);
+    if (value) next.storySchedule = value;
+    else delete next.storySchedule;
+  }
+
+  return Object.keys(next).length ? next : null;
+}
+
 function buildMetadataForCreate(data = {}) {
   const base = normalizeMetadataInput(data);
   const hasIntegrationFields =
@@ -83,9 +140,18 @@ function buildMetadataForCreate(data = {}) {
     data.integrationProvider !== undefined ||
     data.integration_provider !== undefined;
 
-  if (!base && !hasIntegrationFields) return null;
+  const hasContentFields =
+    data.postKind !== undefined ||
+    data.post_kind !== undefined ||
+    data.storySchedule !== undefined ||
+    data.story_schedule !== undefined ||
+    data.storyRecurrence !== undefined ||
+    data.story_recurrence !== undefined;
+
+  if (!base && !hasIntegrationFields && !hasContentFields) return null;
   const merged = base ? { ...base } : {};
-  return applyIntegrationMetadata(merged, data);
+  const withIntegration = applyIntegrationMetadata(merged, data);
+  return applyPostContentMetadata(withIntegration, data);
 }
 
 function buildMetadataForUpdate(existingMetadata, data = {}) {
@@ -98,11 +164,22 @@ function buildMetadataForUpdate(existingMetadata, data = {}) {
     data.integrationProvider !== undefined ||
     data.integration_provider !== undefined;
 
-  if (!patch && !hasIntegrationFields) return { hasUpdate: false, metadata: null };
+  const hasContentFields =
+    data.postKind !== undefined ||
+    data.post_kind !== undefined ||
+    data.storySchedule !== undefined ||
+    data.story_schedule !== undefined ||
+    data.storyRecurrence !== undefined ||
+    data.story_recurrence !== undefined;
+
+  if (!patch && !hasIntegrationFields && !hasContentFields) {
+    return { hasUpdate: false, metadata: null };
+  }
 
   const base = isPlainObject(existingMetadata) ? { ...existingMetadata } : {};
   const merged = patch ? { ...base, ...patch } : base;
-  const next = applyIntegrationMetadata(merged, data);
+  const withIntegration = applyIntegrationMetadata(merged, data);
+  const next = applyPostContentMetadata(withIntegration, data);
 
   return { hasUpdate: true, metadata: next };
 }

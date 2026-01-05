@@ -59,6 +59,19 @@ function resolveNetworkLabel(post, integration) {
 }
 
 function resolvePostType(post) {
+  const postKind =
+    post?.postKind ||
+    post?.post_kind ||
+    post?.metadata?.postKind ||
+    post?.metadata?.post_kind ||
+    null;
+  if (typeof postKind === "string") {
+    const normalized = postKind.toLowerCase();
+    if (normalized === "story") return "Story";
+    if (normalized === "reel" || normalized === "reels") return "Reel";
+    if (normalized === "feed") return "Feed";
+  }
+
   const mediaType = post?.mediaType || post?.media_type;
   if (mediaType === "video") return "Video";
   if (mediaType === "carousel") return "Carrossel";

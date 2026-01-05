@@ -53,6 +53,30 @@ export default function Postcalendar({
   const postsByDate = React.useMemo(() => {
     const map = new Map();
     (posts || []).forEach((post) => {
+      const rawSlots =
+        post?.metadata?.scheduleSlots ||
+        post?.metadata?.schedule_slots ||
+        [];
+      const scheduleSlots = Array.isArray(rawSlots)
+        ? rawSlots.filter((slot) => slot && slot.date)
+        : [];
+
+      if (scheduleSlots.length > 0) {
+        scheduleSlots.forEach((slot, index) => {
+          const date = new Date(`${slot.date}T00:00:00`);
+          if (isNaN(date.getTime())) return;
+          const key = toDateKey(date);
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push({
+            ...post,
+            __slotId: `${post.id}-${index}`,
+            __slotDate: slot.date,
+            __slotTime: slot.time || null,
+          });
+        });
+        return;
+      }
+
       const dateValue =
         post.scheduledDate ||
         post.scheduledAt ||
@@ -189,7 +213,7 @@ export default function Postcalendar({
                   const config = getWorkflowStatusConfig(status);
                   return (
                     <button
-                      key={post.id}
+                      key={post.__slotId || post.id}
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();

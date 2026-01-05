@@ -37,6 +37,21 @@ function formatDateTimeInput(value) {
 }
 
 const DEFAULT_SCHEDULE_TIME = "09:00";
+const DEFAULT_POST_KIND = "feed";
+const POST_KIND_OPTIONS = [
+  { value: "feed", label: "Feed" },
+  { value: "story", label: "Stories" },
+  { value: "reel", label: "Reels" },
+];
+const STORY_WEEKDAYS = [
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sab" },
+  { value: 0, label: "Dom" },
+];
 
 function splitDateTime(value) {
   const formatted = formatDateTimeInput(value);
@@ -50,12 +65,85 @@ function toDateKey(date) {
   return date.toLocaleDateString("en-CA");
 }
 
+function normalizePostKind(value) {
+  if (!value) return DEFAULT_POST_KIND;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "story" || normalized === "reel" || normalized === "feed") {
+    return normalized;
+  }
+  return DEFAULT_POST_KIND;
+}
+
 function buildScheduleDate(date, time) {
   if (!date) return null;
   const safeTime = time || DEFAULT_SCHEDULE_TIME;
   const value = new Date(`${date}T${safeTime}`);
   if (Number.isNaN(value.getTime())) return null;
   return value.toISOString();
+}
+
+function normalizeStorySchedule(schedule) {
+  if (!schedule || typeof schedule !== "object") {
+    return {
+      enabled: false,
+      startDate: "",
+      endDate: "",
+      time: DEFAULT_SCHEDULE_TIME,
+      weekdays: [],
+    };
+  }
+
+  const startDate = typeof schedule.startDate === "string" ? schedule.startDate : "";
+  const endDate = typeof schedule.endDate === "string" ? schedule.endDate : "";
+  const time = typeof schedule.time === "string" ? schedule.time : DEFAULT_SCHEDULE_TIME;
+  const weekdays = Array.isArray(schedule.weekdays)
+    ? schedule.weekdays
+        .map((day) => Number(day))
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+
+  return {
+    enabled: Boolean(schedule.enabled),
+    startDate,
+    endDate,
+    time,
+    weekdays: Array.from(new Set(weekdays)),
+  };
+}
+
+function buildRecurringScheduleSlots(schedule) {
+  if (!schedule?.enabled) return [];
+  const start = schedule.startDate ? new Date(`${schedule.startDate}T00:00:00`) : null;
+  const end = schedule.endDate ? new Date(`${schedule.endDate}T00:00:00`) : null;
+  if (!start || Number.isNaN(start.getTime())) return [];
+  if (!end || Number.isNaN(end.getTime())) return [];
+  if (end < start) return [];
+
+  const weekdaysSet = new Set(schedule.weekdays || []);
+  if (weekdaysSet.size === 0) return [];
+
+  const slots = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const time = schedule.time || DEFAULT_SCHEDULE_TIME;
+
+  while (cursor <= last) {
+    if (weekdaysSet.has(cursor.getDay())) {
+      slots.push({ date: toDateKey(cursor), time });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return slots;
+}
+
+function sortScheduleSlots(slots) {
+  if (!Array.isArray(slots)) return [];
+  return [...slots].sort((a, b) => {
+    const dateCompare = (a.date || "").localeCompare(b.date || "");
+    if (dateCompare !== 0) return dateCompare;
+    return (a.time || "").localeCompare(b.time || "");
+  });
 }
 
 function normalizeScheduleSlots(slots) {
@@ -102,6 +190,7 @@ export function PostForm({
     media_type: "image",
     integrationId: "",
     platform: "",
+    postKind: DEFAULT_POST_KIND,
   });
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -109,6 +198,10 @@ export function PostForm({
   const [tagsInput, setTagsInput] = useState("");
   const [signature, setSignature] = useState("");
   const [scheduleSlots, setScheduleSlots] = useState([{ date: "", time: "" }]);
+  const [storySchedule, setStorySchedule] = useState(
+    normalizeStorySchedule(null)
+  );
+  const [showGeneratedSlots, setShowGeneratedSlots] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showAiHelper, setShowAiHelper] = useState(false);
   const [advancedFields, setAdvancedFields] = useState({
@@ -126,6 +219,12 @@ export function PostForm({
     const storedSlots = normalizeScheduleSlots(
       metadata.scheduleSlots || metadata.schedule_slots
     );
+    const normalizedStorySchedule = normalizeStorySchedule(
+      metadata.storySchedule || metadata.story_schedule
+    );
+    const recurringSlots = normalizedStorySchedule.enabled
+      ? buildRecurringScheduleSlots(normalizedStorySchedule)
+      : [];
     const fallbackSlot = post
       ? splitDateTime(
           post.scheduledDate || post.scheduled_date || post.scheduledAt || post.scheduled_at
@@ -140,6 +239,8 @@ export function PostForm({
     const nextSlots =
       storedSlots.length > 0
         ? storedSlots
+        : recurringSlots.length > 0
+        ? recurringSlots
         : fallbackSlot.date || fallbackSlot.time
         ? [fallbackSlot]
         : [{ date: "", time: "" }];
@@ -147,6 +248,14 @@ export function PostForm({
     const tagsValue = Array.isArray(post?.tags)
       ? post.tags.join(" ")
       : post?.tags || "";
+
+    const resolvedPostKind = normalizePostKind(
+      post?.postKind ||
+        post?.post_kind ||
+        metadata.postKind ||
+        metadata.post_kind ||
+        DEFAULT_POST_KIND
+    );
 
     const payload = post
       ? {
@@ -167,6 +276,7 @@ export function PostForm({
             post.metadata?.platform ||
             post.metadata?.platform_name ||
             "",
+          postKind: resolvedPostKind,
         }
       : {
           title: "",
@@ -177,12 +287,15 @@ export function PostForm({
           media_type: "image",
           integrationId: "",
           platform: "",
+          postKind: DEFAULT_POST_KIND,
         };
 
     setFormData(payload);
     setTagsInput(tagsValue);
     setSignature(metadata.signature || "");
-    setScheduleSlots(nextSlots);
+    setScheduleSlots(sortScheduleSlots(nextSlots));
+    setStorySchedule(normalizedStorySchedule);
+    setShowGeneratedSlots(false);
     setAdvancedFields({
       firstComment: metadata.firstComment || "",
       collaborator: metadata.collaborator || "",
@@ -248,6 +361,11 @@ export function PostForm({
     () => clients.find((client) => client.id === formData.clientId) || null,
     [clients, formData.clientId]
   );
+  const isStoryPost = formData.postKind === "story";
+  const generatedStorySlots = React.useMemo(() => {
+    if (!isStoryPost || !storySchedule.enabled) return [];
+    return sortScheduleSlots(buildRecurringScheduleSlots(storySchedule));
+  }, [isStoryPost, storySchedule]);
 
   const resolveIntegrationLabel = (integration) => {
     if (!integration) return "Selecione uma rede";
@@ -324,6 +442,13 @@ export function PostForm({
     }
   }, [formData.integrationId, postingIntegrations]);
 
+  useEffect(() => {
+    if (!isStoryPost || !storySchedule.enabled) return;
+    const generated = buildRecurringScheduleSlots(storySchedule);
+    if (generated.length === 0) return;
+    setScheduleSlots(sortScheduleSlots(generated));
+  }, [isStoryPost, storySchedule]);
+
   const handleFileChange = (e) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
@@ -346,6 +471,48 @@ export function PostForm({
         idx === index ? { ...slot, [field]: value } : slot
       )
     );
+  };
+
+  const toggleStorySchedule = (value) => {
+    const enabled = Boolean(value);
+    setStorySchedule((prev) => {
+      if (!enabled) {
+        return { ...prev, enabled: false };
+      }
+      const fallbackDate =
+        prev.startDate || scheduleSlots[0]?.date || toDateKey(new Date());
+      const fallbackTime =
+        prev.time || scheduleSlots[0]?.time || DEFAULT_SCHEDULE_TIME;
+      const initialWeekday = fallbackDate
+        ? new Date(`${fallbackDate}T00:00:00`).getDay()
+        : null;
+      return {
+        ...prev,
+        enabled: true,
+        startDate: fallbackDate,
+        endDate: prev.endDate || fallbackDate,
+        time: fallbackTime,
+        weekdays:
+          prev.weekdays && prev.weekdays.length
+            ? prev.weekdays
+            : initialWeekday !== null
+            ? [initialWeekday]
+            : [],
+      };
+    });
+  };
+
+  const updateStoryScheduleField = (field, value) => {
+    setStorySchedule((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleStoryWeekday = (day) => {
+    setStorySchedule((prev) => {
+      const next = new Set(prev.weekdays || []);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return { ...prev, weekdays: Array.from(next) };
+    });
   };
 
   const addScheduleSlot = () => {
@@ -389,11 +556,23 @@ export function PostForm({
       return;
     }
 
-    const cleanedSlots = normalizeScheduleSlots(scheduleSlots);
+    const normalizedPostKind = normalizePostKind(formData.postKind);
+    const recurringSlots =
+      normalizedPostKind === "story" && storySchedule.enabled
+        ? buildRecurringScheduleSlots(storySchedule)
+        : [];
+    const cleanedSlots = normalizeScheduleSlots(
+      recurringSlots.length ? recurringSlots : scheduleSlots
+    );
     const primarySlot = cleanedSlots.find((slot) => slot.date) || null;
     const scheduledDate = primarySlot
       ? buildScheduleDate(primarySlot.date, primarySlot.time)
       : null;
+
+    if (normalizedPostKind === "story" && storySchedule.enabled && cleanedSlots.length === 0) {
+      alert("Selecione os dias e o periodo para o agendamento recorrente.");
+      return;
+    }
 
     const chosenStatus = statusOverride || formData.status || "DRAFT";
     if (chosenStatus === "SCHEDULED" && !scheduledDate) {
@@ -415,8 +594,21 @@ export function PostForm({
 
       const statusPayload = buildStatusPayload(chosenStatus);
       const caption = buildCaption();
+      const storySchedulePayload =
+        normalizedPostKind === "story" && storySchedule.enabled
+          ? {
+              enabled: true,
+              startDate: storySchedule.startDate || null,
+              endDate: storySchedule.endDate || null,
+              time: storySchedule.time || DEFAULT_SCHEDULE_TIME,
+              weekdays: storySchedule.weekdays || [],
+            }
+          : null;
+
       const payload = {
         ...formData,
+        postKind: normalizedPostKind,
+        storySchedule: storySchedulePayload,
         body: caption,
         caption,
         media_url: mediaUrlToSave,
@@ -431,6 +623,7 @@ export function PostForm({
         metadata: {
           ...(statusPayload.metadata || {}),
           scheduleSlots: cleanedSlots,
+          postKind: normalizedPostKind,
           signature: signature || null,
           firstComment: advancedFields.firstComment || null,
           collaborator: advancedFields.collaborator || null,
@@ -585,6 +778,30 @@ export function PostForm({
                     </div>
                   </div>
                 </div>
+                <div className="mt-3 space-y-2">
+                  <Label>Tipo de post</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {POST_KIND_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            postKind: option.value,
+                          }))
+                        }
+                        className={`rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+                          formData.postKind === option.value
+                            ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+                            : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </StepCard>
 
               <StepCard
@@ -714,48 +931,198 @@ export function PostForm({
                 title="Data e horario das publicacoes"
                 subtitle="Defina um ou mais horarios para publicar."
               >
-                <div className="space-y-3">
-                  {scheduleSlots.map((slot, index) => (
-                    <div
-                      key={`slot-${index}`}
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <DateField
-                        className="flex-1 min-w-[160px]"
-                        value={slot.date}
-                        onChange={(event) =>
-                          updateScheduleSlot(index, "date", event.target.value)
-                        }
-                      />
-                      <TimeField
-                        className="w-[140px]"
-                        value={slot.time}
-                        onChange={(event) =>
-                          updateScheduleSlot(index, "time", event.target.value)
-                        }
-                      />
-                      {scheduleSlots.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => removeScheduleSlot(index)}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
-                          aria-label="Remover horario"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                {isStoryPost ? (
+                  <div className="space-y-4">
+                    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={storySchedule.enabled}
+                            onCheckedChange={toggleStorySchedule}
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--text)]">
+                              Agendamento recorrente (Stories)
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              Programe o mesmo story em dias da semana.
+                            </p>
+                          </div>
+                        </div>
+                        {storySchedule.enabled ? (
+                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)]">
+                            {generatedStorySlots.length || 0} horarios
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {storySchedule.enabled ? (
+                        <div className="mt-4 space-y-3">
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div className="space-y-2">
+                              <Label>Inicio</Label>
+                              <DateField
+                                value={storySchedule.startDate}
+                                onChange={(event) =>
+                                  updateStoryScheduleField("startDate", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Fim</Label>
+                              <DateField
+                                value={storySchedule.endDate}
+                                onChange={(event) =>
+                                  updateStoryScheduleField("endDate", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Horario</Label>
+                              <TimeField
+                                value={storySchedule.time}
+                                onChange={(event) =>
+                                  updateStoryScheduleField("time", event.target.value)
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Dias da semana</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {STORY_WEEKDAYS.map((day) => (
+                                <button
+                                  key={day.value}
+                                  type="button"
+                                  onClick={() => toggleStoryWeekday(day.value)}
+                                  className={`rounded-[10px] border px-3 py-2 text-xs font-semibold transition ${
+                                    storySchedule.weekdays.includes(day.value)
+                                      ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+                                      : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                                  }`}
+                                >
+                                  {day.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {generatedStorySlots.length
+                              ? `Serão agendados ${generatedStorySlots.length} stories neste periodo.`
+                              : "Selecione um periodo e os dias para gerar os agendamentos."}
+                          </p>
+                        </div>
                       ) : null}
                     </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={Plus}
-                  onClick={addScheduleSlot}
-                >
-                  Incluir mais dias e horarios
-                </Button>
+
+                    {(!storySchedule.enabled || showGeneratedSlots) && (
+                      <div className="space-y-3">
+                        {(storySchedule.enabled ? generatedStorySlots : scheduleSlots).map(
+                          (slot, index) => (
+                            <div
+                              key={`slot-${index}-${slot.date}-${slot.time}`}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <DateField
+                                className="flex-1 min-w-[160px]"
+                                value={slot.date}
+                                onChange={(event) =>
+                                  updateScheduleSlot(index, "date", event.target.value)
+                                }
+                                disabled={storySchedule.enabled}
+                              />
+                              <TimeField
+                                className="w-[140px]"
+                                value={slot.time}
+                                onChange={(event) =>
+                                  updateScheduleSlot(index, "time", event.target.value)
+                                }
+                                disabled={storySchedule.enabled}
+                              />
+                              {!storySchedule.enabled && scheduleSlots.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeScheduleSlot(index)}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                                  aria-label="Remover horario"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              ) : null}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {storySchedule.enabled ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={showGeneratedSlots ? ChevronUp : ChevronDown}
+                        onClick={() => setShowGeneratedSlots((prev) => !prev)}
+                      >
+                        {showGeneratedSlots ? "Ocultar horarios" : "Ver horarios gerados"}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={Plus}
+                        onClick={addScheduleSlot}
+                      >
+                        Incluir mais dias e horarios
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {scheduleSlots.map((slot, index) => (
+                        <div
+                          key={`slot-${index}`}
+                          className="flex flex-wrap items-center gap-2"
+                        >
+                          <DateField
+                            className="flex-1 min-w-[160px]"
+                            value={slot.date}
+                            onChange={(event) =>
+                              updateScheduleSlot(index, "date", event.target.value)
+                            }
+                          />
+                          <TimeField
+                            className="w-[140px]"
+                            value={slot.time}
+                            onChange={(event) =>
+                              updateScheduleSlot(index, "time", event.target.value)
+                            }
+                          />
+                          {scheduleSlots.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removeScheduleSlot(index)}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                              aria-label="Remover horario"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={Plus}
+                      onClick={addScheduleSlot}
+                    >
+                      Incluir mais dias e horarios
+                    </Button>
+                  </>
+                )}
               </StepCard>
 
               <StepCard
