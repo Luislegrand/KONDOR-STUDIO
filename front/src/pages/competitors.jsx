@@ -16,6 +16,9 @@ import { useActiveClient } from "@/hooks/useActiveClient.js";
 import CompetitorFormDialog from "@/components/competitors/CompetitorFormDialog.jsx";
 import {
   ArrowUpRight,
+  BarChart3,
+  Heart,
+  MessageCircle,
   RefreshCw,
   Search,
   Users,
@@ -463,9 +466,69 @@ export default function Competitors() {
                   </div>
                 </div>
 
-                <div className="rounded-[14px] border border-dashed border-[var(--border)] p-4 text-center text-sm text-[var(--text-muted)]">
-                  Dados detalhados (top posts, variacao diaria e demografia) aparecerao
-                  aqui assim que a integracao Meta estiver ativa.
+                <div className="grid gap-4">
+                  <div className="rounded-[14px] border border-[var(--border)] bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                        <Users className="h-4 w-4 text-[var(--text-muted)]" />
+                        Top posts
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        Em breve
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {[1, 2, 3].map((item) => (
+                        <div
+                          key={`placeholder-post-${item}`}
+                          className="flex items-center justify-between rounded-[10px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-xs font-semibold text-[var(--text)]">
+                              Post #{item}
+                            </p>
+                            <p className="text-[10px] text-[var(--text-muted)]">
+                              Sem dados de performance
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                            <span className="flex items-center gap-1">
+                              <Heart className="h-3 w-3" />
+                              --
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3 w-3" />
+                              --
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[14px] border border-[var(--border)] bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                        <BarChart3 className="h-4 w-4 text-[var(--text-muted)]" />
+                        Evolucao diaria
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        Em breve
+                      </span>
+                    </div>
+                    <div className="mt-4 flex h-24 items-end gap-2">
+                      {[32, 48, 24, 56, 40, 28, 52].map((height, index) => (
+                        <div
+                          key={`bar-${index}`}
+                          className="flex-1 rounded-[6px] bg-[var(--surface-muted)]"
+                          style={{ height: `${height}%` }}
+                        />
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">
+                      Ative a integracao Meta para visualizar a evolucao diaria.
+                    </p>
+                  </div>
                 </div>
 
                 <Button
