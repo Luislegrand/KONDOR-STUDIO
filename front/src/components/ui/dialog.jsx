@@ -16,15 +16,17 @@ export function Dialog({ open, onOpenChange, children }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50">
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={handleOverlayClick}
       />
 
       {/* Conteúdo */}
-      <div className="relative z-50">{children}</div>
+      <div className="relative z-50 flex min-h-full items-start justify-center overflow-y-auto px-4 py-6 sm:py-10">
+        {children}
+      </div>
     </div>
   );
 }
@@ -34,7 +36,8 @@ export function DialogContent({ className = "", children, ...props }) {
     <div
       className={
         "bg-white rounded-2xl shadow-xl border border-gray-200 " +
-        "w-[calc(100vw-2rem)] max-w-full sm:max-w-lg mx-auto p-4 sm:p-6 animate-fade-in-up " +
+        "w-[calc(100vw-2rem)] max-w-full sm:max-w-lg mx-auto my-4 p-4 sm:p-6 " +
+        "max-h-[calc(100vh-8rem)] overflow-y-auto animate-fade-in-up " +
         className
       }
       {...props}
