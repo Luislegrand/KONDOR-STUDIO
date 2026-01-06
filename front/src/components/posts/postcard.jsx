@@ -215,11 +215,13 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   }, [menuOpen, updateMenuPosition]);
 
   const triggerStatusMenu = (event) => {
+    event.preventDefault();
     event.stopPropagation();
     setMenuOpen((prev) => !prev);
   };
 
   const selectStatus = (event, value) => {
+    event.preventDefault();
     event.stopPropagation();
     setMenuOpen(false);
     if (value === localStatus) return;
@@ -230,7 +232,11 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
   return (
     <Card
       className="group relative w-full border border-[var(--border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
-      onClick={() => onEdit && onEdit(post)}
+      onClick={(event) => {
+        // Prevent default click behavior to keep scroll position stable.
+        event.preventDefault();
+        onEdit && onEdit(post);
+      }}
       role="button"
       tabIndex={0}
     >
@@ -309,6 +315,7 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
           size="sm"
           variant="ghost"
           onClick={(event) => {
+            event.preventDefault();
             event.stopPropagation();
             onEdit && onEdit(post);
           }}
