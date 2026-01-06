@@ -79,36 +79,8 @@ export default function Posts() {
   const [preferencesHydrated, setPreferencesHydrated] = useState(false);
   const lastSavedRef = React.useRef("");
   const saveTimeoutRef = React.useRef(null);
-  const mainScrollRef = React.useRef(null);
-  const scrollSnapshotRef = React.useRef(0);
-  const shouldRestoreScrollRef = React.useRef(false);
   const queryClient = useQueryClient();
   const { toast, showToast } = useToast();
-
-  const getMainScroll = () => {
-    if (mainScrollRef.current) return mainScrollRef.current;
-    if (typeof document === "undefined") return null;
-    mainScrollRef.current = document.querySelector("main");
-    return mainScrollRef.current;
-  };
-
-  const captureScrollPosition = () => {
-    const container = getMainScroll();
-    if (!container) return;
-    scrollSnapshotRef.current = container.scrollTop;
-    shouldRestoreScrollRef.current = true;
-  };
-
-  React.useLayoutEffect(() => {
-    if (!shouldRestoreScrollRef.current) return;
-    shouldRestoreScrollRef.current = false;
-    const container = getMainScroll();
-    if (!container) return;
-    const targetScrollTop = scrollSnapshotRef.current;
-    if (Math.abs(container.scrollTop - targetScrollTop) > 1) {
-      container.scrollTop = targetScrollTop;
-    }
-  });
 
   React.useEffect(() => {
     if (activeClientId === selectedClientId) return;
@@ -421,7 +393,6 @@ export default function Posts() {
 
   return (
     <PageShell>
-      <div onPointerDownCapture={captureScrollPosition}>
       <PageHeader
         title="Posts"
         subtitle="Gerencie o fluxo de criacao e aprovacao."
@@ -489,6 +460,7 @@ export default function Posts() {
             ].map((option) => (
               <button
                 key={option.key}
+                // type="button" evita submit implícito caso este bloco seja renderizado dentro de um form.
                 type="button"
                 onClick={() => setViewMode(option.key)}
                 className={`h-8 rounded-[8px] px-3 text-xs font-semibold transition ${
@@ -502,7 +474,7 @@ export default function Posts() {
               </button>
             ))}
           </div>
-          <Button leftIcon={Plus} onClick={() => handleNewPost()}>
+          <Button type="button" leftIcon={Plus} onClick={() => handleNewPost()}>
             Novo post
           </Button>
         </div>
@@ -524,7 +496,7 @@ export default function Posts() {
                   : "Crie seu primeiro post para iniciar o fluxo."
               }
               action={
-                <Button leftIcon={Plus} onClick={() => handleNewPost()}>
+                <Button type="button" leftIcon={Plus} onClick={() => handleNewPost()}>
                   Novo post
                 </Button>
               }
@@ -567,7 +539,6 @@ export default function Posts() {
       />
 
       <Toast toast={toast} />
-      </div>
     </PageShell>
   );
 }

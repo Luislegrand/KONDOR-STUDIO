@@ -140,7 +140,9 @@ Retorne no formato JSON exato:
             />
           </div>
 
+          {/* type="button" evita submit implícito quando este bloco é usado dentro do form de posts. */}
           <Button
+            type="button"
             onClick={generateCaptions}
             disabled={generating}
             className="w-full bg-purple-600 hover:bg-purple-700"
@@ -171,6 +173,7 @@ Retorne no formato JSON exato:
                   </CardTitle>
                   <div className="flex gap-2">
                     <Button
+                      type="button"
                       size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard(caption, index)}
@@ -182,6 +185,7 @@ Retorne no formato JSON exato:
                       )}
                     </Button>
                     <Button
+                      type="button"
                       size="sm"
                       onClick={() => onApply && onApply(caption)}
                       className="bg-purple-600 hover:bg-purple-700"
