@@ -38,10 +38,10 @@ export default function ClientCard({ client, onEdit, onDelete }) {
   const monthlyFeeLabel = formatCurrencyBRL(client.monthlyFeeCents);
 
   return (
-    <Card className="hover:shadow-lg transition-shadow border border-purple-100">
+    <Card className="group relative overflow-hidden border border-[var(--border)] bg-white transition hover:-translate-y-0.5 hover:shadow-lg">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center overflow-hidden">
+          <div className="w-12 h-12 rounded-full bg-[var(--primary-light)] flex items-center justify-center overflow-hidden">
             {logo ? (
               <img
                 src={logo}
@@ -49,16 +49,16 @@ export default function ClientCard({ client, onEdit, onDelete }) {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <User className="w-6 h-6 text-purple-600" />
+              <User className="w-6 h-6 text-[var(--primary)]" />
             )}
           </div>
           <div>
-            <CardTitle className="text-base font-semibold text-gray-900">
+            <CardTitle className="text-base font-semibold text-[var(--text)]">
               {client.name}
             </CardTitle>
             {client.sector && (
-              <p className="text-xs text-gray-500 flex items-center gap-1">
-                <Building2 className="w-3 h-3" />
+              <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-[var(--text-muted)]" />
                 {client.sector}
               </p>
             )}
@@ -66,9 +66,9 @@ export default function ClientCard({ client, onEdit, onDelete }) {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 text-sm text-gray-700">
+      <CardContent className="space-y-4 text-sm text-[var(--text)]">
         {(client.briefing || client.notes) && (
-          <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3">
+          <div className="text-xs text-[var(--text-muted)] bg-[var(--surface-muted)] rounded-lg p-3">
             {client.briefing && (
               <p className="mb-1">
                 <span className="font-semibold">Briefing:</span>{" "}
@@ -84,22 +84,22 @@ export default function ClientCard({ client, onEdit, onDelete }) {
         )}
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-gray-600">
-            <Wallet className="w-4 h-4 text-purple-500" />
-            <span className="text-xs">
+          <div className="flex items-center gap-2 text-[var(--text-muted)]">
+            <Wallet className="w-4 h-4 text-[var(--primary)]" />
+            <span className="text-xs text-[var(--text)]">
               Valor mensal: <strong>{monthlyFeeLabel}</strong>
             </span>
           </div>
-          <div className="flex items-center gap-2 text-gray-600">
-            <CalendarDays className="w-4 h-4 text-purple-500" />
-            <span className="text-xs">
+          <div className="flex items-center gap-2 text-[var(--text-muted)]">
+            <CalendarDays className="w-4 h-4 text-[var(--primary)]" />
+            <span className="text-xs text-[var(--text)]">
               Renovação: <strong>{formatDate(client.renewalDate)}</strong>
             </span>
           </div>
           {client.portalEmail && (
-            <div className="flex items-center gap-2 text-gray-600">
-              <Mail className="w-4 h-4 text-purple-500" />
-              <span className="text-xs break-all">
+            <div className="flex items-center gap-2 text-[var(--text-muted)]">
+              <Mail className="w-4 h-4 text-[var(--primary)]" />
+              <span className="text-xs break-all text-[var(--text)]">
                 Portal: <strong>{client.portalEmail}</strong>
               </span>
             </div>
@@ -108,7 +108,7 @@ export default function ClientCard({ client, onEdit, onDelete }) {
 
         {client.tags && client.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            <Tags className="w-4 h-4 text-purple-500" />
+            <Tags className="w-4 h-4 text-[var(--primary)]" />
             {client.tags.map((tag) => (
               <Badge key={tag} variant="outline">
                 {tag}

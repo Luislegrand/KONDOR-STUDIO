@@ -396,9 +396,19 @@ export default function Posts() {
       <PageHeader
         title="Posts"
         subtitle="Gerencie o fluxo de criacao e aprovacao."
+        actions={
+          <Button
+            size="lg"
+            type="button"
+            leftIcon={Plus}
+            onClick={() => handleNewPost()}
+          >
+            Novo post
+          </Button>
+        }
       />
 
-      <FilterBar className="mt-6">
+      <FilterBar className="mt-8">
         <div className="min-w-[220px] flex-1">
           <Label>Perfil/cliente</Label>
           <SelectNative
@@ -474,13 +484,10 @@ export default function Posts() {
               </button>
             ))}
           </div>
-          <Button type="button" leftIcon={Plus} onClick={() => handleNewPost()}>
-            Novo post
-          </Button>
         </div>
       </FilterBar>
 
-      <div className="mt-6">
+      <div className="mt-8">
         {viewMode === "calendar" ? (
           isLoading ? (
             <EmptyState

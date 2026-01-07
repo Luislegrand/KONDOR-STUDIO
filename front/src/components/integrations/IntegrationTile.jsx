@@ -36,7 +36,7 @@ export default function IntegrationTile({
   disabled = false,
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/60 transition-transform hover:-translate-y-1 hover:border-slate-300">
+    <div className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 hover:border-slate-300">
       <div className="flex items-start justify-between gap-4">
         <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClass}`}>
           {icon}
@@ -47,12 +47,12 @@ export default function IntegrationTile({
       </div>
 
       <div className="mt-4 space-y-1">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
+        <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
+        {subtitle ? <p className="text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
       </div>
 
       {description ? (
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">{description}</p>
+        <p className="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">{description}</p>
       ) : null}
       {meta ? (
         <p className="mt-2 text-[11px] text-slate-400">{meta}</p>
@@ -62,7 +62,7 @@ export default function IntegrationTile({
         <Button
           onClick={onConnect}
           disabled={disabled}
-          className="w-full bg-purple-600 text-white hover:bg-purple-700"
+          className="w-full"
         >
           {actionLabel}
         </Button>

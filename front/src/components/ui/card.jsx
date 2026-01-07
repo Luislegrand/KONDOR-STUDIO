@@ -19,7 +19,7 @@ export function CardHeader({ className = "", ...props }) {
   return (
     <div
       className={
-        "flex flex-col gap-1.5 border-b border-[var(--border)] px-5 py-4 " + className
+        "flex flex-col gap-1.5 border-b border-[var(--border)] px-6 py-5 " + className
       }
       {...props}
     />
@@ -52,7 +52,7 @@ export function CardDescription({ className = "", ...props }) {
 
 export function CardContent({ className = "", ...props }) {
   return (
-    <div className={"px-5 py-4 " + className} {...props} />
+    <div className={"px-6 py-5 " + className} {...props} />
   );
 }
 
@@ -60,7 +60,7 @@ export function CardFooter({ className = "", ...props }) {
   return (
     <div
       className={
-        "flex items-center justify-between gap-2 border-t border-[var(--border)] px-5 py-4 " +
+        "flex items-center justify-between gap-2 border-t border-[var(--border)] px-6 py-5 " +
         className
       }
       {...props}

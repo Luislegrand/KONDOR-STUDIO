@@ -590,6 +590,7 @@ export default function Integrations() {
         actions={
           <Button
             variant="secondary"
+            size="lg"
             leftIcon={RefreshCw}
             onClick={() => refetch()}
             disabled={isFetching}
@@ -600,11 +601,11 @@ export default function Integrations() {
         }
       />
 
-      <div className="mt-2 text-xs text-[var(--text-muted)]">
+      <div className="mt-4 text-xs text-[var(--text-muted)]">
         {connectedCount} de {connectableCatalog.length} integracoes conectadas.
       </div>
 
-      <div className="mt-6 space-y-10">
+      <div className="mt-8 space-y-12">
         {metaBanner ? (
           <div
             className={`rounded-[12px] border px-4 py-3 text-sm ${

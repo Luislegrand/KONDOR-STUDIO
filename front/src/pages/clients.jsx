@@ -89,13 +89,13 @@ export default function Clients() {
         title="Clientes"
         subtitle="Gerencie sua carteira de clientes."
         actions={
-          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+          <Button size="lg" leftIcon={Plus} onClick={() => setDialogOpen(true)}>
             Novo cliente
           </Button>
         }
       />
 
-      <div className="mt-6">
+      <div className="mt-8">
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -123,7 +123,7 @@ export default function Clients() {
             }
           />
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {clients.map((client) => (
               <ClientCard
                 key={client.id}

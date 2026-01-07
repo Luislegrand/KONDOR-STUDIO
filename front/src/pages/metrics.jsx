@@ -64,30 +64,43 @@ function formatDateInput(date) {
   return new Date(date).toISOString().slice(0, 10);
 }
 
-function MetricCard({ label, value }) {
+function MetricCard({ label, value, size = "sm", className = "" }) {
+  const isLarge = size === "lg";
   return (
-    <div className="rounded-[12px] border border-[var(--border)] bg-white px-4 py-3">
-      <p className="text-xs text-[var(--text-muted)]">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-[var(--text)]">{value}</p>
+    <div
+      className={`rounded-[14px] border border-[var(--border)] bg-white ${
+        isLarge ? "px-6 py-5" : "px-4 py-4"
+      } ${className}`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p
+        className={`mt-2 font-semibold text-[var(--text)] ${
+          isLarge ? "text-3xl md:text-4xl" : "text-2xl"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
 function SectionCard({ title, icon: Icon, children, action }) {
   return (
-    <div className="rounded-[16px] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+    <div className="rounded-[20px] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
         <div className="flex items-center gap-2">
           {Icon ? (
-            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--surface-muted)]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-[var(--surface-muted)]">
               <Icon className="h-4 w-4 text-[var(--text-muted)]" />
             </span>
           ) : null}
-          <h3 className="text-sm font-semibold text-[var(--text)]">{title}</h3>
+          <h3 className="text-base font-semibold text-[var(--text)]">{title}</h3>
         </div>
         {action || null}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </div>
   );
 }
@@ -200,15 +213,42 @@ export default function Metrics() {
       return (
         <div className="space-y-6">
           <SectionCard title="Resumo geral do perfil" icon={TrendingUp}>
-            <div className="grid gap-4 md:grid-cols-4">
-              {overviewCards.map((card) => (
-                <MetricCard key={card.label} label={card.label} value={card.value} />
-              ))}
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  KPIs principais
+                </p>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  {overviewCards.slice(0, 2).map((card) => (
+                    <MetricCard
+                      key={card.label}
+                      label={card.label}
+                      value={card.value}
+                      size="lg"
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  KPIs secundarios
+                </p>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  {overviewCards.slice(2).map((card) => (
+                    <MetricCard key={card.label} label={card.label} value={card.value} />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {interactionCards.map((card) => (
-                <MetricCard key={card.label} label={card.label} value={card.value} />
-              ))}
+            <div className="mt-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Engajamento e interacoes
+              </p>
+              <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {interactionCards.map((card) => (
+                  <MetricCard key={card.label} label={card.label} value={card.value} />
+                ))}
+              </div>
             </div>
           </SectionCard>
 
@@ -247,12 +287,12 @@ export default function Metrics() {
 
   return (
     <PageShell>
-      <div className="rounded-[20px] overflow-hidden border border-[var(--border)] bg-white">
-        <div className={`bg-gradient-to-r ${headerConfig.gradient} px-6 py-6 text-white`}>
+      <div className="rounded-[24px] overflow-hidden border border-[var(--border)] bg-white">
+        <div className={`bg-gradient-to-r ${headerConfig.gradient} px-6 py-7 text-white md:px-8 md:py-8`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-white/70">Perfil</p>
-              <h2 className="text-2xl font-semibold">
+              <h2 className="text-2xl font-semibold md:text-3xl">
                 {activeClient?.name || "Selecione um perfil"}
               </h2>
               <p className="text-xs text-white/70 mt-1">
@@ -296,7 +336,7 @@ export default function Metrics() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/20 pt-3">
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/20 pt-4">
             {NETWORKS.map((network) => (
               <button
                 key={network.key}
@@ -314,7 +354,7 @@ export default function Metrics() {
           </div>
         </div>
 
-        <div className="border-t border-[var(--border)] bg-white px-6 py-3">
+        <div className="border-t border-[var(--border)] bg-white px-6 py-4">
           <div className="flex flex-wrap items-center gap-2">
             {SECTIONS.map((section) => (
               <button
@@ -341,7 +381,7 @@ export default function Metrics() {
       </div>
 
       {periodPreset === "custom" ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Data inicial</Label>
             <DateField
@@ -359,7 +399,7 @@ export default function Metrics() {
         </div>
       ) : null}
 
-      <div className="mt-6 space-y-6">{renderSectionContent()}</div>
+      <div className="mt-8 space-y-8">{renderSectionContent()}</div>
     </PageShell>
   );
 }

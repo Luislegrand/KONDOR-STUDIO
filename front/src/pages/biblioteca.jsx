@@ -104,7 +104,7 @@ export default function Biblioteca() {
         kicker="Biblioteca"
       />
 
-      <div className="mt-6 space-y-6">
+      <div className="mt-8 space-y-8">
         <FiltersBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}

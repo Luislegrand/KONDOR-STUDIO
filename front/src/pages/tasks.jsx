@@ -147,13 +147,13 @@ export default function Tasks() {
         title="Tarefas"
         subtitle="Organize o fluxo de trabalho da sua agencia."
         actions={
-          <Button leftIcon={Plus} onClick={handleNew}>
+          <Button size="lg" leftIcon={Plus} onClick={handleNew}>
             Nova tarefa
           </Button>
         }
       />
 
-      <div className="mt-6">
+      <div className="mt-8">
         <Taskboard
           tasks={filteredTasks}
           clients={clients}

@@ -86,15 +86,15 @@ export default function Team() {
         title="Equipe"
         subtitle="Gerencie os membros da sua agencia."
         actions={
-          <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
+          <Button size="lg" leftIcon={Plus} onClick={() => setDialogOpen(true)}>
             Adicionar membro
           </Button>
         }
       />
 
-      <div className="mt-6">
+      <div className="mt-8">
         {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(3)].map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardHeader className="h-32 bg-gray-200" />
@@ -112,8 +112,8 @@ export default function Team() {
               </Button>
             }
           />
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {team.map((member) => {
               const canSendInvite =
                 !member._raw ||

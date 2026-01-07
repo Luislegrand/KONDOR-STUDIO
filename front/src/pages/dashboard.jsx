@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
 import PageShell from "@/components/ui/page-shell.jsx";
 import PageHeader from "@/components/ui/page-header.jsx";
+import { cn } from "@/utils/classnames.js";
 import {
   Activity,
   ArrowDownRight,
@@ -184,26 +185,50 @@ function buildDailySeries({ items, dateKey, days }) {
   return series;
 }
 
-function StatCard({ title, value, description, icon: Icon, accent, trend, sparkline, isLoading }) {
+function StatCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+  accent,
+  trend,
+  sparkline,
+  isLoading,
+  size = "md",
+  className = "",
+}) {
   const trendPositive = trend !== null && trend !== undefined ? trend >= 0 : null;
   const TrendIcon = trendPositive ? ArrowUpRight : ArrowDownRight;
+  const isLarge = size === "lg";
+  const isCompact = size === "sm";
+  const valueClasses = isLarge ? "text-4xl" : isCompact ? "text-2xl" : "text-3xl";
+  const iconBoxClasses = isLarge ? "h-11 w-11" : "h-9 w-9";
+  const iconClasses = isLarge ? "h-5 w-5" : "h-4 w-4";
+  const contentPadding = isLarge ? "pt-6" : isCompact ? "pt-4" : "pt-5";
+  const sparklineHeight = isLarge ? "h-20" : "h-16";
 
   return (
-    <Card className="group relative overflow-hidden border border-[var(--border)] bg-white transition hover:-translate-y-0.5 hover:shadow-lg">
+    <Card
+      className={cn(
+        "group relative overflow-hidden border border-[var(--border)] bg-white transition hover:-translate-y-0.5 hover:shadow-lg",
+        isLarge ? "min-h-[220px]" : "min-h-[190px]",
+        className
+      )}
+    >
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent?.solid }} />
-      <CardContent className="space-y-3 pt-5">
+      <CardContent className={cn("space-y-3", contentPadding)}>
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
             {title}
           </p>
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-[12px]"
+            className={cn("flex items-center justify-center rounded-[12px]", iconBoxClasses)}
             style={{ backgroundColor: accent?.soft, color: accent?.solid }}
           >
-            {Icon ? <Icon className="h-4 w-4 kondor-float" /> : null}
+            {Icon ? <Icon className={cn("kondor-float", iconClasses)} /> : null}
           </div>
         </div>
-        <div className="text-3xl font-semibold text-[var(--text)]">
+        <div className={cn("font-semibold text-[var(--text)]", valueClasses)}>
           {isLoading ? <span className="inline-block h-7 w-20 rounded-full kondor-shimmer" /> : (
             <AnimatedNumber value={value} formatter={formatCompact} />
           )}
@@ -221,8 +246,8 @@ function StatCard({ title, value, description, icon: Icon, accent, trend, sparkl
             </span>
           ) : null}
         </div>
-        {sparkline ? (
-          <div className="h-16">
+        {sparkline && !isCompact ? (
+          <div className={sparklineHeight}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkline}>
                 <defs>
@@ -408,7 +433,7 @@ export default function Dashboard() {
               </Badge>
             ) : null}
             <Button
-              variant="secondary"
+              size="lg"
               leftIcon={RefreshCw}
               onClick={handleGlobalRefresh}
             >
@@ -418,15 +443,15 @@ export default function Dashboard() {
         }
       />
 
-      <div className="mt-6 space-y-8">
-        <div className="rounded-[20px] border border-[var(--border)] bg-gradient-to-r from-[var(--primary)] via-[#7c3aed] to-[var(--accent-sky)] p-6 text-white shadow-[var(--shadow-md)]">
+      <div className="mt-8 space-y-10">
+        <section className="rounded-[24px] border border-[var(--border)] bg-gradient-to-r from-[var(--primary)] via-[#7c3aed] to-[var(--accent-sky)] p-7 text-white shadow-[var(--shadow-md)] md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-white/70">
                 Dashboard
               </p>
-              <h2 className="text-2xl font-semibold">Visao consolidada</h2>
-              <p className="mt-2 text-sm text-white/80">
+              <h2 className="text-2xl font-semibold md:text-3xl">Visao consolidada</h2>
+              <p className="mt-2 text-sm text-white/80 md:text-base">
                 Tendencias, cadencia de conteudos e produtividade em um so lugar.
               </p>
             </div>
@@ -435,7 +460,7 @@ export default function Dashboard() {
               {`Ultimos ${rangeDays} dias`}
             </div>
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
             {[
               { label: "Clientes", value: totalClients },
               { label: "Posts ativos", value: totalPosts },
@@ -443,7 +468,7 @@ export default function Dashboard() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-[14px] border border-white/15 bg-white/10 px-4 py-3"
+                className="rounded-[16px] border border-white/15 bg-white/10 px-4 py-4"
               >
                 <p className="text-xs text-white/70">{item.label}</p>
                 <p className="mt-1 text-xl font-semibold">
@@ -452,55 +477,71 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Clientes"
-            value={totalClients}
-            description={`${clientsInRange} novos no periodo`}
-            icon={Users}
-            accent={STAT_ACCENTS.clients}
-            trend={clientsTrend}
-            sparkline={buildDailySeries({
-              items: clients,
-              dateKey: "createdAt",
-              days: 7,
-            })}
-            isLoading={isLoading}
-          />
-          <StatCard
-            title="Posts"
-            value={totalPosts}
-            description={`${postsInRange} criados no periodo`}
-            icon={FileText}
-            accent={STAT_ACCENTS.posts}
-            trend={postsTrend}
-            sparkline={postsSeries.slice(-7)}
-            isLoading={isLoading}
-          />
-          <StatCard
-            title="Tarefas"
-            value={totalTasks}
-            description={`${tasksInRange} criadas no periodo`}
-            icon={CheckSquare}
-            accent={STAT_ACCENTS.tasks}
-            trend={tasksTrend}
-            sparkline={tasksSeries.slice(-7)}
-            isLoading={isLoading}
-          />
-          <StatCard
-            title="Equipe"
-            value={totalTeam}
-            description={`${teamInRange} novos membros no periodo`}
-            icon={Activity}
-            accent={STAT_ACCENTS.team}
-            trend={teamTrend}
-            isLoading={isLoading}
-          />
-        </div>
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--text-muted)]">
+              KPIs principais
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-6 md:grid-cols-2">
+              <StatCard
+                size="lg"
+                title="Posts"
+                value={totalPosts}
+                description={`${postsInRange} criados no periodo`}
+                icon={FileText}
+                accent={STAT_ACCENTS.posts}
+                trend={postsTrend}
+                sparkline={postsSeries.slice(-7)}
+                isLoading={isLoading}
+              />
+              <StatCard
+                size="lg"
+                title="Tarefas"
+                value={totalTasks}
+                description={`${tasksInRange} criadas no periodo`}
+                icon={CheckSquare}
+                accent={STAT_ACCENTS.tasks}
+                trend={tasksTrend}
+                sparkline={tasksSeries.slice(-7)}
+                isLoading={isLoading}
+              />
+            </div>
+            <div className="grid gap-6">
+              <StatCard
+                size="sm"
+                title="Clientes"
+                value={totalClients}
+                description={`${clientsInRange} novos no periodo`}
+                icon={Users}
+                accent={STAT_ACCENTS.clients}
+                trend={clientsTrend}
+                isLoading={isLoading}
+              />
+              <StatCard
+                size="sm"
+                title="Equipe"
+                value={totalTeam}
+                description={`${teamInRange} novos membros no periodo`}
+                icon={Activity}
+                accent={STAT_ACCENTS.team}
+                trend={teamTrend}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
+        </section>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--text-muted)]">
+              Producao e cadencia
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium text-[var(--text)]">
@@ -517,7 +558,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="h-[260px]">
+            <CardContent className="h-[300px]">
               {activitySeries.length ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={activitySeries}>
@@ -572,7 +613,7 @@ export default function Dashboard() {
               </CardTitle>
               <BarChart3 className="h-4 w-4 text-[var(--text-muted)] kondor-float" />
             </CardHeader>
-            <CardContent className="h-[260px]">
+            <CardContent className="h-[240px]">
               {tasksByStatus.length ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -605,9 +646,16 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </section>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--text-muted)]">
+              Conteudo de apoio
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium text-[var(--text)]">
@@ -617,7 +665,7 @@ export default function Dashboard() {
                 Total {formatNumber(totalPosts)}
               </span>
             </CardHeader>
-            <CardContent className="h-[280px]">
+            <CardContent className="h-[300px]">
               {postsByStatus.length ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={postsByStatus}>
@@ -691,7 +739,8 @@ export default function Dashboard() {
               ) : null}
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </section>
       </div>
     </PageShell>
   );

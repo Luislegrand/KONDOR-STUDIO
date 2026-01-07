@@ -112,79 +112,93 @@ export default function Financeiro() {
             <Button variant="secondary" leftIcon={Plus} onClick={handleNewCost}>
               Novo custo
             </Button>
-            <Button leftIcon={Plus} onClick={handleNew}>
+            <Button size="lg" leftIcon={Plus} onClick={handleNew}>
               Novo lancamento
             </Button>
           </div>
         }
       />
 
-      <div className="mt-6 space-y-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <Card>
+      <div className="mt-8 space-y-10">
+        <div className="grid gap-6 lg:grid-cols-12">
+          <Card
+            className={`relative overflow-hidden lg:col-span-7 ${
+              balance >= 0 ? "bg-emerald-50/60" : "bg-rose-50/60"
+            }`}
+          >
+            <div
+              className={`absolute inset-x-0 top-0 h-1 ${
+                balance >= 0 ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
             <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Receitas (income)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">
-                {formatCurrencyBRL(totalIncome)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Custos (expense)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-rose-600">
-                {formatCurrencyBRL(totalCosts)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Outros lançamentos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {formatCurrencyBRL(totalOthers)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total de lançamentos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {records.length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-gray-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
                 Saldo (receitas - custos)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div
-                className={`text-2xl font-bold ${
-                  balance >= 0 ? "text-emerald-600" : "text-rose-600"
+                className={`text-3xl font-semibold md:text-4xl ${
+                  balance >= 0 ? "text-emerald-700" : "text-rose-700"
                 }`}
               >
                 {formatCurrencyBRL(balance)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden lg:col-span-5">
+            <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+            <CardHeader>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                Receitas (income)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold text-emerald-700">
+                {formatCurrencyBRL(totalIncome)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden lg:col-span-4">
+            <div className="absolute inset-x-0 top-0 h-1 bg-rose-500" />
+            <CardHeader>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                Custos (expense)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold text-rose-700">
+                {formatCurrencyBRL(totalCosts)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden lg:col-span-4">
+            <div className="absolute inset-x-0 top-0 h-1 bg-slate-400" />
+            <CardHeader>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                Outros lançamentos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold text-[var(--text)]">
+                {formatCurrencyBRL(totalOthers)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden lg:col-span-4">
+            <div className="absolute inset-x-0 top-0 h-1 bg-[var(--primary)]" />
+            <CardHeader>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                Total de lançamentos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold text-[var(--text)]">
+                {records.length}
               </div>
             </CardContent>
           </Card>
