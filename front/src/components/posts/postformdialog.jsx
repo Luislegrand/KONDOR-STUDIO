@@ -208,6 +208,27 @@ function parseTags(value) {
     .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
 }
 
+// Define StepCard at module scope to keep a stable component identity and
+// avoid remounts that can reset the main scroll position.
+const StepCard = ({ step, title, subtitle, children }) => (
+  <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)] transition-[box-shadow,border-color] duration-[var(--motion-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-md)] hover:border-slate-200/80">
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary-light)] text-xs font-semibold text-[var(--primary)]">
+          {step}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
+          {subtitle ? (
+            <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+    <div className="mt-4 space-y-4">{children}</div>
+  </div>
+);
+
 export function PostForm({
   open = true,
   onCancel,
@@ -768,24 +789,6 @@ export function PostForm({
   };
 
   const effectivePreview = previewUrl;
-  const StepCard = ({ step, title, subtitle, children }) => (
-    <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)] transition-[box-shadow,border-color] duration-[var(--motion-base)] ease-[var(--ease-standard)] hover:shadow-[var(--shadow-md)] hover:border-slate-200/80">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary-light)] text-xs font-semibold text-[var(--primary)]">
-            {step}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
-            {subtitle ? (
-              <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
-            ) : null}
-          </div>
-        </div>
-      </div>
-      <div className="mt-4 space-y-4">{children}</div>
-    </div>
-  );
 
   return (
     <div className={`flex h-full flex-col ${containerClassName}`}>
