@@ -26,9 +26,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: FileText,
     tone: "text-slate-500",
     badge: "bg-slate-100 text-slate-700",
-    accent: "bg-slate-400",
-    accentSoft: "bg-slate-50/70",
-    border: "border-slate-200/80",
     description: "Ideias e conteudos iniciais.",
   },
   CONTENT: {
@@ -36,9 +33,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: PenSquare,
     tone: "text-sky-600",
     badge: "bg-sky-50 text-sky-700",
-    accent: "bg-sky-500",
-    accentSoft: "bg-sky-50/60",
-    border: "border-sky-100/80",
     description: "Conteudos em producao.",
   },
   INTERNAL_APPROVAL: {
@@ -46,9 +40,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: ShieldCheck,
     tone: "text-indigo-600",
     badge: "bg-indigo-50 text-indigo-700",
-    accent: "bg-indigo-500",
-    accentSoft: "bg-indigo-50/60",
-    border: "border-indigo-100/80",
     description: "Revisao do time interno.",
   },
   CLIENT_APPROVAL: {
@@ -56,9 +47,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: UserCheck,
     tone: "text-amber-600",
     badge: "bg-amber-50 text-amber-700",
-    accent: "bg-amber-500",
-    accentSoft: "bg-amber-50/60",
-    border: "border-amber-100/80",
     description: "Aguardando validacao do cliente.",
   },
   CHANGES: {
@@ -66,9 +54,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: AlertTriangle,
     tone: "text-rose-600",
     badge: "bg-rose-50 text-rose-700",
-    accent: "bg-rose-500",
-    accentSoft: "bg-rose-50/60",
-    border: "border-rose-100/80",
     description: "Pendencias ou correcoes solicitadas.",
   },
   SCHEDULING: {
@@ -76,9 +61,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: Clock,
     tone: "text-violet-600",
     badge: "bg-violet-50 text-violet-700",
-    accent: "bg-violet-500",
-    accentSoft: "bg-violet-50/60",
-    border: "border-violet-100/80",
     description: "Aprovados aguardando agenda.",
   },
   SCHEDULED: {
@@ -86,9 +68,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: CalendarCheck2,
     tone: "text-emerald-600",
     badge: "bg-emerald-50 text-emerald-700",
-    accent: "bg-emerald-500",
-    accentSoft: "bg-emerald-50/60",
-    border: "border-emerald-100/80",
     description: "Postagens ja programadas.",
   },
   DONE: {
@@ -96,9 +75,6 @@ export const WORKFLOW_STATUS_CONFIG = {
     icon: CheckCircle2,
     tone: "text-emerald-700",
     badge: "bg-emerald-100 text-emerald-800",
-    accent: "bg-emerald-600",
-    accentSoft: "bg-emerald-100/60",
-    border: "border-emerald-200/80",
     description: "Publicados ou finalizados.",
   },
 };
