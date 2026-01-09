@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import GridLayout, { WidthProvider } from "react-grid-layout";
+import GridLayout, { useContainerWidth } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { base44 } from "@/apiClient/base44Client";
@@ -11,8 +11,6 @@ import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.jsx";
-
-const Grid = WidthProvider(GridLayout);
 
 const WIDGET_TYPES = [
   { key: "KPI", label: "KPI" },
@@ -245,7 +243,7 @@ function PreviewDialog({ open, onOpenChange, widgets, layout }) {
           <DialogTitle>Preview do template</DialogTitle>
         </DialogHeader>
         <div className="rounded-[16px] border border-dashed border-[var(--border)] bg-[var(--surface)] p-3">
-          <Grid
+          <GridLayout
             layout={layout}
             cols={12}
             rowHeight={32}
@@ -265,7 +263,7 @@ function PreviewDialog({ open, onOpenChange, widgets, layout }) {
                 </p>
               </div>
             ))}
-          </Grid>
+          </GridLayout>
         </div>
       </DialogContent>
     </Dialog>
@@ -277,6 +275,10 @@ export default function ReportsTemplateBuilder() {
   const queryClient = useQueryClient();
   const { templateId } = useParams();
   const isNew = !templateId;
+  const { width, containerRef } = useContainerWidth({
+    measureBeforeMount: true,
+    initialWidth: 960,
+  });
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -499,55 +501,58 @@ export default function ReportsTemplateBuilder() {
           </aside>
 
           <section className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-            <Grid
-              layout={layout}
-              cols={12}
-              rowHeight={32}
-              margin={[16, 16]}
-              onLayoutChange={(nextLayout) => setLayout(nextLayout)}
-            >
-              {widgets.map((widget) => (
-                <div
-                  key={widget.id}
-                  className="group rounded-[12px] border border-[var(--border)] bg-white p-3 shadow-[var(--shadow-sm)]"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {widget.widgetType}
-                      </p>
-                      <p className="text-sm font-semibold text-[var(--text)]">
-                        {widget.title || "Widget"}
-                      </p>
-                      {widget.source ? (
+            <div ref={containerRef}>
+              <GridLayout
+                layout={layout}
+                cols={12}
+                rowHeight={32}
+                margin={[16, 16]}
+                width={width}
+                onLayoutChange={(nextLayout) => setLayout(nextLayout)}
+              >
+                {widgets.map((widget) => (
+                  <div
+                    key={widget.id}
+                    className="group rounded-[12px] border border-[var(--border)] bg-white p-3 shadow-[var(--shadow-sm)]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
                         <p className="text-xs text-[var(--text-muted)]">
-                          {widget.source} {widget.level ? `• ${widget.level}` : ""}
+                          {widget.widgetType}
                         </p>
-                      ) : null}
-                    </div>
-                    <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setActiveWidgetId(widget.id);
-                          setConfigOpen(true);
-                        }}
-                      >
-                        Config
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemoveWidget(widget.id)}
-                      >
-                        Remover
-                      </Button>
+                        <p className="text-sm font-semibold text-[var(--text)]">
+                          {widget.title || "Widget"}
+                        </p>
+                        {widget.source ? (
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {widget.source} {widget.level ? `• ${widget.level}` : ""}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setActiveWidgetId(widget.id);
+                            setConfigOpen(true);
+                          }}
+                        >
+                          Config
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveWidget(widget.id)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </Grid>
+                ))}
+              </GridLayout>
+            </div>
           </section>
         </div>
       </div>
