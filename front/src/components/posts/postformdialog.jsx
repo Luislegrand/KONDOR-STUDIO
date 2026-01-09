@@ -859,9 +859,20 @@ export function PostForm({
                       ))}
                     </SelectNative>
                     {formData.clientId && postingIntegrations.length === 0 ? (
-                      <p className="text-[11px] text-amber-600">
-                        Cadastre uma integracao deste cliente antes de publicar.
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-amber-600">
+                        <span>Cadastre uma integracao deste cliente antes de publicar.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              window.location.href = "/integrations";
+                            }
+                          }}
+                          className="font-semibold underline-offset-2 hover:underline"
+                        >
+                          Ir para Integracoes
+                        </button>
+                      </div>
                     ) : null}
                   </div>
 
@@ -1065,7 +1076,14 @@ export function PostForm({
                     ) : (
                       <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
                         <ImageIcon className="h-6 w-6 text-[var(--text-muted)]" />
-                        Nenhuma midia selecionada
+                        <p>Nenhuma midia selecionada.</p>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--text)] shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
+                        >
+                          Selecionar midia
+                        </button>
                       </div>
                     )}
                   </div>

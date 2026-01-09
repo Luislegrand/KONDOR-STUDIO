@@ -724,8 +724,15 @@ export default function Dashboard() {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                    Nenhuma atividade registrada neste periodo.
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-[var(--text-muted)]">
+                    <p>Sem atividade registrada neste periodo.</p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => navigate("/posts/new")}
+                    >
+                      Criar novo post
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -766,8 +773,15 @@ export default function Dashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                      Nenhuma tarefa encontrada.
+                    <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-[var(--text-muted)]">
+                      <p>Nenhuma tarefa encontrada neste recorte.</p>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate("/tasks")}
+                      >
+                        Ver tarefas
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -812,8 +826,16 @@ export default function Dashboard() {
                       );
                     })}
                   {!posts.length ? (
-                    <div className="rounded-[12px] border border-dashed border-[var(--border)] px-4 py-4 text-sm text-[var(--text-muted)]">
-                      Crie posts para visualizar o calendario aqui.
+                    <div className="rounded-[12px] border border-dashed border-[var(--border)] px-4 py-4 text-center text-sm text-[var(--text-muted)]">
+                      <p>Sem posts agendados por enquanto.</p>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mt-3"
+                        onClick={() => navigate("/posts/new")}
+                      >
+                        Agendar um post
+                      </Button>
                     </div>
                   ) : null}
                 </CardContent>
@@ -911,8 +933,15 @@ export default function Dashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                    Nenhum post encontrado.
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-[var(--text-muted)]">
+                    <p>Nenhum post entrou no pipeline ainda.</p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => navigate("/posts/new")}
+                    >
+                      Criar primeiro post
+                    </Button>
                   </div>
                 )}
               </CardContent>

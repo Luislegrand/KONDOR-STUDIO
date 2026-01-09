@@ -131,6 +131,12 @@ export default function AdminBilling() {
     setPage(1);
   };
 
+  const resetFilters = () => {
+    setSearch("");
+    setStatus("");
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -274,7 +280,12 @@ export default function AdminBilling() {
               {!isLoading && tenants.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    Nenhum tenant encontrado.
+                    <div className="flex flex-col items-center gap-2">
+                      <p>Nenhum tenant encontrado com os filtros atuais.</p>
+                      <Button size="sm" variant="secondary" onClick={resetFilters}>
+                        Limpar filtros
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )}

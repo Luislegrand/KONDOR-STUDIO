@@ -70,6 +70,12 @@ export default function AdminTenants() {
     setPage(1);
   };
 
+  const resetFilters = () => {
+    setSearch("");
+    setStatus("");
+    setPage(1);
+  };
+
   const navigateToTenant = (tenantId) => {
     navigate(`/admin/tenants/${tenantId}`);
   };
@@ -196,7 +202,12 @@ export default function AdminTenants() {
               {!isLoading && tenants.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
-                    Nenhum tenant encontrado com os filtros atuais.
+                    <div className="flex flex-col items-center gap-2">
+                      <p>Nenhum tenant encontrado com os filtros atuais.</p>
+                      <Button size="sm" variant="secondary" onClick={resetFilters}>
+                        Limpar filtros
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )}

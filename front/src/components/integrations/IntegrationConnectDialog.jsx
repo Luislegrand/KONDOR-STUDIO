@@ -386,9 +386,17 @@ export default function IntegrationConnectDialog({
                     ))}
                   </SelectNative>
                   {metaAdOptions.length === 0 ? (
-                    <p className="text-[11px] text-amber-600">
-                      Nenhuma conta de anúncios disponível para este usuário.
-                    </p>
+                    <div className="text-[11px] text-amber-600">
+                      <p>Nenhuma conta de anuncios disponivel para este usuario.</p>
+                      <a
+                        href="https://business.facebook.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold underline-offset-2 hover:underline"
+                      >
+                        Abrir Business Manager
+                      </a>
+                    </div>
                   ) : null}
                 </div>
               ) : (
@@ -405,9 +413,17 @@ export default function IntegrationConnectDialog({
                     ))}
                   </SelectNative>
                   {metaPageOptions.length === 0 ? (
-                    <p className="text-[11px] text-amber-600">
-                      Nenhuma página com Instagram Business vinculada.
-                    </p>
+                    <div className="text-[11px] text-amber-600">
+                      <p>Nenhuma pagina com Instagram Business vinculada.</p>
+                      <a
+                        href="https://business.facebook.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold underline-offset-2 hover:underline"
+                      >
+                        Vincular pagina no Meta
+                      </a>
+                    </div>
                   ) : null}
                 </div>
               )}

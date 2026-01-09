@@ -211,6 +211,7 @@ export default function Financeiro() {
           isLoading={isLoading}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onCreate={handleNew}
         />
 
         <Financeformdialog

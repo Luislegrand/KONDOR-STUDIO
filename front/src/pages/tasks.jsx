@@ -163,6 +163,7 @@ export default function Tasks() {
           onStatusChange={handleStatusChange}
           collapsedColumns={collapsedColumns}
           onCollapsedChange={setCollapsedColumns}
+          onCreate={handleNew}
         />
       </div>
 

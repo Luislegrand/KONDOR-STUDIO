@@ -87,8 +87,8 @@ export default function PostEdit() {
           }
         />
         <EmptyState
-          title="Post nao encontrado"
-          description="Nao foi possivel localizar o post solicitado."
+          title="Nada para editar por aqui"
+          description="O link parece incompleto. Volte para a lista e escolha um post."
           action={
             <Button type="button" variant="ghost" onClick={handleCancel}>
               Voltar para posts
@@ -113,8 +113,13 @@ export default function PostEdit() {
           }
         />
         <EmptyState
-          title="Carregando post"
-          description="Aguarde enquanto carregamos os detalhes."
+          title="Carregando detalhes do post"
+          description="Se estiver demorando, voce pode tentar atualizar."
+          action={
+            <Button type="button" variant="ghost" onClick={() => window.location.reload()}>
+              Atualizar agora
+            </Button>
+          }
           className="mt-6"
         />
       </PageShell>
@@ -134,8 +139,8 @@ export default function PostEdit() {
           }
         />
         <EmptyState
-          title="Post nao encontrado"
-          description="Verifique se o post ainda existe ou tente novamente."
+          title="Post indisponivel"
+          description="Ele pode ter sido removido ou movido. Selecione outro post."
           action={
             <Button type="button" variant="ghost" onClick={handleCancel}>
               Voltar para posts

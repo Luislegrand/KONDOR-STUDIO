@@ -79,6 +79,17 @@ export default function AdminLogs() {
     setPage(1);
   };
 
+  const resetFilters = () => {
+    setFilters({
+      search: "",
+      level: "",
+      source: "",
+      tenantId: "",
+      since: "",
+    });
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -210,7 +221,12 @@ export default function AdminLogs() {
               {!isLoading && logs.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                    Nenhum log encontrado com os filtros atuais.
+                    <div className="flex flex-col items-center gap-2">
+                      <p>Nenhum log encontrado com os filtros atuais.</p>
+                      <Button size="sm" variant="secondary" onClick={resetFilters}>
+                        Limpar filtros
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )}

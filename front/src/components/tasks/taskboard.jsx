@@ -70,6 +70,7 @@ export default function Taskboard({
   onStatusChange,
   collapsedColumns,
   onCollapsedChange,
+  onCreate,
 }) {
   const isControlled = collapsedColumns !== undefined;
   const [internalCollapsed, setInternalCollapsed] = React.useState(
@@ -135,7 +136,19 @@ export default function Taskboard({
 
   const renderEmpty = () => (
     <div className="rounded-[12px] border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-4 py-6 text-center text-xs text-[var(--text-muted)]">
-      Nenhuma tarefa nesta coluna.
+      <p>Nenhuma tarefa nesta etapa ainda.</p>
+      <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+        Crie uma tarefa para dar sequencia ao fluxo.
+      </p>
+      {onCreate ? (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="mt-3 inline-flex items-center justify-center rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--text)] shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
+        >
+          Criar nova tarefa
+        </button>
+      ) : null}
     </div>
   );
 

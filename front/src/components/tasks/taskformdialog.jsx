@@ -158,9 +158,20 @@ export default function Taskformdialog({
                   {clientMenuOpen && (
                     <div className="absolute mt-2 w-full max-h-48 overflow-y-auto rounded-[12px] border border-[var(--border)] bg-white shadow-[var(--shadow-md)] z-20 animate-fade-in-up">
                       {clients.length === 0 && (
-                        <p className="text-xs text-[var(--text-muted)] p-3">
-                          Nenhum cliente cadastrado.
-                        </p>
+                        <div className="p-3 text-xs text-[var(--text-muted)]">
+                          <p>Nenhum cliente cadastrado ainda.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== "undefined") {
+                                window.location.href = "/clients";
+                              }
+                            }}
+                            className="mt-2 inline-flex items-center rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--text)] shadow-[var(--shadow-sm)]"
+                          >
+                            Cadastrar cliente
+                          </button>
+                        </div>
                       )}
                       {clients.map((c) => (
                         <button

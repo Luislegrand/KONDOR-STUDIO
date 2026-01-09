@@ -43,6 +43,7 @@ export default function Financetable({
   isLoading,
   onEdit,
   onDelete,
+  onCreate,
 }) {
   if (isLoading) {
     return (
@@ -75,9 +76,21 @@ export default function Financetable({
       </CardHeader>
       <CardContent>
         {records.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            Nenhum lançamento financeiro cadastrado.
-          </p>
+          <div className="flex flex-col items-start gap-3 text-sm text-gray-500">
+            <div>
+              <p className="font-semibold text-gray-800">
+                Nenhum lancamento financeiro registrado
+              </p>
+              <p className="text-xs text-gray-500">
+                Cadastre receitas ou custos para acompanhar o saldo.
+              </p>
+            </div>
+            {onCreate ? (
+              <Button size="sm" onClick={onCreate}>
+                Criar lancamento
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

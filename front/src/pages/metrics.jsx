@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/apiClient/base44Client";
 import PageShell from "@/components/ui/page-shell.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import EmptyState from "@/components/ui/empty-state.jsx";
+import { Button } from "@/components/ui/button.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
 import { DateField } from "@/components/ui/date-field.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
@@ -112,6 +114,7 @@ export default function Metrics() {
   const [periodPreset, setPeriodPreset] = useState("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const navigate = useNavigate();
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
@@ -255,8 +258,13 @@ export default function Metrics() {
           {metrics.length === 0 && !isLoading ? (
             <SectionCard title="Sem dados" icon={BarChart3}>
               <EmptyState
-                title="Nenhuma informacao encontrada"
-                description="Este canal ainda nao retornou dados para o periodo selecionado."
+                title="Ainda nao ha metricas para este periodo"
+                description="Verifique o periodo, conecte a integracao ou aguarde novas coletas."
+                action={
+                  <Button variant="secondary" onClick={() => navigate("/integrations")}>
+                    Conectar integracao
+                  </Button>
+                }
               />
             </SectionCard>
           ) : null}
@@ -278,8 +286,13 @@ export default function Metrics() {
     return (
       <SectionCard title={sectionLabel || "Metricas"} icon={Icon}>
         <EmptyState
-          title="Nenhuma informacao encontrada"
-          description="Os dados deste painel aparecerao assim que a integracao retornar metricas."
+          title="Sem dados suficientes para este painel"
+          description="Aguardamos novas coletas. Voce pode revisar a integracao agora."
+          action={
+            <Button variant="secondary" onClick={() => navigate("/integrations")}>
+              Revisar integracao
+            </Button>
+          }
         />
       </SectionCard>
     );

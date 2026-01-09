@@ -141,8 +141,14 @@ export default function PublicApproval() {
                   />
                 )
               ) : (
-                <div className="p-8 text-sm text-slate-400">
-                  Nenhuma mídia disponível.
+                <div className="p-8 text-center text-sm text-slate-500">
+                  <p>Nenhuma mídia disponível no momento.</p>
+                  <a
+                    href="#approval-note"
+                    className="mt-3 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    Descrever ajustes
+                  </a>
                 </div>
               )}
             </div>
@@ -176,6 +182,7 @@ export default function PublicApproval() {
           </div>
 
           <Textarea
+            id="approval-note"
             rows={4}
             value={note}
             onChange={(event) => setNote(event.target.value)}

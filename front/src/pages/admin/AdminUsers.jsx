@@ -119,6 +119,16 @@ export default function AdminUsers() {
     },
   });
 
+  const resetFilters = () => {
+    setFilters({
+      search: "",
+      role: "",
+      status: "",
+      tenantId: "",
+    });
+    setPage(1);
+  };
+
   const handleUpdate = (id, payload) => {
     if (!canUpdate) return;
     setFeedback(null);
@@ -438,7 +448,16 @@ export default function AdminUsers() {
               {!isLoading && users.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    Nenhum usuario encontrado.
+                    <div className="flex flex-col items-center gap-2">
+                      <p>Nenhum usuario encontrado com os filtros atuais.</p>
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}

@@ -279,12 +279,17 @@ export default function Competitors() {
             {competitorsQuery.isLoading ? (
               <EmptyState
                 title="Carregando concorrentes"
-                description="Aguarde enquanto carregamos os dados."
+                description="Estamos reunindo os dados de monitoramento."
+                action={
+                  <Button variant="ghost" onClick={() => competitorsQuery.refetch()}>
+                    Atualizar agora
+                  </Button>
+                }
               />
             ) : listEmpty ? (
               <EmptyState
-                title="Nenhum concorrente cadastrado"
-                description="Adicione concorrentes para acompanhar o desempenho."
+                title="Sem concorrentes monitorados"
+                description="Cadastre concorrentes para acompanhar mercado e oportunidades."
                 action={
                   <Button leftIcon={UsersRound} onClick={handleAdd}>
                     Adicionar concorrente
@@ -542,8 +547,20 @@ export default function Competitors() {
             ) : (
               <EmptyState
                 title="Selecione um concorrente"
-                description="Escolha um concorrente para visualizar detalhes."
+                description="Escolha um nome na lista para abrir o resumo completo."
                 icon={UserRound}
+                action={
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (competitors[0]?.id) {
+                        setSelectedCompetitorId(competitors[0].id);
+                      }
+                    }}
+                  >
+                    Selecionar primeiro da lista
+                  </Button>
+                }
               />
             )}
           </CardContent>

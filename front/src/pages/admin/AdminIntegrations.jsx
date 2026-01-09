@@ -121,6 +121,11 @@ export default function AdminIntegrations() {
     setPage(1);
   };
 
+  const resetFilters = () => {
+    setFilters({ tenantId: "", provider: "", status: "" });
+    setPage(1);
+  };
+
   const openEditor = (integration) => {
     setEditing(integration);
     setConfigText(
@@ -340,7 +345,12 @@ export default function AdminIntegrations() {
                 {!isLoading && integrations.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                      Nenhuma integracao encontrada.
+                      <div className="flex flex-col items-center gap-2">
+                        <p>Nenhuma integracao encontrada para os filtros atuais.</p>
+                        <Button size="sm" variant="secondary" onClick={resetFilters}>
+                          Limpar filtros
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 )}

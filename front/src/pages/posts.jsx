@@ -194,6 +194,14 @@ export default function Posts() {
     persistCollapsedColumns(collapsedColumns);
   }, [collapsedColumns]);
 
+  const clearFilters = React.useCallback(() => {
+    setSelectedClientId("");
+    setActiveClientId("");
+    setDateStart("");
+    setDateEnd("");
+    setSearchTerm("");
+  }, [setActiveClientId]);
+
   React.useEffect(() => {
     if (!preferencesQuery.isFetched || preferencesHydrated) return;
 
@@ -449,20 +457,32 @@ export default function Posts() {
           isLoading ? (
             <EmptyState
               title="Carregando posts"
-              description="Aguarde enquanto carregamos o calendario."
+              description="Estamos buscando os posts do periodo selecionado."
+              action={
+                <Button type="button" variant="ghost" onClick={() => postsQuery.refetch()}>
+                  Atualizar agora
+                </Button>
+              }
             />
           ) : !hasResults ? (
             <EmptyState
-              title={hasFilters ? "Nenhum post encontrado" : "Nenhum post criado"}
+              title={hasFilters ? "Sem posts neste periodo" : "Sua agenda de posts esta vazia"}
               description={
                 hasFilters
-                  ? "Ajuste os filtros para encontrar posts neste periodo."
-                  : "Crie seu primeiro post para iniciar o fluxo."
+                  ? "Este periodo esta vazio. Ajuste os filtros ou publique algo novo."
+                  : "Ainda nao ha posts. Crie o primeiro para iniciar o fluxo."
               }
               action={
-                <Button type="button" leftIcon={Plus} onClick={() => handleNewPost()}>
-                  Novo post
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {hasFilters ? (
+                    <Button type="button" variant="ghost" onClick={clearFilters}>
+                      Limpar filtros
+                    </Button>
+                  ) : null}
+                  <Button type="button" leftIcon={Plus} onClick={() => handleNewPost()}>
+                    Criar novo post
+                  </Button>
+                </div>
               }
             />
           ) : (
@@ -483,6 +503,7 @@ export default function Posts() {
             isLoading={isLoading}
             collapsedColumns={collapsedColumns}
             onCollapsedChange={setCollapsedColumns}
+            onCreate={handleNewPost}
           />
         )}
       </div>

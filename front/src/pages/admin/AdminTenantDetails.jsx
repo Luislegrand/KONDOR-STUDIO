@@ -184,7 +184,7 @@ export default function AdminTenantDetails() {
   if (!tenant) {
     return (
       <div className="text-sm text-gray-500">
-        Tenant não encontrado.
+        Nao encontramos esse tenant por aqui.
         {" "}
         <button onClick={() => navigate(-1)} className="text-purple-600">
           Voltar
@@ -368,7 +368,11 @@ export default function AdminTenantDetails() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4" onSubmit={handleNoteSubmit}>
+                <form
+                  id="tenant-note-form"
+                  className="space-y-4"
+                  onSubmit={handleNoteSubmit}
+                >
                   <div className="space-y-1 text-sm">
                     <label className="font-medium text-gray-700">Título</label>
                     <Input
@@ -445,7 +449,15 @@ export default function AdminTenantDetails() {
                   </div>
                 )}
                 {!loadingNotes && notes.length === 0 && (
-                  <p className="text-sm text-gray-500">Nenhuma nota registrada.</p>
+                  <div className="flex flex-col items-start gap-2 text-sm text-gray-500">
+                    <p>Nenhuma nota registrada para este tenant.</p>
+                    <a
+                      href="#tenant-note-form"
+                      className="text-xs font-semibold text-purple-600 hover:text-purple-800"
+                    >
+                      Registrar primeira nota
+                    </a>
+                  </div>
                 )}
                 {!loadingNotes && notes.map((note) => (
                   <div key={note.id} className="border border-gray-100 rounded-lg p-3 space-y-1">

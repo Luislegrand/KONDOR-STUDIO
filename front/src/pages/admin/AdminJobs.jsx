@@ -73,6 +73,17 @@ export default function AdminJobs() {
     setPage(1);
   };
 
+  const resetFilters = () => {
+    setFilters({
+      queue: "",
+      status: "FAILED",
+      tenantId: "",
+      search: "",
+      since: "",
+    });
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -191,7 +202,16 @@ export default function AdminJobs() {
               {!isLoading && jobs.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    Nenhum job encontrado.
+                    <div className="flex flex-col items-center gap-2">
+                      <p>Nenhum job encontrado com os filtros atuais.</p>
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44 } from "@/apiClient/base44Client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import FiltersBar from "@/components/creatives/filtersBar.jsx";
@@ -9,6 +10,7 @@ import PageShell from "@/components/ui/page-shell.jsx";
 import PageHeader from "@/components/ui/page-header.jsx";
 
 export default function Biblioteca() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterClient, setFilterClient] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -119,7 +121,10 @@ export default function Biblioteca() {
         />
 
         {filteredCreatives.length === 0 ? (
-          <CreativeEmptyState />
+          <CreativeEmptyState
+            onAction={() => navigate("/posts/new")}
+            actionLabel="Criar post e enviar midia"
+          />
         ) : (
           <CreativeGrid
             creatives={filteredCreatives}

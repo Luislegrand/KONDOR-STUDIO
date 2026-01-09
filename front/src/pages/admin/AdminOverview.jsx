@@ -154,7 +154,15 @@ export default function AdminOverview() {
           </CardHeader>
           <CardContent>
             {errorHighlights.length === 0 && (
-              <p className="text-sm text-gray-500">Nenhum alerta crítico.</p>
+              <div className="flex flex-col items-start gap-2 text-sm text-gray-500">
+                <p>Nenhum alerta critico nas ultimas 24h.</p>
+                <a
+                  href="/admin/logs"
+                  className="text-xs font-semibold text-purple-600 hover:text-purple-800"
+                >
+                  Ver logs completos
+                </a>
+              </div>
             )}
             <ul className="space-y-3">
               {errorHighlights.map((tenant) => (
@@ -187,9 +195,15 @@ export default function AdminOverview() {
           </CardHeader>
           <CardContent>
             {jobHighlights.length === 0 && (
-              <p className="text-sm text-gray-500">
-                Sem jobs críticos registrados.
-              </p>
+              <div className="flex flex-col items-start gap-2 text-sm text-gray-500">
+                <p>Nenhum job critico registrado agora.</p>
+                <a
+                  href="/admin/jobs"
+                  className="text-xs font-semibold text-purple-600 hover:text-purple-800"
+                >
+                  Abrir monitoramento de jobs
+                </a>
+              </div>
             )}
             <div className="space-y-3">
               {jobHighlights.map((job) => (

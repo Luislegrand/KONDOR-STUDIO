@@ -782,7 +782,7 @@ function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges
       </CardHeader>
       <CardContent className="space-y-4">
         {posts.length === 0 ? (
-          <EmptyState message="Nenhum post disponível por enquanto." />
+          <EmptyState message="Ainda nao ha posts para revisar. Assim que sua agencia enviar, eles aparecem aqui." />
         ) : (
           posts.map((post) => {
             const approval = approvalsByPostId.get(post.id);
@@ -917,7 +917,7 @@ function ClientKanbanBoard({ columns, grouped, approvalsByPostId, onApprove, onR
       </div>
       {empty && (
         <div className="mt-6">
-          <EmptyState message="Ainda não há posts nesse pipeline." />
+          <EmptyState message="Este pipeline esta vazio. Aguarde novos conteudos ou atualize para conferir." />
         </div>
       )}
     </div>
@@ -934,7 +934,14 @@ function KanbanColumn({ title, posts, approvalsByPostId, onApprove, onRequestCha
       <div className="space-y-3">
         {posts.length === 0 ? (
           <div className="rounded-xl bg-slate-50 px-3 py-6 text-center text-xs text-slate-400">
-            Sem itens
+            <p>Nenhum post nesta etapa ainda.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-2 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              Atualizar lista
+            </button>
           </div>
         ) : (
           posts.map((post) => (
@@ -1146,8 +1153,8 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
                 />
               )
             ) : (
-              <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-slate-400">
-                Sem mídia enviada.
+              <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-center text-sm text-slate-400">
+                Midia ainda nao enviada. Use "Solicitar ajustes" se precisar do arquivo.
               </div>
             )}
           </div>
@@ -1275,7 +1282,7 @@ function PlatformTabs({ metrics }) {
             {stats ? (
               <MetricsDashboard stats={stats} />
             ) : (
-              <EmptyState message="Sem dados para este canal ainda." />
+              <EmptyState message="Este canal ainda nao retornou metricas. Aguarde a proxima coleta." />
             )}
           </TabsContent>
         );
@@ -1330,11 +1337,19 @@ function MetricsSummary({ totalMetrics }) {
   );
 }
 
-function EmptyState({ message }) {
+function EmptyState({ message, actionLabel = "Atualizar painel", onAction }) {
+  const handleAction = onAction || (() => window.location.reload());
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 py-10 text-center text-sm text-slate-400">
       <BarChart3 className="mb-3 h-8 w-8 text-slate-300" />
-      {message}
+      <p>{message}</p>
+      <button
+        type="button"
+        onClick={handleAction}
+        className="mt-3 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      >
+        {actionLabel}
+      </button>
     </div>
   );
 }

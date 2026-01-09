@@ -113,12 +113,12 @@ export default function Clients() {
           </div>
         ) : clients.length === 0 ? (
           <EmptyState
-            title="Nenhum cliente cadastrado"
-            description="Adicione seu primeiro cliente para organizar a operacao."
+            title="Sua carteira esta vazia"
+            description="Cadastre um cliente para comecar a organizar projetos e entregas."
             icon={Building2}
             action={
               <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
-                Adicionar cliente
+                Cadastrar cliente
               </Button>
             }
           />

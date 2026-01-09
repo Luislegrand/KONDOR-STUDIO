@@ -19,7 +19,11 @@ export default function AdminDataConsole() {
   const [result, setResult] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
-  const { data: tablesData, isLoading: loadingTables } = useQuery({
+  const {
+    data: tablesData,
+    isLoading: loadingTables,
+    refetch: refetchTables,
+  } = useQuery({
     queryKey: ["admin-data-tables"],
     queryFn: () => base44.admin.dataTables(),
   });
@@ -191,7 +195,12 @@ export default function AdminDataConsole() {
               </div>
             )}
             {!loadingTables && tables.length === 0 && (
-              <p className="text-sm text-gray-500">Nenhuma tabela encontrada.</p>
+              <div className="flex flex-col items-start gap-2 text-sm text-gray-500">
+                <p>Nenhuma tabela encontrada. Verifique a conexao e tente novamente.</p>
+                <Button size="sm" variant="secondary" onClick={() => refetchTables()}>
+                  Atualizar lista
+                </Button>
+              </div>
             )}
             {!loadingTables &&
               tables.map((table) => (

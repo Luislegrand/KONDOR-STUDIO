@@ -103,12 +103,12 @@ export default function Team() {
           </div>
         ) : team.length === 0 ? (
           <EmptyState
-            title="Nenhum membro cadastrado"
-            description="Adicione membros da sua equipe para colaborar no fluxo."
+            title="Equipe em branco"
+            description="Convide pelo menos um membro para distribuir tarefas e aprovacoes."
             icon={UserCircle}
             action={
               <Button leftIcon={Plus} onClick={() => setDialogOpen(true)}>
-                Adicionar primeiro membro
+                Convidar membro
               </Button>
             }
           />
