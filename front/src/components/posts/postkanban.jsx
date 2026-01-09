@@ -61,7 +61,7 @@ export default function Postkanban({
   const renderSkeletonColumn = () => (
     <div className="space-y-3">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-20 rounded-[12px] bg-slate-100 animate-pulse" />
+        <div key={i} className="h-24 rounded-[16px] bg-slate-100 animate-pulse" />
       ))}
     </div>
   );
@@ -87,6 +87,10 @@ export default function Postkanban({
         {WORKFLOW_STATUS_ORDER.map((key) => {
           const config = WORKFLOW_STATUS_CONFIG[key];
           const Icon = config?.icon;
+          const accent = config?.accent || "bg-slate-200";
+          const accentSoft = config?.accentSoft || "bg-[var(--surface-muted)]";
+          const accentBorder = config?.accentBorder || "border-[var(--border)]";
+          const accentText = config?.accentText || "text-[var(--text-muted)]";
           const isCollapsed = Boolean(collapsed?.[key]);
           const items = groupedPosts[key] || [];
 
@@ -94,22 +98,27 @@ export default function Postkanban({
             <section
               key={key}
               className={`flex-shrink-0 transition-[width] duration-200 ease-out ${
-                isCollapsed ? "w-[72px]" : "w-[340px]"
+                isCollapsed ? "w-[84px]" : "w-[400px]"
               }`}
             >
-              <div className="flex h-full flex-col rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
+              <div className={`flex h-full flex-col rounded-[18px] border ${accentBorder} bg-white p-4 shadow-[var(--shadow-sm)]`}>
+                <div className={`h-1.5 w-full rounded-full ${accent}`} aria-hidden="true" />
                 <header
-                  className={`flex items-start justify-between gap-2 ${
-                    isCollapsed ? "flex-col" : ""
+                  className={`mt-3 flex items-start justify-between gap-3 rounded-[14px] border ${accentBorder} ${accentSoft} px-3 py-2 ${
+                    isCollapsed ? "flex-col items-center text-center" : ""
                   }`}
                 >
                   <div
-                    className={`flex items-start gap-2 ${isCollapsed ? "flex-col" : ""}`}
+                    className={`flex items-start gap-2 ${isCollapsed ? "flex-col items-center" : ""}`}
                   >
                     {Icon ? (
-                      <Icon
-                        className={`h-5 w-5 ${config?.tone || "text-slate-500"}`}
-                      />
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-[12px] border ${accentBorder} bg-white/80`}
+                      >
+                        <Icon
+                          className={`h-4 w-4 ${config?.tone || "text-slate-500"}`}
+                        />
+                      </span>
                     ) : null}
                     {!isCollapsed ? (
                       <div>
@@ -126,13 +135,15 @@ export default function Postkanban({
                   <div
                     className={`flex items-center gap-2 ${isCollapsed ? "flex-col" : ""}`}
                   >
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--text)]">
+                    <span
+                      className={`rounded-full border ${accentBorder} bg-white px-2.5 py-1 text-xs font-semibold ${accentText}`}
+                    >
                       {items.length}
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleColumn(key)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border ${accentBorder} text-[var(--text-muted)] transition hover:bg-white`}
                       aria-label={isCollapsed ? "Expandir coluna" : "Recolher coluna"}
                     >
                       {isCollapsed ? (
@@ -146,7 +157,7 @@ export default function Postkanban({
 
                 {!isCollapsed ? (
                   <div
-                    className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1"
+                    className="mt-5 flex-1 space-y-3 overflow-y-auto pr-1"
                     style={{ maxHeight: "calc(100vh - 280px)" }}
                   >
                     {isLoading

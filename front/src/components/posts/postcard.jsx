@@ -1,15 +1,9 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card.jsx";
+import { Card } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Badge } from "@/components/ui/badge.jsx";
-import { ChevronDown } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, GripVertical } from "lucide-react";
 import {
   getWorkflowStatuses,
   getWorkflowStatusConfig,
@@ -231,7 +225,7 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
 
   return (
     <Card
-      className="group relative w-full border border-[var(--border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+      className="group relative w-full overflow-hidden border border-[var(--border)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md cursor-grab active:cursor-grabbing"
       onClick={(event) => {
         // Prevent default click behavior to keep scroll position stable.
         event.preventDefault();
@@ -240,89 +234,112 @@ export default function Postcard({ post, client, integration, onEdit, onStatusCh
       role="button"
       tabIndex={0}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-sm font-semibold text-[var(--text)] line-clamp-2">
-              {post.title || "Post sem titulo"}
-            </CardTitle>
-            {client && (
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                {client.name}
-              </p>
-            )}
-          </div>
-          <Badge className={`text-[10px] border border-transparent ${statusConfig.badge}`}>
-            {statusConfig.label}
-          </Badge>
-        </div>
-      </CardHeader>
-
-      {(description || hasClientFeedback) && (
-        <CardContent className="pt-0 pb-2 space-y-3">
-          {description && (
-            <p className="text-xs text-[var(--text-muted)] line-clamp-2 whitespace-pre-line">
-              {description}
-            </p>
-          )}
-          {hasClientFeedback && (
-            <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                Ajustes solicitados
-              </p>
-              <p className="text-xs text-amber-800 line-clamp-2 whitespace-pre-line">
-                {clientFeedback}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      )}
-
-      <CardContent className="pt-0 pb-2">
-        <div className="flex flex-wrap gap-2">
-          {typeLabels.map((label) => (
-            <Badge key={`type-${label}`} variant="outline" className="text-[10px]">
-              {label}
-            </Badge>
-          ))}
-          {networkLabels.map((label) => (
-            <Badge key={`network-${label}`} variant="outline" className="text-[10px]">
-              {label}
-            </Badge>
-          ))}
-          {scheduledLabel ? (
-            <Badge variant="outline" className="text-[10px]">
-              {scheduledLabel}
-            </Badge>
-          ) : null}
-        </div>
-      </CardContent>
-
-      <CardFooter className="pt-2 flex items-center justify-between gap-2">
-        <div className="relative w-full">
+      <div
+        className={`absolute left-0 top-0 h-full w-1.5 ${statusConfig.accent || "bg-slate-300"}`}
+        aria-hidden="true"
+      />
+      <div className="relative flex flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-3">
           <button
             type="button"
             onClick={triggerStatusMenu}
             ref={triggerRef}
-            className="w-full inline-flex items-center justify-between rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-muted)]"
+            className={`inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold ${statusConfig.badge} shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]`}
+            aria-label="Alterar status do post"
           >
+            <span
+              className={`h-2 w-2 rounded-full ${statusConfig.accent || "bg-slate-300"}`}
+              aria-hidden="true"
+            />
             <span>{statusConfig.label}</span>
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-3.5 w-3.5 opacity-70" />
           </button>
+          <div className="pointer-events-none flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] opacity-70 transition group-hover:opacity-100">
+            <GripVertical className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Arraste</span>
+          </div>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onEdit && onEdit(post);
-          }}
+
+        <div>
+          <h3 className="text-base font-semibold leading-tight text-[var(--text)] line-clamp-2">
+            {post.title || "Post sem titulo"}
+          </h3>
+          <div className="mt-1 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+            <Building2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <span className="font-medium text-[var(--text)]">
+              {client?.name || "Cliente nao informado"}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className={`flex items-center justify-between gap-3 rounded-[12px] border ${statusConfig.accentBorder || "border-[var(--border)]"} ${statusConfig.accentSoft || "bg-[var(--surface-muted)]"} px-3 py-2`}
         >
-          Detalhes
-        </Button>
-      </CardFooter>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+            <CalendarDays
+              className={`h-3.5 w-3.5 ${statusConfig.accentText || "text-[var(--text-muted)]"}`}
+            />
+            Publicacao
+          </div>
+          <span
+            className={`text-xs font-semibold ${
+              scheduledLabel ? "text-[var(--text)]" : "text-[var(--text-muted)]"
+            }`}
+          >
+            {scheduledLabel || "Sem data"}
+          </span>
+        </div>
+
+        {(description || hasClientFeedback) && (
+          <div className="space-y-3">
+            {description && (
+              <p className="text-xs text-[var(--text-muted)] line-clamp-2 whitespace-pre-line">
+                {description}
+              </p>
+            )}
+            {hasClientFeedback && (
+              <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                  Ajustes solicitados
+                </p>
+                <p className="text-xs text-amber-800 line-clamp-2 whitespace-pre-line">
+                  {clientFeedback}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(typeLabels.length > 0 || networkLabels.length > 0) && (
+          <div className="flex flex-wrap gap-2">
+            {typeLabels.map((label) => (
+              <Badge key={`type-${label}`} variant="outline" className="text-[10px]">
+                {label}
+              </Badge>
+            ))}
+            {networkLabels.map((label) => (
+              <Badge key={`network-${label}`} variant="outline" className="text-[10px]">
+                {label}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end border-t border-[var(--border)] pt-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onEdit && onEdit(post);
+            }}
+          >
+            Detalhes
+          </Button>
+        </div>
+      </div>
       {menuOpen &&
         typeof document !== "undefined" &&
         createPortal(
