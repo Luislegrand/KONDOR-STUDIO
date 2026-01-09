@@ -5,6 +5,7 @@ const router = express.Router();
 const auth = require('../../middleware/auth');
 const connectionsController = require('./connections.controller');
 const metricCatalogController = require('./metricCatalog.controller');
+const templatesController = require('./templates.controller');
 
 router.get('/health', (req, res) => {
   return res.json({ ok: true, module: 'reporting' });
@@ -20,5 +21,11 @@ router.post(
   auth.requireRole('OWNER', 'ADMIN'),
   metricCatalogController.create,
 );
+
+router.get('/templates', templatesController.list);
+router.post('/templates', templatesController.create);
+router.get('/templates/:id', templatesController.get);
+router.put('/templates/:id', templatesController.update);
+router.post('/templates/:id/duplicate', templatesController.duplicate);
 
 module.exports = router;

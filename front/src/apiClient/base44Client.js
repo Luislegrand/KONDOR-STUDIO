@@ -619,6 +619,39 @@ const Reporting = {
       body: JSON.stringify(payload || {}),
     });
   },
+
+  async listTemplates(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/reporting/templates${qs}`, { method: "GET" });
+  },
+
+  async getTemplate(id) {
+    if (!id) throw new Error("templateId obrigatorio");
+    return jsonFetch(`/reporting/templates/${id}`, { method: "GET" });
+  },
+
+  async createTemplate(payload = {}) {
+    return jsonFetch("/reporting/templates", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async updateTemplate(id, payload = {}) {
+    if (!id) throw new Error("templateId obrigatorio");
+    return jsonFetch(`/reporting/templates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async duplicateTemplate(id, payload = {}) {
+    if (!id) throw new Error("templateId obrigatorio");
+    return jsonFetch(`/reporting/templates/${id}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
 };
 
 // --------------------
