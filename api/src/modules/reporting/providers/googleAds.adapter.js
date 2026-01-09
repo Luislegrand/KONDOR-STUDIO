@@ -2,7 +2,7 @@ const {
   getIntegrationSettings,
   normalizeMetricsPayload,
 } = require('./providerUtils');
-const googleAdsMetricsService = require('../../services/googleAdsMetricsService');
+const googleAdsMetricsService = require('../../../services/googleAdsMetricsService');
 
 function getBaseUrl() {
   return process.env.GOOGLE_ADS_API_BASE_URL || 'https://googleads.googleapis.com/v14';

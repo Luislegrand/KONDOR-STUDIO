@@ -1,4 +1,4 @@
-const { decrypt } = require('../../utils/crypto');
+const { decrypt } = require('../../../utils/crypto');
 
 function isPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);

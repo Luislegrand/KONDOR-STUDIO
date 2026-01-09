@@ -5,6 +5,7 @@ const router = express.Router();
 const auth = require('../../middleware/auth');
 const brandGroupsController = require('./brandGroups.controller');
 const connectionsController = require('./connections.controller');
+const dashboardsController = require('./dashboards.controller');
 const metricCatalogController = require('./metricCatalog.controller');
 const templatesController = require('./templates.controller');
 const reportsController = require('./reports.controller');
@@ -25,6 +26,12 @@ router.post(
   metricCatalogController.create,
 );
 
+router.get('/dashboards', dashboardsController.list);
+router.post('/dashboards', dashboardsController.create);
+router.get('/dashboards/:id', dashboardsController.get);
+router.put('/dashboards/:id', dashboardsController.update);
+router.post('/dashboards/:id/query', dashboardsController.query);
+
 router.get('/templates', templatesController.list);
 router.post('/templates', templatesController.create);
 router.get('/templates/:id', templatesController.get);
@@ -34,6 +41,7 @@ router.post('/templates/:id/duplicate', templatesController.duplicate);
 router.get('/reports', reportsController.list);
 router.post('/reports', reportsController.create);
 router.get('/reports/:id', reportsController.get);
+router.get('/reports/:id/snapshots', reportsController.snapshots);
 router.put('/reports/:id/layout', reportsController.updateLayout);
 router.post('/reports/:id/refresh', reportsController.refresh);
 

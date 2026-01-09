@@ -62,6 +62,13 @@ export default function ReportViewer() {
       data?.status === "GENERATING" ? 5000 : false,
   });
 
+  const { data: snapshotsData, isFetching: snapshotsLoading } = useQuery({
+    queryKey: ["reporting-report-snapshots", reportId],
+    queryFn: () => base44.reporting.getReportSnapshots(reportId),
+    enabled: Boolean(reportId),
+    refetchInterval: report?.status === "GENERATING" ? 5000 : false,
+  });
+
   useEffect(() => {
     if (!report) return;
     const widgets = report.widgets || [];
@@ -97,6 +104,9 @@ export default function ReportViewer() {
       if (data) {
         queryClient.setQueryData(reportQueryKey, data);
       }
+      queryClient.invalidateQueries({
+        queryKey: ["reporting-report-snapshots", reportId],
+      });
     },
     onError: (err) => {
       setRefreshError(err?.message || "Erro ao atualizar dados.");
@@ -104,6 +114,18 @@ export default function ReportViewer() {
   });
 
   const widgets = useMemo(() => report?.widgets || [], [report]);
+  const snapshotsByWidget = useMemo(() => {
+    const items = snapshotsData?.items || [];
+    return items.reduce((acc, item) => {
+      if (item && item.widgetId) acc[item.widgetId] = item;
+      return acc;
+    }, {});
+  }, [snapshotsData]);
+
+  const reportingErrors = useMemo(() => {
+    const errors = report?.params?.reporting?.errors;
+    return Array.isArray(errors) ? errors : [];
+  }, [report]);
 
   if (isLoading) {
     return (
@@ -175,9 +197,20 @@ export default function ReportViewer() {
             </Button>
           </div>
         </div>
+        {report?.generatedAt ? (
+          <p className="text-xs text-[var(--text-muted)]">
+            Atualizado em {new Date(report.generatedAt).toLocaleString("pt-BR")}
+          </p>
+        ) : null}
         {refreshError ? (
           <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {refreshError}
+          </div>
+        ) : null}
+        {report?.status === "ERROR" && reportingErrors.length ? (
+          <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {reportingErrors.length} widget(s) com erro. Exemplo:{" "}
+            {reportingErrors[0]?.message || "Falha ao consultar dados."}
           </div>
         ) : null}
 
@@ -198,6 +231,9 @@ export default function ReportViewer() {
                   key={widget.id}
                   className="rounded-[12px] border border-[var(--border)] bg-white p-3 shadow-[var(--shadow-sm)]"
                 >
+                  {snapshotsLoading ? (
+                    <div className="mb-3 h-6 w-24 rounded-full bg-[var(--surface-muted)] animate-pulse" />
+                  ) : null}
                   <p className="text-xs text-[var(--text-muted)]">
                     {widget.widgetType}
                   </p>
@@ -207,9 +243,57 @@ export default function ReportViewer() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {widget.source} {widget.level ? `• ${widget.level}` : ""}
                   </p>
-                  <div className="mt-3 rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
-                    Sem dados carregados
-                  </div>
+                  {(() => {
+                    const snapshot = snapshotsByWidget[widget.id];
+                    const data = snapshot?.data || null;
+                    const totals =
+                      data && typeof data.totals === "object" ? data.totals : {};
+                    const metrics = Array.isArray(widget.metrics)
+                      ? widget.metrics
+                      : [];
+                    const primaryMetric = metrics[0] || null;
+                    const primaryValue =
+                      primaryMetric && totals
+                        ? totals[primaryMetric]
+                        : null;
+
+                    if (!data) {
+                      return (
+                        <div className="mt-3 rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
+                          Sem dados carregados
+                        </div>
+                      );
+                    }
+
+                    if (widget.widgetType === "KPI" && primaryMetric) {
+                      return (
+                        <div className="mt-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {primaryMetric}
+                          </p>
+                          <p className="text-lg font-semibold text-[var(--text)]">
+                            {typeof primaryValue === "number"
+                              ? primaryValue.toLocaleString("pt-BR")
+                              : "-"}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const seriesCount = Array.isArray(data.series)
+                      ? data.series.length
+                      : 0;
+                    const totalsCount = Object.keys(totals || {}).length;
+
+                    return (
+                      <div className="mt-3 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
+                        {seriesCount
+                          ? `${seriesCount} serie(s) carregadas`
+                          : "Dados carregados"}
+                        {totalsCount ? ` • ${totalsCount} metricas` : ""}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </GridLayout>

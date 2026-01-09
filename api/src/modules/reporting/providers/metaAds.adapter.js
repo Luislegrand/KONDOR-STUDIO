@@ -3,7 +3,7 @@ const {
   getIntegrationConfig,
   normalizeMetricsPayload,
 } = require('./providerUtils');
-const metaMetricsService = require('../../services/metaMetricsService');
+const metaMetricsService = require('../../../services/metaMetricsService');
 
 function getGraphBaseUrl() {
   const base = process.env.META_GRAPH_BASE_URL;

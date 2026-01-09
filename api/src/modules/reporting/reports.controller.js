@@ -5,6 +5,7 @@ const {
   COMPARE_MODES,
 } = require('./reports.validators');
 const reportsService = require('./reports.service');
+const reportingSnapshots = require('./reportingSnapshots.service');
 
 function parseCreatePayload(body = {}) {
   const payload = {
@@ -164,6 +165,22 @@ module.exports = {
     } catch (err) {
       const status = err.status || 500;
       return res.status(status).json({ error: err.message || 'Erro ao atualizar relatorio' });
+    }
+  },
+
+  async snapshots(req, res) {
+    try {
+      const data = await reportingSnapshots.listReportSnapshots(
+        req.tenantId,
+        req.params.id,
+      );
+      if (!data) {
+        return res.status(404).json({ error: 'Relatorio nao encontrado' });
+      }
+      return res.json(data);
+    } catch (err) {
+      const status = err.status || 500;
+      return res.status(status).json({ error: err.message || 'Erro ao buscar snapshots' });
     }
   },
 };

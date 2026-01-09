@@ -139,6 +139,21 @@ export default function ReportsHome() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-[var(--text)]">
+                Dashboards ao vivo
+              </h2>
+              <p className="text-sm text-[var(--text-muted)]">
+                Ajuste filtros globais e acompanhe os dados em tempo real.
+              </p>
+            </div>
+            <Button onClick={() => navigate("/reports/dashboards")}>
+              Ver dashboards
+            </Button>
+          </div>
+        </section>
+        <section className="rounded-[18px] border border-[var(--border)] bg-white px-6 py-6 shadow-[var(--shadow-sm)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">
                 Conexoes por marca
               </h2>
               <p className="text-sm text-[var(--text-muted)]">

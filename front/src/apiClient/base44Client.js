@@ -688,6 +688,44 @@ const Reporting = {
       method: "POST",
     });
   },
+
+  async getReportSnapshots(id) {
+    if (!id) throw new Error("reportId obrigatorio");
+    return jsonFetch(`/reporting/reports/${id}/snapshots`, { method: "GET" });
+  },
+
+  async listDashboards(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/reporting/dashboards${qs}`, { method: "GET" });
+  },
+
+  async getDashboard(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reporting/dashboards/${id}`, { method: "GET" });
+  },
+
+  async createDashboard(payload = {}) {
+    return jsonFetch("/reporting/dashboards", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async updateDashboard(id, payload = {}) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reporting/dashboards/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async queryDashboardData(id, payload = {}) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reporting/dashboards/${id}/query`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
 };
 
 // --------------------

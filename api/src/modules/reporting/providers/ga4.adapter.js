@@ -3,7 +3,7 @@ const {
   getIntegrationSettings,
   normalizeMetricsPayload,
 } = require('./providerUtils');
-const googleAnalyticsMetricsService = require('../../services/googleAnalyticsMetricsService');
+const googleAnalyticsMetricsService = require('../../../services/googleAnalyticsMetricsService');
 
 function base64UrlEncode(input) {
   const value = typeof input === 'string' ? input : JSON.stringify(input);
