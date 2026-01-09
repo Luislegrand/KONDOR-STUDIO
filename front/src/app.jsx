@@ -19,6 +19,7 @@ const Metrics = lazy(() => import("./pages/metrics.jsx"));
 const Competitors = lazy(() => import("./pages/competitors.jsx"));
 const Integrations = lazy(() => import("./pages/integrations.jsx"));
 const Settings = lazy(() => import("./pages/settings.jsx"));
+const ReportsHome = lazy(() => import("./pages/reports/ReportsHome.jsx"));
 
 const Home = lazy(() => import("./pages/home.jsx"));
 const Checkout = lazy(() => import("./pages/checkout.jsx"));
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="/team" element={<Team />} />
             <Route path="/biblioteca" element={<Biblioteca />} />
             <Route path="/metrics" element={<Metrics />} />
+            <Route path="/reports" element={<ReportsHome />} />
             <Route path="/competitors" element={<Competitors />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
