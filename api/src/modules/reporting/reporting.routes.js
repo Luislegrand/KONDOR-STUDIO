@@ -35,5 +35,6 @@ router.get('/reports', reportsController.list);
 router.post('/reports', reportsController.create);
 router.get('/reports/:id', reportsController.get);
 router.put('/reports/:id/layout', reportsController.updateLayout);
+router.post('/reports/:id/refresh', reportsController.refresh);
 
 module.exports = router;

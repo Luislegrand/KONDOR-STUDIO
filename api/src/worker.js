@@ -7,12 +7,16 @@ const {
   reportsQueue,
   whatsappQueue,
   publishingQueue,
+  reportGenerateQueue,
+  dashboardRefreshQueue,
 } = require('./queues');
 const { prisma } = require('./prisma');
 
 const updateMetricsJob = require('./jobs/updateMetricsJob');
 const refreshMetaTokensJob = require('./jobs/refreshMetaTokensJob');
 const reportGenerationJob = require('./jobs/reportGenerationJob');
+const reportingGenerateJob = require('./jobs/reportingGenerateJob');
+const dashboardRefreshJob = require('./jobs/dashboardRefreshJob');
 const automationWhatsAppJob = require('./jobs/automationWhatsAppJob');
 const whatsappApprovalJob = require('./jobs/whatsappApprovalRequestJob');
 const publishScheduledPostsJob = require('./jobs/publishScheduledPostsJob');
@@ -33,6 +37,8 @@ const WHATSAPP_AUTOMATION_PERIOD_MS =
   Number(process.env.WHATSAPP_AUTOMATION_PERIOD_MS) || 300000; // 5min
 const POSTS_PUBLISH_PERIOD_MS =
   Number(process.env.POSTS_PUBLISH_PERIOD_MS) || 60000; // 1min
+const DASHBOARD_REFRESH_PERIOD_MS =
+  Number(process.env.DASHBOARD_REFRESH_PERIOD_MS) || 0;
 
 // ------------------------------------------------------
 // Helper genérico para rodar pollOnce() dos módulos de job
@@ -81,6 +87,24 @@ const reportsWorker = new Worker(
   { connection },
 );
 
+const reportGenerateWorker = new Worker(
+  reportGenerateQueue.name,
+  async (job) => {
+    console.log('[reporting] processing job', job.id, job.name);
+    await reportingGenerateJob.processJob(job.data || {});
+  },
+  { connection },
+);
+
+const dashboardRefreshWorker = new Worker(
+  dashboardRefreshQueue.name,
+  async (job) => {
+    console.log('[dashboardRefresh] processing job', job.id, job.name);
+    await dashboardRefreshJob.processJob(job.data || {});
+  },
+  { connection },
+);
+
 const whatsappWorker = new Worker(
   whatsappQueue.name,
   async (job) => {
@@ -118,6 +142,14 @@ reportsWorker.on('completed', (job) => {
   console.log('[reports] job completed', job.id);
 });
 
+reportGenerateWorker.on('completed', (job) => {
+  console.log('[reporting] job completed', job.id);
+});
+
+dashboardRefreshWorker.on('completed', (job) => {
+  console.log('[dashboardRefresh] job completed', job.id);
+});
+
 whatsappWorker.on('completed', (job) => {
   console.log('[whatsapp] job completed', job.id);
 });
@@ -153,6 +185,16 @@ reportsWorker.on('failed', async (job, err) => {
   await logJobFailure(reportsQueue.name, job, err);
 });
 
+reportGenerateWorker.on('failed', async (job, err) => {
+  console.error('[reporting] job failed', job?.id, err);
+  await logJobFailure(reportGenerateQueue.name, job, err);
+});
+
+dashboardRefreshWorker.on('failed', async (job, err) => {
+  console.error('[dashboardRefresh] job failed', job?.id, err);
+  await logJobFailure(dashboardRefreshQueue.name, job, err);
+});
+
 whatsappWorker.on('failed', async (job, err) => {
   console.error('[whatsapp] job failed', job?.id, err);
   await logJobFailure(whatsappQueue.name, job, err);
@@ -172,12 +214,18 @@ async function ensureRepeatableJobs() {
     REPORTS_GENERATION_PERIOD_MS,
     WHATSAPP_AUTOMATION_PERIOD_MS,
     POSTS_PUBLISH_PERIOD_MS,
+    DASHBOARD_REFRESH_PERIOD_MS,
   });
 
   await metricsSyncQueue.upsertJobScheduler('metrics-poll', { every: METRICS_AGG_PERIOD_MS });
   await reportsQueue.upsertJobScheduler('reports-poll', { every: REPORTS_GENERATION_PERIOD_MS });
   await whatsappQueue.upsertJobScheduler('whatsapp-poll', { every: WHATSAPP_AUTOMATION_PERIOD_MS });
   await publishingQueue.upsertJobScheduler('posts-publish', { every: POSTS_PUBLISH_PERIOD_MS });
+  if (DASHBOARD_REFRESH_PERIOD_MS > 0) {
+    await dashboardRefreshQueue.upsertJobScheduler('dashboard-refresh', {
+      every: DASHBOARD_REFRESH_PERIOD_MS,
+    });
+  }
 
   console.log('[worker] repeatable jobs registrados com sucesso');
 }

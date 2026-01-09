@@ -681,6 +681,13 @@ const Reporting = {
       body: JSON.stringify(payload || {}),
     });
   },
+
+  async refreshReport(id) {
+    if (!id) throw new Error("reportId obrigatorio");
+    return jsonFetch(`/reporting/reports/${id}/refresh`, {
+      method: "POST",
+    });
+  },
 };
 
 // --------------------

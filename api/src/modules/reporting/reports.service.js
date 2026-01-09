@@ -1,5 +1,6 @@
 const { prisma } = require('../../prisma');
 const templatesService = require('./templates.service');
+const reportingJobs = require('./reportingJobs.service');
 
 function toDate(value) {
   if (!value) return null;
@@ -187,10 +188,24 @@ async function updateReportLayout(tenantId, reportId, widgets) {
   return getReport(tenantId, reportId);
 }
 
+async function refreshReport(tenantId, reportId) {
+  const existing = await getReport(tenantId, reportId);
+  if (!existing) return null;
+
+  await prisma.report.update({
+    where: { id: existing.id },
+    data: { status: 'GENERATING' },
+  });
+
+  await reportingJobs.enqueueReportGeneration(tenantId, existing.id);
+  return getReport(tenantId, existing.id);
+}
+
 module.exports = {
   listReports,
   getReport,
   createReport,
   updateReportLayout,
+  refreshReport,
   toDate,
 };

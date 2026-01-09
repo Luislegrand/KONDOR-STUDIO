@@ -13,10 +13,14 @@ const metricsSyncQueue = createQueue('metrics-sync');
 const reportsQueue = createQueue('reports-generation');
 const whatsappQueue = createQueue('whatsapp-automation');
 const publishingQueue = createQueue('posts-publish');
+const reportGenerateQueue = createQueue('report-generate');
+const dashboardRefreshQueue = createQueue('dashboard-refresh');
 
 module.exports = {
   metricsSyncQueue,
   reportsQueue,
   whatsappQueue,
   publishingQueue,
+  reportGenerateQueue,
+  dashboardRefreshQueue,
 };

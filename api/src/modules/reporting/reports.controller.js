@@ -153,4 +153,17 @@ module.exports = {
       return res.status(status).json({ error: err.message || 'Erro ao atualizar layout' });
     }
   },
+
+  async refresh(req, res) {
+    try {
+      const report = await reportsService.refreshReport(req.tenantId, req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: 'Relatorio nao encontrado' });
+      }
+      return res.json(report);
+    } catch (err) {
+      const status = err.status || 500;
+      return res.status(status).json({ error: err.message || 'Erro ao atualizar relatorio' });
+    }
+  },
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import GridLayout, { useContainerWidth } from "react-grid-layout";
 import PageShell from "@/components/ui/page-shell.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -44,6 +44,7 @@ function buildLayout(widgets) {
 export default function ReportViewer() {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { width, containerRef } = useContainerWidth({
     measureBeforeMount: true,
     initialWidth: 960,
@@ -51,10 +52,14 @@ export default function ReportViewer() {
 
   const [layout, setLayout] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
 
+  const reportQueryKey = ["reporting-report", reportId];
   const { data: report, isLoading } = useQuery({
-    queryKey: ["reporting-report", reportId],
+    queryKey: reportQueryKey,
     queryFn: () => base44.reporting.getReport(reportId),
+    refetchInterval: (data) =>
+      data?.status === "GENERATING" ? 5000 : false,
   });
 
   useEffect(() => {
@@ -80,6 +85,21 @@ export default function ReportViewer() {
     },
     onSuccess: () => {
       setIsEditing(false);
+    },
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      setRefreshError("");
+      return base44.reporting.refreshReport(reportId);
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.setQueryData(reportQueryKey, data);
+      }
+    },
+    onError: (err) => {
+      setRefreshError(err?.message || "Erro ao atualizar dados.");
     },
   });
 
@@ -143,14 +163,23 @@ export default function ReportViewer() {
             ) : (
               <Button onClick={() => setIsEditing(true)}>Editar layout</Button>
             )}
-            <Button variant="secondary" disabled>
-              Atualizar dados
+            <Button
+              variant="secondary"
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isLoading || isEditing}
+            >
+              {refreshMutation.isLoading ? "Atualizando..." : "Atualizar dados"}
             </Button>
             <Button variant="secondary" disabled>
               Exportar PDF
             </Button>
           </div>
         </div>
+        {refreshError ? (
+          <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {refreshError}
+          </div>
+        ) : null}
 
         <section className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
           <div ref={containerRef}>
