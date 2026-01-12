@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import { DateField } from "@/components/ui/date-field.jsx";
 import StatPill from "@/components/ui/stat-pill.jsx";
 import Toast from "@/components/ui/toast.jsx";
 import useToast from "@/hooks/useToast.js";
@@ -22,14 +23,43 @@ import {
   MessageCircle,
   RefreshCw,
   Search,
+  TrendingUp,
   Users,
   UserRound,
   UsersRound,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const PLATFORM_OPTIONS = [
   { value: "instagram", label: "Instagram" },
 ];
+
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+];
+
+function toDateKey(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString("pt-BR");
@@ -47,6 +77,50 @@ function formatDate(value) {
   return date.toLocaleDateString("pt-BR");
 }
 
+function formatShortDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function normalizeMetric(value) {
+  if (value === undefined || value === null) return null;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatDelta(value, formatter) {
+  if (value === undefined || value === null) return "--";
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return "--";
+  const sign = parsed > 0 ? "+" : "";
+  if (typeof formatter === "function") return `${sign}${formatter(parsed)}`;
+  return `${sign}${parsed}`;
+}
+
+function deltaClass(value) {
+  if (value === undefined || value === null) return "text-[var(--text-muted)]";
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return "text-[var(--text-muted)]";
+  if (parsed > 0) return "text-[var(--accent-teal)]";
+  if (parsed < 0) return "text-[var(--accent-rose)]";
+  return "text-[var(--text-muted)]";
+}
+
+function buildTimelineSeries(items, metricKey) {
+  const buckets = new Map();
+  (items || []).forEach((item) => {
+    (item.snapshots || []).forEach((snapshot) => {
+      const key = toDateKey(snapshot.collectedAt);
+      if (!key) return;
+      if (!buckets.has(key)) buckets.set(key, { date: key });
+      buckets.get(key)[item.id] = normalizeMetric(snapshot[metricKey]);
+    });
+  });
+  return Array.from(buckets.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function resolveStatusVariant(status) {
   if (status === "ACTIVE") return "success";
   if (status === "INACTIVE") return "warning";
@@ -58,6 +132,12 @@ export default function Competitors() {
   const [selectedClientId, setSelectedClientId] = React.useState(activeClientId || "");
   const [platform, setPlatform] = React.useState("instagram");
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [startDate, setStartDate] = React.useState(() => {
+    const today = new Date();
+    const from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return toDateKey(from);
+  });
+  const [endDate, setEndDate] = React.useState(() => toDateKey(new Date()));
   const [selectedCompetitorId, setSelectedCompetitorId] = React.useState(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingCompetitor, setEditingCompetitor] = React.useState(null);
@@ -74,7 +154,7 @@ export default function Competitors() {
     queryFn: () => base44.entities.Client.list(),
   });
 
-  const filters = React.useMemo(() => {
+  const listFilters = React.useMemo(() => {
     const trimmed = searchTerm.trim();
     return {
       clientId: selectedClientId || undefined,
@@ -84,8 +164,8 @@ export default function Competitors() {
   }, [selectedClientId, platform, searchTerm]);
 
   const competitorsQuery = useQuery({
-    queryKey: ["competitors", filters],
-    queryFn: () => base44.entities.Competitor.list(filters),
+    queryKey: ["competitors", listFilters],
+    queryFn: () => base44.entities.Competitor.list(listFilters),
   });
 
   const competitors = Array.isArray(competitorsQuery.data)
@@ -111,10 +191,74 @@ export default function Competitors() {
     (item) => item.id === selectedCompetitorId
   );
 
+  const compareFilters = React.useMemo(() => {
+    const trimmed = searchTerm.trim();
+    return {
+      clientId: selectedClientId || undefined,
+      platform: platform || undefined,
+      q: trimmed || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      limit: 12,
+      perCompetitor: 60,
+    };
+  }, [selectedClientId, platform, searchTerm, startDate, endDate]);
+
+  const comparisonEnabled = Boolean(startDate && endDate);
+  const comparisonQuery = useQuery({
+    queryKey: ["competitors-compare", compareFilters],
+    queryFn: () => base44.entities.Competitor.compare(compareFilters),
+    enabled: comparisonEnabled,
+  });
+
+  const comparisonItems =
+    comparisonEnabled && Array.isArray(comparisonQuery.data?.items)
+      ? comparisonQuery.data.items
+      : [];
+
+  const comparisonRows = React.useMemo(
+    () =>
+      comparisonItems.map((item) => ({
+        id: item.id,
+        name: item.name || `@${item.username}`,
+        username: item.username,
+        status: item.status,
+        latestSnapshot: item.latestSnapshot,
+        firstSnapshot: item.firstSnapshot,
+        deltas: item.deltas || {},
+        followers: normalizeMetric(item.latestSnapshot?.followers),
+        engagementRate: normalizeMetric(item.latestSnapshot?.engagementRate),
+        interactions: normalizeMetric(item.latestSnapshot?.interactions),
+        postsCount: normalizeMetric(item.latestSnapshot?.postsCount),
+        followersDelta: normalizeMetric(item.deltas?.followers),
+        engagementDelta: normalizeMetric(item.deltas?.engagementRate),
+        interactionsDelta: normalizeMetric(item.deltas?.interactions),
+        postsDelta: normalizeMetric(item.deltas?.postsCount),
+        collectedAt: item.latestSnapshot?.collectedAt,
+      })),
+    [comparisonItems]
+  );
+
+  const followersSeries = React.useMemo(
+    () => buildTimelineSeries(comparisonItems, "followers"),
+    [comparisonItems]
+  );
+
+  const seriesMeta = React.useMemo(
+    () =>
+      comparisonItems.map((item, index) => ({
+        id: item.id,
+        label: item.name || `@${item.username}`,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      })),
+    [comparisonItems]
+  );
+
   const createMutation = useMutation({
     mutationFn: (payload) => base44.entities.Competitor.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competitors"] });
+      queryClient.invalidateQueries({ queryKey: ["competitors-compare"] });
       setDialogOpen(false);
       setEditingCompetitor(null);
     },
@@ -127,6 +271,7 @@ export default function Competitors() {
     mutationFn: ({ id, data }) => base44.entities.Competitor.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competitors"] });
+      queryClient.invalidateQueries({ queryKey: ["competitors-compare"] });
       setDialogOpen(false);
       setEditingCompetitor(null);
     },
@@ -139,6 +284,7 @@ export default function Competitors() {
     mutationFn: (id) => base44.entities.Competitor.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["competitors"] });
+      queryClient.invalidateQueries({ queryKey: ["competitors-compare"] });
     },
     onError: (error) => {
       showToast(error?.message || "Erro ao remover concorrente.", "error");
@@ -150,6 +296,7 @@ export default function Competitors() {
     onSuccess: (response) => {
       showToast(response?.message || "Solicitacao enviada com sucesso.", "info");
       queryClient.invalidateQueries({ queryKey: ["competitors"] });
+      queryClient.invalidateQueries({ queryKey: ["competitors-compare"] });
     },
     onError: (error) => {
       showToast(error?.message || "Erro ao solicitar atualizacao.", "error");
@@ -181,6 +328,11 @@ export default function Competitors() {
   };
 
   const listEmpty = !competitorsQuery.isLoading && competitors.length === 0;
+  const comparisonEmpty =
+    comparisonEnabled &&
+    comparisonQuery.isFetched &&
+    !comparisonQuery.isLoading &&
+    comparisonItems.length === 0;
 
   return (
     <PageShell>
@@ -239,6 +391,31 @@ export default function Competitors() {
               className="pl-9"
             />
           </div>
+        </div>
+
+        <div className="min-w-[160px]">
+          <Label>Inicio</Label>
+          <DateField value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        </div>
+
+        <div className="min-w-[160px]">
+          <Label>Fim</Label>
+          <DateField value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              competitorsQuery.refetch();
+              comparisonQuery.refetch();
+            }}
+            disabled={competitorsQuery.isFetching || comparisonQuery.isFetching}
+          >
+            Atualizar comparativo
+          </Button>
         </div>
       </FilterBar>
 
@@ -566,6 +743,203 @@ export default function Competitors() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Comparativo do periodo</CardTitle>
+              <p className="text-sm text-[var(--text-muted)]">
+                Analise o desempenho agregado no periodo selecionado.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatPill
+                label="Periodo"
+                value={
+                  startDate && endDate
+                    ? `${formatDate(startDate)} - ${formatDate(endDate)}`
+                    : "Sem filtro"
+                }
+                variant="default"
+              />
+              <StatPill
+                label="Concorrentes"
+                value={comparisonItems.length}
+                variant="default"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!comparisonEnabled ? (
+            <EmptyState
+              title="Defina um periodo"
+              description="Escolha um intervalo para calcular o comparativo."
+            />
+          ) : comparisonQuery.isLoading ? (
+            <EmptyState
+              title="Carregando comparativo"
+              description="Estamos reunindo os dados do periodo."
+            />
+          ) : comparisonEmpty ? (
+            <EmptyState
+              title="Sem dados para comparar"
+              description="Cadastre concorrentes e aguarde a coleta para visualizar os graficos."
+              action={
+                <Button leftIcon={UsersRound} onClick={handleAdd}>
+                  Adicionar concorrente
+                </Button>
+              }
+            />
+          ) : (
+            <div className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <div className="rounded-[16px] border border-[var(--border)] bg-white p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                    <TrendingUp className="h-4 w-4 text-[var(--text-muted)]" />
+                    Crescimento de seguidores
+                  </div>
+                  <div className="mt-4 h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={followersSeries}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-muted)" />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={(value) => formatShortDate(value)}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value) => formatNumber(value)}
+                          labelFormatter={(value) => formatDate(value)}
+                        />
+                        <Legend />
+                        {seriesMeta.map((series) => (
+                          <Line
+                            key={series.id}
+                            type="monotone"
+                            dataKey={series.id}
+                            name={series.label}
+                            stroke={series.color}
+                            strokeWidth={2}
+                            dot={false}
+                            connectNulls
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="rounded-[16px] border border-[var(--border)] bg-white p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                    <BarChart3 className="h-4 w-4 text-[var(--text-muted)]" />
+                    Crescimento de seguidores no periodo
+                  </div>
+                  <div className="mt-4 h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={comparisonRows} margin={{ left: 8, right: 16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-muted)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value) => formatNumber(value)}
+                          labelFormatter={(value) => value}
+                        />
+                        <Bar
+                          dataKey="followersDelta"
+                          name="Delta seguidores"
+                          fill="var(--chart-2)"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    Delta calculado entre a primeira e a ultima coleta do periodo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[16px] border border-[var(--border)] bg-white p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <BarChart3 className="h-4 w-4 text-[var(--text-muted)]" />
+                  Tabela comparativa
+                </div>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-3 py-2">Concorrente</th>
+                        <th className="px-3 py-2">Seguidores</th>
+                        <th className="px-3 py-2">Delta</th>
+                        <th className="px-3 py-2">Engajamento</th>
+                        <th className="px-3 py-2">Delta</th>
+                        <th className="px-3 py-2">Interacoes</th>
+                        <th className="px-3 py-2">Delta</th>
+                        <th className="px-3 py-2">Posts</th>
+                        <th className="px-3 py-2">Ultima coleta</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {comparisonRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className={
+                            row.id === selectedCompetitorId
+                              ? "bg-[var(--surface-muted)]"
+                              : ""
+                          }
+                        >
+                          <td className="px-3 py-3">
+                            <div className="text-sm font-semibold text-[var(--text)]">
+                              {row.name}
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              @{row.username}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.followers !== null ? formatNumber(row.followers) : "--"}
+                          </td>
+                          <td className={`px-3 py-3 font-semibold ${deltaClass(row.followersDelta)}`}>
+                            {formatDelta(row.followersDelta, (value) => formatNumber(value))}
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.engagementRate !== null
+                              ? formatPercent(row.engagementRate)
+                              : "--"}
+                          </td>
+                          <td className={`px-3 py-3 font-semibold ${deltaClass(row.engagementDelta)}`}>
+                            {formatDelta(row.engagementDelta, (value) =>
+                              `${value.toFixed(2)}%`
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.interactions !== null
+                              ? formatNumber(row.interactions)
+                              : "--"}
+                          </td>
+                          <td className={`px-3 py-3 font-semibold ${deltaClass(row.interactionsDelta)}`}>
+                            {formatDelta(row.interactionsDelta, (value) => formatNumber(value))}
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.postsCount !== null ? formatNumber(row.postsCount) : "--"}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-[var(--text-muted)]">
+                            {row.collectedAt ? formatDate(row.collectedAt) : "--"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <CompetitorFormDialog
         open={dialogOpen}
