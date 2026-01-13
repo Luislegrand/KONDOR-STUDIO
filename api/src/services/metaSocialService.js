@@ -266,9 +266,50 @@ async function resolvePageAccessToken(pageId, userAccessToken) {
   return userAccessToken;
 }
 
+function normalizeUsername(value) {
+  if (!value) return null;
+  return String(value).trim().replace(/^@/, '') || null;
+}
+
+async function fetchInstagramBusinessDiscovery({
+  accessToken,
+  igBusinessId,
+  username,
+  limit = 12,
+}) {
+  if (!accessToken) throw new Error('Missing Meta access token');
+  if (!igBusinessId) throw new Error('Missing igBusinessId');
+  const normalizedUsername = normalizeUsername(username);
+  if (!normalizedUsername) throw new Error('Missing Instagram username');
+
+  const base = getGraphBaseUrl();
+  const fields = [
+    `business_discovery.username(${normalizedUsername}){`,
+    'followers_count,',
+    'media_count,',
+    `media.limit(${Number(limit) || 12}){like_count,comments_count,timestamp}`,
+    '}',
+  ].join('');
+
+  const url = new URL(`${base}/${igBusinessId}`);
+  url.searchParams.set('fields', fields);
+  url.searchParams.set('access_token', accessToken);
+
+  const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json?.error?.message || 'Graph API error';
+    const code = json?.error?.code || 'unknown';
+    throw new Error(`Graph GET business_discovery failed (${code}): ${msg}`);
+  }
+
+  return json?.business_discovery || null;
+}
+
 module.exports = {
   normalizeKind,
   resolvePageAccessToken,
+  fetchInstagramBusinessDiscovery,
 
   /**
    * Gera a URL de conexão OAuth do Meta

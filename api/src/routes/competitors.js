@@ -176,20 +176,19 @@ router.post("/:id/snapshots", async (req, res) => {
  */
 router.post("/:id/sync", async (req, res) => {
   try {
-    const updated = await competitorsService.markSyncRequested(
-      req.tenantId,
-      req.params.id
-    );
-    if (!updated) return res.status(404).json({ error: "Concorrente não encontrado" });
+    const result = await competitorsService.syncFromMeta(req.tenantId, req.params.id);
     return res.json({
       ok: true,
-      status: "pending",
-      message: "Integração Meta ainda não configurada.",
-      competitor: updated,
+      status: "ready",
+      snapshot: result.snapshot,
+      integrationId: result.integrationId,
     });
   } catch (err) {
     console.error("POST /competitors/:id/sync error:", err);
-    return res.status(500).json({ error: "Erro ao solicitar sync" });
+    const status = err.statusCode || err.status || 500;
+    return res.status(status).json({
+      error: err.message || "Erro ao solicitar sync",
+    });
   }
 });
 

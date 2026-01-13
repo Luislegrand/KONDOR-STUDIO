@@ -2,6 +2,8 @@
 // CRUD e snapshots de concorrentes (multi-tenant)
 
 const { prisma } = require("../prisma");
+const metaSocialService = require("./metaSocialService");
+const { decrypt } = require("../utils/crypto");
 
 function sanitizeString(value) {
   if (value === undefined || value === null) return null;
@@ -51,6 +53,49 @@ function mergeCollectedAtRange(startDate, endDate) {
 function normalizeMetadata(metadata) {
   if (!metadata || typeof metadata !== "object") return null;
   return { ...metadata };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function resolveIntegrationSettings(integration) {
+  if (!integration) return {};
+  return isPlainObject(integration.settings) ? integration.settings : {};
+}
+
+function resolveIntegrationAccessToken(integration) {
+  if (!integration) return null;
+  if (integration.accessTokenEncrypted) {
+    try {
+      return decrypt(integration.accessTokenEncrypted);
+    } catch (_) {
+      return null;
+    }
+  }
+  if (integration.accessToken) return integration.accessToken;
+  const settings = resolveIntegrationSettings(integration);
+  if (settings.accessToken) return settings.accessToken;
+  if (settings.token) return settings.token;
+  return null;
+}
+
+async function findMetaIntegration(tenantId, clientId) {
+  if (!tenantId || !clientId) return null;
+  return prisma.integration.findFirst({
+    where: {
+      tenantId,
+      provider: "META",
+      status: "CONNECTED",
+      clientId,
+      OR: [
+        { settings: { path: ["kind"], equals: "meta_business" } },
+        { settings: { path: ["kind"], equals: "instagram_only" } },
+        { settings: { path: ["kind"], equals: "instagram" } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+  });
 }
 
 function sanitizeCompetitor(record) {
@@ -266,6 +311,131 @@ module.exports = {
       where: { id: competitorId },
       data: { metadata },
     });
+  },
+
+  async syncFromMeta(tenantId, competitorId) {
+    const competitor = await prisma.competitor.findFirst({
+      where: { id: competitorId, tenantId },
+    });
+    if (!competitor) {
+      const err = new Error("Concorrente não encontrado");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const metadata = normalizeMetadata(competitor.metadata) || {};
+    metadata.lastSyncRequestedAt = new Date().toISOString();
+    await prisma.competitor.update({
+      where: { id: competitor.id },
+      data: { metadata },
+    });
+
+    try {
+      if (!competitor.clientId) {
+        const err = new Error("Concorrente precisa estar associado a um cliente");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const integration = await findMetaIntegration(tenantId, competitor.clientId);
+      if (!integration) {
+        const err = new Error("Integração Meta não encontrada para este cliente");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const settings = resolveIntegrationSettings(integration);
+      const igBusinessId =
+        settings.igBusinessId || settings.ig_business_id || settings.instagramBusinessId;
+      if (!igBusinessId) {
+        const err = new Error("Integração Meta sem Instagram Business ID");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const baseToken = resolveIntegrationAccessToken(integration);
+      if (!baseToken) {
+        const err = new Error("Token Meta não encontrado para esta integração");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const pageId = settings.pageId || settings.page_id;
+      const accessToken = pageId
+        ? await metaSocialService.resolvePageAccessToken(pageId, baseToken)
+        : baseToken;
+
+      const discovery = await metaSocialService.fetchInstagramBusinessDiscovery({
+        accessToken,
+        igBusinessId,
+        username: competitor.username,
+      });
+
+      if (!discovery) {
+        const err = new Error("Não foi possível obter dados do Instagram");
+        err.statusCode = 502;
+        throw err;
+      }
+
+      const followers = toInt(discovery.followers_count);
+      const postsCount = toInt(discovery.media_count);
+      const media = Array.isArray(discovery.media?.data) ? discovery.media.data : [];
+
+      let likes = 0;
+      let comments = 0;
+      media.forEach((item) => {
+        const likeCount = toInt(item?.like_count) || 0;
+        const commentCount = toInt(item?.comments_count) || 0;
+        likes += likeCount;
+        comments += commentCount;
+      });
+      const interactions = likes + comments;
+      const engagementRate =
+        Number.isFinite(followers) && followers > 0
+          ? Number((((interactions || 0) / followers) * 100).toFixed(2))
+          : null;
+
+      const snapshot = await prisma.competitorSnapshot.create({
+        data: {
+          tenantId,
+          competitorId: competitor.id,
+          platform: competitor.platform,
+          followers,
+          postsCount,
+          engagementRate,
+          interactions,
+          likes,
+          comments,
+          collectedAt: new Date(),
+          meta: {
+            provider: "meta",
+            source: "business_discovery",
+            igBusinessId,
+            username: competitor.username,
+            mediaCount: media.length,
+          },
+        },
+      });
+
+      metadata.lastSyncAt = new Date().toISOString();
+      metadata.lastSyncStatus = "success";
+      metadata.lastSyncError = null;
+      await prisma.competitor.update({
+        where: { id: competitor.id },
+        data: { metadata },
+      });
+
+      return { snapshot, integrationId: integration.id };
+    } catch (err) {
+      metadata.lastSyncAt = new Date().toISOString();
+      metadata.lastSyncStatus = "error";
+      metadata.lastSyncError = err?.message || "Falha ao sincronizar concorrente";
+      await prisma.competitor.update({
+        where: { id: competitor.id },
+        data: { metadata },
+      });
+      throw err;
+    }
   },
 
   async compare(tenantId, opts = {}) {
