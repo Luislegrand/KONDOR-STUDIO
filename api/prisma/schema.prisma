@@ -87,6 +87,12 @@ enum DataSourceConnectionStatus {
   ERROR
 }
 
+enum Ga4IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
 enum MetricCatalogType {
   METRIC
   DIMENSION
@@ -118,6 +124,14 @@ enum ReportWidgetType {
   TABLE
   TEXT
   IMAGE
+}
+
+enum AnalyticsWidgetType {
+  NUMBER
+  LINE
+  BAR
+  TABLE
+  PIE
 }
 
 enum DashboardScope {
@@ -200,6 +214,10 @@ model Tenant {
   projects         Project[]
   posts            Post[]
   integrations     Integration[]
+  integrationGoogleGa4 IntegrationGoogleGa4[]
+  integrationGoogleGa4Properties IntegrationGoogleGa4Property[]
+  analyticsDashboards AnalyticsDashboard[]
+  analyticsDashboardWidgets AnalyticsDashboardWidget[]
   uploads          Upload[]
   reports          Report[]
   brandGroups      BrandGroup[]
@@ -257,6 +275,8 @@ model User {
   tasksCreated       Task[]         @relation("TasksCreated")
   requestedApprovals Approval[]     @relation("ApprovalRequester")
   approvalsToReview  Approval[]     @relation("ApprovalApprover")
+  integrationGoogleGa4 IntegrationGoogleGa4[]
+  analyticsDashboards AnalyticsDashboard[]
   uploads            Upload[]
   auditLogs          AuditLog[]
   supportNotes       TenantNote[]   @relation("TenantNoteAuthor")
@@ -1113,6 +1133,93 @@ model IntegrationJob {
   @@index([integrationId])
   @@index([status])
   @@map("integration_jobs")
+}
+
+model IntegrationGoogleGa4 {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleAccountEmail String?
+  accessToken       String?
+  refreshTokenEnc   String?
+  tokenExpiry       DateTime?
+  scope             String
+  status            Ga4IntegrationStatus @default(DISCONNECTED)
+  lastError         String?
+  properties        IntegrationGoogleGa4Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("integration_google_ga4")
+}
+
+model IntegrationGoogleGa4Property {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  integrationId String
+  integration   IntegrationGoogleGa4 @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  propertyId    String
+  displayName   String
+  accountId     String?
+  isSelected    Boolean  @default(false)
+  dashboards    AnalyticsDashboard[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, integrationId, propertyId])
+  @@index([tenantId])
+  @@index([integrationId])
+  @@index([propertyId])
+  @@map("integration_google_ga4_properties")
+}
+
+model AnalyticsDashboard {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrationPropertyId String
+  integrationProperty   IntegrationGoogleGa4Property @relation(fields: [integrationPropertyId], references: [id], onDelete: Restrict)
+  name                  String
+  description           String?
+  defaultDateRange      Json?
+  widgets               AnalyticsDashboardWidget[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([integrationPropertyId])
+  @@map("analytics_dashboards")
+}
+
+model AnalyticsDashboardWidget {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dashboardId String
+  dashboard   AnalyticsDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  type        AnalyticsWidgetType
+  title       String
+  config      Json
+  layout      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([dashboardId])
+  @@map("analytics_dashboard_widgets")
 }
 
 model JobQueue {

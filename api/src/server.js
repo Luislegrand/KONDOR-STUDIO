@@ -284,6 +284,7 @@ const whatsappWebhookRoutes = require("./routes/webhooks/whatsapp");
 const whatsappIntegrationPublicRoutes = require("./routes/integrationsWhatsAppPublic");
 // ✅ META (Facebook/Instagram/Ads) OAuth callback
 const metaIntegrationPublicRoutes = require("./routes/integrationsMetaPublic");
+const ga4IntegrationPublicRoutes = require("./routes/integrationsGa4Public");
 
 let publicRoutes;
 try {
@@ -306,6 +307,7 @@ if (publicRoutes) safeMount("/api/public", publicRoutes);
 safeMount("/api/webhooks/whatsapp", whatsappWebhookRoutes);
 safeMount("/api/integrations/whatsapp", whatsappIntegrationPublicRoutes);
 safeMount("/api/integrations/meta", metaIntegrationPublicRoutes);
+safeMount("/api/integrations/ga4", ga4IntegrationPublicRoutes);
 
 // =========================
 // Rotas internas (protegidas)
@@ -335,9 +337,11 @@ safeMount("/api/finance", require("./routes/financialRecords"));
 safeMount("/api/metrics", require("./routes/metrics"));
 safeMount("/api/approvals", require("./routes/approvals"));
 safeMount("/api/integrations", require("./routes/integrations"));
+safeMount("/api/integrations/ga4", require("./routes/integrationsGa4"));
 safeMount("/api/uploads", require("./routes/uploads"));
 safeMount("/api/reports", require("./routes/reports"));
 safeMount("/api/reporting", require("./routes/reporting"));
+safeMount("/api/analytics", require("./routes/analyticsDashboards"));
 safeMount("/api/billing", require("./routes/billing"));
 safeMount("/api/team", require("./routes/team"));
 safeMount("/api/dashboard", require("./routes/dashboard"));

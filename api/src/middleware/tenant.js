@@ -18,6 +18,7 @@ const TENANT_OPTIONAL_PATHS = [
 
   // ✅ Meta OAuth callback precisa ser público e sem X-Tenant
   '/api/integrations/meta/callback',
+  '/api/integrations/ga4/oauth/callback',
 ];
 
 // Extrai tenant de:

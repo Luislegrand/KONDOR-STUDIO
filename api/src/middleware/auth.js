@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
 
   // ✅ Meta OAuth callback precisa ser público (Meta chama sem Bearer token)
   '/api/integrations/meta/callback',
+  '/api/integrations/ga4/oauth/callback',
 ];
 
 // Suporte simples a token em header "Authorization: Bearer <token>"

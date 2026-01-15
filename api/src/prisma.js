@@ -125,6 +125,10 @@ function useTenant(tenantId) {
     'upload',
     'integration',
     'integrationJob',
+    'integrationGoogleGa4',
+    'integrationGoogleGa4Property',
+    'analyticsDashboard',
+    'analyticsDashboardWidget',
     'jobQueue',
     'financialRecord',
   ];
