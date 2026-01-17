@@ -55,6 +55,24 @@ services:
         sync: false
       - key: APPROVAL_PUBLIC_LINK_TTL_HOURS
         sync: false
+      - key: APP_URL_FRONT
+        sync: false
+      - key: API_URL
+        sync: false
+
+      # ==== GA4 / GOOGLE OAUTH ====
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_OAUTH_SCOPES
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: GA4_MOCK_MODE
+        sync: false
 
       # ==== S3 ====
       - key: S3_ENDPOINT

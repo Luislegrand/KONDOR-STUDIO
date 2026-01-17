@@ -34,8 +34,11 @@ module.exports = {
       const url = require('../lib/googleClient').buildAuthUrl({ state });
       return res.json({ url });
     } catch (error) {
+      const message =
+        error?.message ||
+        'Failed to start GA4 OAuth';
       console.error('GA4 oauthStart error:', error);
-      return res.status(500).json({ error: 'Failed to start GA4 OAuth' });
+      return res.status(error?.status || 500).json({ error: message });
     }
   },
 
