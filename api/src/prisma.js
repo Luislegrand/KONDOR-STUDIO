@@ -94,8 +94,14 @@ function useTenant(tenantId) {
     wrapper.create = (args = {}) => model.create(addDataTenant(args, tenantId));
     wrapper.createMany = (args = {}) => model.createMany(addDataTenant(args, tenantId));
 
-    // upsert (caller must include tenantId in unique where if needed)
-    wrapper.upsert = (args = {}) => model.upsert(args);
+    // upsert (inject tenantId into create payload; caller must set unique where)
+    wrapper.upsert = (args = {}) => {
+      const clone = Object.assign({}, args);
+      if (clone.create && tenantId) {
+        clone.create = Object.assign({}, clone.create, { tenantId });
+      }
+      return model.upsert(clone);
+    };
 
     // update/updateMany/delete/deleteMany - keep caller control but try to protect updateMany/deleteMany by adding tenant
     wrapper.update = (args = {}) => model.update(addWhereTenant(args, tenantId));
