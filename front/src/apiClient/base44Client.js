@@ -676,6 +676,13 @@ const Reporting = {
     });
   },
 
+  async getGa4MetadataByConnection(connectionId) {
+    if (!connectionId) throw new Error("connectionId obrigatorio");
+    return jsonFetch(`/reporting/connections/${connectionId}/ga4/metadata`, {
+      method: "GET",
+    });
+  },
+
   async listReports(params = {}) {
     const qs = buildQuery(params);
     return jsonFetch(`/reporting/reports${qs}`, { method: "GET" });

@@ -1,5 +1,6 @@
 const { prisma } = require('../../prisma');
 const { getAdapter, getIntegrationKind } = require('./providers');
+const ga4MetadataService = require('../../services/ga4MetadataService');
 
 const SOURCE_INTEGRATION_MAP = {
   META_ADS: { providers: ['META'], kinds: ['meta_ads'] },
@@ -128,7 +129,7 @@ async function listIntegrationAccounts(tenantId, integrationId, source) {
   return items || [];
 }
 
-async function linkConnection(tenantId, brandId, payload) {
+async function linkConnection(tenantId, brandId, payload, userId) {
   const brand = await assertBrand(tenantId, brandId);
   if (!brand) {
     const err = new Error('Marca não encontrada');
@@ -137,6 +138,74 @@ async function linkConnection(tenantId, brandId, payload) {
   }
 
   const { source, integrationId, externalAccountId, displayName } = payload;
+  if (source === 'GA4' && !integrationId) {
+    if (!userId) {
+      const err = new Error('userId é obrigatório para conectar GA4');
+      err.status = 400;
+      throw err;
+    }
+
+    const property = await prisma.integrationGoogleGa4Property.findFirst({
+      where: {
+        tenantId,
+        propertyId: String(externalAccountId),
+        integration: { userId: String(userId) },
+      },
+      include: { integration: true },
+    });
+
+    if (!property) {
+      const err = new Error('Propriedade GA4 não encontrada');
+      err.status = 404;
+      throw err;
+    }
+
+    if (property.integration?.status !== 'CONNECTED') {
+      const err = new Error('Integração GA4 não está CONNECTED');
+      err.status = 400;
+      throw err;
+    }
+
+    const meta = {
+      ga4UserId: String(userId),
+      ga4IntegrationId: property.integrationId,
+      propertyId: String(property.propertyId),
+    };
+
+    const existing = await prisma.dataSourceConnection.findFirst({
+      where: {
+        tenantId,
+        brandId,
+        source,
+        externalAccountId: String(externalAccountId),
+      },
+    });
+
+    if (existing) {
+      return prisma.dataSourceConnection.update({
+        where: { id: existing.id },
+        data: {
+          integrationId: null,
+          displayName: displayName || property.displayName || existing.displayName,
+          status: 'CONNECTED',
+          meta,
+        },
+      });
+    }
+
+    return prisma.dataSourceConnection.create({
+      data: {
+        tenantId,
+        brandId,
+        source,
+        integrationId: null,
+        externalAccountId: String(externalAccountId),
+        displayName: displayName || property.displayName || String(externalAccountId),
+        status: 'CONNECTED',
+        meta,
+      },
+    });
+  }
   const integration = await prisma.integration.findFirst({
     where: { id: integrationId, tenantId },
   });
@@ -214,8 +283,56 @@ async function linkConnection(tenantId, brandId, payload) {
   });
 }
 
+async function getGa4Metadata(tenantId, connectionId) {
+  if (!connectionId) {
+    const err = new Error('connectionId é obrigatório');
+    err.status = 400;
+    throw err;
+  }
+
+  const connection = await prisma.dataSourceConnection.findFirst({
+    where: { id: connectionId, tenantId },
+  });
+
+  if (!connection) {
+    const err = new Error('Conexão não encontrada');
+    err.status = 404;
+    throw err;
+  }
+
+  if (connection.source !== 'GA4') {
+    const err = new Error('Conexão não é GA4');
+    err.status = 400;
+    throw err;
+  }
+
+  const propertyId =
+    connection.externalAccountId ||
+    connection.meta?.propertyId ||
+    null;
+  const userId = connection.meta?.ga4UserId || null;
+
+  if (!propertyId || !userId) {
+    const err = new Error('Conexão GA4 sem metadados OAuth');
+    err.status = 400;
+    throw err;
+  }
+
+  const metadata = await ga4MetadataService.getMetadata({
+    tenantId,
+    userId,
+    propertyId: String(propertyId),
+  });
+
+  return {
+    propertyId: String(propertyId),
+    ...metadata,
+  };
+}
+
 module.exports = {
   listConnections,
   listIntegrationAccounts,
   linkConnection,
+  getGa4Metadata,
 };

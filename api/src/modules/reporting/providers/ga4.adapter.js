@@ -4,6 +4,178 @@ const {
   normalizeMetricsPayload,
 } = require('./providerUtils');
 const googleAnalyticsMetricsService = require('../../../services/googleAnalyticsMetricsService');
+const ga4DataService = require('../../../services/ga4DataService');
+
+function normalizeString(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function buildDimensionFilter(filters) {
+  if (!filters || typeof filters !== 'object') return null;
+  const entries = Object.entries(filters).filter(([, value]) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string' && !value.trim()) return false;
+    if (Array.isArray(value) && !value.length) return false;
+    return true;
+  });
+
+  if (!entries.length) return null;
+
+  const expressions = entries.map(([fieldName, value]) => {
+    if (Array.isArray(value)) {
+      return {
+        filter: {
+          fieldName,
+          inListFilter: {
+            values: value.map((item) => String(item)),
+            caseSensitive: false,
+          },
+        },
+      };
+    }
+    return {
+      filter: {
+        fieldName,
+        stringFilter: {
+          matchType: 'EXACT',
+          value: String(value),
+          caseSensitive: false,
+        },
+      },
+    };
+  });
+
+  if (expressions.length === 1) return expressions[0];
+  return { andGroup: { expressions } };
+}
+
+function ensureDimension(list, value, { prepend } = {}) {
+  const next = Array.isArray(list) ? [...list] : [];
+  if (!value) return next;
+  if (next.includes(value)) return next;
+  if (prepend) {
+    next.unshift(value);
+  } else {
+    next.push(value);
+  }
+  return next;
+}
+
+function buildGa4Dimensions({ breakdown, widgetType }) {
+  let dimensions = [];
+  if (breakdown) dimensions = ensureDimension(dimensions, String(breakdown));
+  if (widgetType === 'LINE' || (!breakdown && widgetType === 'BAR')) {
+    dimensions = ensureDimension(dimensions, 'date', { prepend: true });
+  }
+  return dimensions;
+}
+
+function buildGa4DateRanges(querySpec = {}) {
+  const dateFrom = normalizeString(querySpec.dateFrom);
+  const dateTo = normalizeString(querySpec.dateTo);
+  if (!dateFrom && !dateTo) return null;
+  return [
+    {
+      startDate: dateFrom || dateTo,
+      endDate: dateTo || dateFrom,
+    },
+  ];
+}
+
+function buildTotals(metricHeaders, totals, rows) {
+  const totalsRow = Array.isArray(totals) ? totals[0] : null;
+  if (totalsRow && Array.isArray(totalsRow.metrics)) {
+    const map = {};
+    metricHeaders.forEach((metric, idx) => {
+      const raw = totalsRow.metrics?.[idx];
+      const value = Number(raw || 0);
+      map[metric] = Number.isFinite(value) ? value : 0;
+    });
+    return map;
+  }
+
+  const fallback = {};
+  metricHeaders.forEach((metric) => {
+    fallback[metric] = 0;
+  });
+  rows.forEach((row) => {
+    metricHeaders.forEach((metric, idx) => {
+      const value = Number(row.metrics?.[idx] || 0);
+      if (!Number.isFinite(value)) return;
+      fallback[metric] += value;
+    });
+  });
+  return fallback;
+}
+
+function buildSeries(dimensionHeaders, metricHeaders, rows) {
+  if (!dimensionHeaders.length) return [];
+  const dateIndex = dimensionHeaders.indexOf('date');
+  const primaryIndex = dateIndex >= 0 ? dateIndex : 0;
+  const secondaryIndex = dimensionHeaders.length > 1 ? (primaryIndex === 0 ? 1 : 0) : null;
+  const seriesMap = new Map();
+
+  rows.forEach((row) => {
+    const x = row.dimensions?.[primaryIndex];
+    if (x === null || x === undefined) return;
+    const secondaryValue = secondaryIndex !== null ? row.dimensions?.[secondaryIndex] : null;
+    metricHeaders.forEach((metric, metricIndex) => {
+      const value = Number(row.metrics?.[metricIndex] || 0);
+      if (!Number.isFinite(value)) return;
+      const name = secondaryValue ? `${secondaryValue} • ${metric}` : metric;
+      if (!seriesMap.has(name)) seriesMap.set(name, new Map());
+      const points = seriesMap.get(name);
+      points.set(x, (points.get(x) || 0) + value);
+    });
+  });
+
+  return Array.from(seriesMap.entries()).map(([name, points]) => ({
+    name,
+    metric: name,
+    data: Array.from(points.entries())
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+      .map(([x, y]) => ({ x, y })),
+  }));
+}
+
+function buildTable(dimensionHeaders, metricHeaders, rows) {
+  if (!rows.length) return [];
+  return rows.map((row) => {
+    const item = {};
+    dimensionHeaders.forEach((dimension, idx) => {
+      item[dimension] = row.dimensions?.[idx] ?? null;
+    });
+    metricHeaders.forEach((metric, idx) => {
+      const value = Number(row.metrics?.[idx] || 0);
+      item[metric] = Number.isFinite(value) ? value : 0;
+    });
+    return item;
+  });
+}
+
+function buildPie(dimensionHeaders, metricHeaders, rows) {
+  if (!rows.length || !dimensionHeaders.length || !metricHeaders.length) return [];
+  const dateIndex = dimensionHeaders.indexOf('date');
+  const dimensionIndex = dimensionHeaders.findIndex(
+    (dimension, idx) => idx !== dateIndex,
+  );
+  if (dimensionIndex < 0) return [];
+
+  const bucket = new Map();
+  rows.forEach((row) => {
+    const name = row.dimensions?.[dimensionIndex];
+    if (!name) return;
+    const value = Number(row.metrics?.[0] || 0);
+    if (!Number.isFinite(value)) return;
+    bucket.set(name, (bucket.get(name) || 0) + value);
+  });
+
+  return Array.from(bucket.entries()).map(([name, value]) => ({
+    name,
+    value,
+  }));
+}
 
 function base64UrlEncode(input) {
   const value = typeof input === 'string' ? input : JSON.stringify(input);
@@ -130,33 +302,93 @@ async function listSelectableAccounts(integration) {
 }
 
 async function queryMetrics(connection, querySpec = {}) {
-  if (!connection || !connection.integration) {
+  if (!connection) {
     return { series: [], table: [], totals: {}, meta: { mocked: true } };
   }
 
-  const integration = {
-    ...connection.integration,
-    settings: {
-      ...(connection.integration.settings || {}),
-      propertyId: connection.externalAccountId,
-      property_id: connection.externalAccountId,
-    },
-  };
+  if (connection.integration) {
+    const integration = {
+      ...connection.integration,
+      settings: {
+        ...(connection.integration.settings || {}),
+        propertyId: connection.externalAccountId,
+        property_id: connection.externalAccountId,
+      },
+    };
 
-  const range = {
-    since: querySpec?.dateFrom || querySpec?.since || null,
-    until: querySpec?.dateTo || querySpec?.until || null,
-  };
+    const range = {
+      since: querySpec?.dateFrom || querySpec?.since || null,
+      until: querySpec?.dateTo || querySpec?.until || null,
+    };
 
-  const metrics = Array.isArray(querySpec.metrics) ? querySpec.metrics : null;
-  const rows = await googleAnalyticsMetricsService.fetchAccountMetrics(integration, {
-    range,
-    metricTypes: metrics,
-    granularity: querySpec.granularity || 'day',
+    const metrics = Array.isArray(querySpec.metrics) ? querySpec.metrics : null;
+    const rows = await googleAnalyticsMetricsService.fetchAccountMetrics(integration, {
+      range,
+      metricTypes: metrics,
+      granularity: querySpec.granularity || 'day',
+    });
+
+    const normalized = normalizeMetricsPayload(rows || []);
+    return { ...normalized, meta: { source: 'GA4' } };
+  }
+
+  const tenantId = connection.tenantId;
+  const userId = connection.meta?.ga4UserId;
+  const propertyId =
+    connection.externalAccountId ||
+    connection.meta?.propertyId ||
+    null;
+
+  if (!tenantId || !userId || !propertyId) {
+    return { series: [], table: [], totals: {}, meta: { source: 'GA4', mocked: true } };
+  }
+
+  const metrics = Array.isArray(querySpec.metrics) ? querySpec.metrics : [];
+  if (!metrics.length) {
+    return { series: [], table: [], totals: {}, meta: { source: 'GA4', mocked: true } };
+  }
+
+  const breakdown = normalizeString(querySpec.breakdown);
+  const widgetType = normalizeString(querySpec.widgetType || querySpec.type);
+  const dimensions = buildGa4Dimensions({ breakdown, widgetType });
+  const dateRanges = buildGa4DateRanges(querySpec);
+  const dimensionFilter = buildDimensionFilter(querySpec.filters);
+
+  const payload = {
+    metrics,
+    dimensions,
+  };
+  if (dateRanges) payload.dateRanges = dateRanges;
+  if (dimensionFilter) payload.dimensionFilter = dimensionFilter;
+
+  const response = await ga4DataService.runReport({
+    tenantId,
+    userId,
+    propertyId,
+    payload,
+    rateKey: [tenantId, userId, propertyId].join(':'),
   });
 
-  const normalized = normalizeMetricsPayload(rows || []);
-  return { ...normalized, meta: { source: 'GA4' } };
+  const dimensionHeaders = Array.isArray(response.dimensionHeaders)
+    ? response.dimensionHeaders
+    : [];
+  const metricHeaders = Array.isArray(response.metricHeaders)
+    ? response.metricHeaders
+    : metrics;
+  const rows = Array.isArray(response.rows) ? response.rows : [];
+
+  const totals = buildTotals(metricHeaders, response.totals, rows);
+  const series = buildSeries(dimensionHeaders, metricHeaders, rows);
+  const table = buildTable(dimensionHeaders, metricHeaders, rows);
+  const pie = buildPie(dimensionHeaders, metricHeaders, rows);
+
+  return {
+    series,
+    table,
+    totals,
+    pie,
+    meta: { source: 'GA4', propertyId },
+  };
 }
 
 module.exports = {

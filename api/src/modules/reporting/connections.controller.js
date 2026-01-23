@@ -25,6 +25,20 @@ module.exports = {
     }
   },
 
+  async ga4Metadata(req, res) {
+    try {
+      const { connectionId } = req.params;
+      const data = await connectionsService.getGa4Metadata(
+        req.tenantId,
+        connectionId,
+      );
+      return res.json(data);
+    } catch (err) {
+      const status = err.status || 500;
+      return res.status(status).json({ error: err.message || 'Erro ao buscar metadata GA4' });
+    }
+  },
+
   async link(req, res) {
     try {
       const { brandId } = req.params;
@@ -33,6 +47,7 @@ module.exports = {
         req.tenantId,
         brandId,
         payload,
+        req.user?.id,
       );
       logReportingAction({
         tenantId: req.tenantId,

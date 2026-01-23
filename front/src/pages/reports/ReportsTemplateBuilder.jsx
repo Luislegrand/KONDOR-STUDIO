@@ -89,6 +89,7 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
   const source = draft?.source || "";
   const level = draft?.level || "";
   const widgetType = draft?.widgetType || "KPI";
+  const isGa4Source = source === "GA4";
 
   const { data: levelsData } = useQuery({
     queryKey: ["reporting-metric-levels", source],
@@ -96,7 +97,7 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
       if (!source) return { items: [] };
       return base44.reporting.listMetricCatalog({ source, type: "METRIC" });
     },
-    enabled: open && Boolean(source),
+    enabled: open && Boolean(source) && !isGa4Source,
   });
 
   const { data: metricsData } = useQuery({
@@ -117,22 +118,57 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
     enabled: open && Boolean(source) && Boolean(level),
   });
 
+  const { data: ga4Status } = useQuery({
+    queryKey: ["ga4-status"],
+    queryFn: () => base44.ga4.status(),
+    enabled: open && isGa4Source,
+  });
+
+  const ga4PropertyId =
+    ga4Status?.selectedProperty?.propertyId ||
+    ga4Status?.properties?.[0]?.propertyId ||
+    "";
+
+  const { data: ga4Metadata } = useQuery({
+    queryKey: ["ga4-template-metadata", ga4PropertyId],
+    queryFn: () => base44.ga4.metadata(ga4PropertyId),
+    enabled: open && isGa4Source && Boolean(ga4PropertyId),
+  });
+
+  const ga4Metrics = useMemo(() => {
+    const list = ga4Metadata?.metrics || [];
+    return list.map((metric) => ({
+      metricKey: metric.apiName,
+      label: metric.uiName || metric.apiName,
+    }));
+  }, [ga4Metadata]);
+
+  const ga4Dimensions = useMemo(() => {
+    const list = ga4Metadata?.dimensions || [];
+    return list.map((dimension) => ({
+      metricKey: dimension.apiName,
+      label: dimension.uiName || dimension.apiName,
+    }));
+  }, [ga4Metadata]);
+
   const metrics = useMemo(() => {
-    const list = metricsData?.items || [];
+    const list =
+      isGa4Source && ga4Metrics.length ? ga4Metrics : metricsData?.items || [];
     return list.filter((metric) => {
       if (!metric.supportedCharts || !metric.supportedCharts.length) return true;
       return metric.supportedCharts.includes(widgetType);
     });
-  }, [metricsData, widgetType]);
+  }, [ga4Metrics, isGa4Source, metricsData, widgetType]);
 
   const levels = useMemo(() => {
+    if (isGa4Source) return ["PROPERTY"];
     const list = levelsData?.items || [];
     const unique = new Set();
     list.forEach((item) => {
       if (item?.level) unique.add(String(item.level));
     });
     return Array.from(unique);
-  }, [levelsData]);
+  }, [isGa4Source, levelsData]);
 
   const metricsMap = useMemo(() => {
     const map = new Map();
@@ -143,12 +179,15 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
   }, [metrics]);
 
   const dimensions = useMemo(() => {
-    const list = dimensionsData?.items || [];
+    const list =
+      isGa4Source && ga4Dimensions.length
+        ? ga4Dimensions
+        : dimensionsData?.items || [];
     return list.filter((dimension) => {
       if (!dimension.supportedCharts || !dimension.supportedCharts.length) return true;
       return dimension.supportedCharts.includes(widgetType);
     });
-  }, [dimensionsData, widgetType]);
+  }, [dimensionsData, ga4Dimensions, isGa4Source, widgetType]);
 
   const previewRange = useMemo(() => {
     const today = new Date();

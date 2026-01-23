@@ -205,7 +205,10 @@ function formatResponse(payload, querySpec = {}) {
     payload?.totals && typeof payload.totals === 'object' ? payload.totals : {};
   const series = normalizeSeries(payload?.series || []);
   const table = normalizeTable(payload?.table || []);
-  const pie = normalizePie(totals, querySpec.metrics || []);
+  const pie =
+    Array.isArray(payload?.pie) && payload.pie.length
+      ? payload.pie
+      : normalizePie(totals, querySpec.metrics || []);
   const meta = {
     ...(payload?.meta && typeof payload.meta === 'object' ? payload.meta : {}),
     currency: payload?.meta?.currency || querySpec.options?.currency || null,

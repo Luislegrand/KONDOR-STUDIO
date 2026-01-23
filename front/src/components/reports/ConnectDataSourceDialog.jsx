@@ -87,6 +87,7 @@ export default function ConnectDataSourceDialog({
   const [accountId, setAccountId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
+  const isGa4 = source === "GA4";
 
   useEffect(() => {
     if (!open) return;
@@ -105,7 +106,7 @@ export default function ConnectDataSourceDialog({
       const data = await base44.entities.Integration.list(params);
       return data;
     },
-    enabled: open && Boolean(brandId) && Boolean(source),
+    enabled: open && Boolean(brandId) && Boolean(source) && !isGa4,
   });
 
   const integrations = useMemo(() => {
@@ -122,10 +123,31 @@ export default function ConnectDataSourceDialog({
         { method: "GET" }
       );
     },
-    enabled: open && Boolean(integrationId) && Boolean(source),
+    enabled: open && Boolean(integrationId) && Boolean(source) && !isGa4,
   });
 
-  const accounts = useMemo(() => accountData?.items || [], [accountData]);
+  const { data: ga4Status, isLoading: ga4Loading } = useQuery({
+    queryKey: ["ga4-status"],
+    queryFn: () => base44.ga4.status(),
+    enabled: open && isGa4,
+  });
+
+  const ga4Accounts = useMemo(() => {
+    const list = ga4Status?.properties || [];
+    return list.map((prop) => ({
+      id: prop.propertyId,
+      displayName: prop.displayName
+        ? `${prop.displayName} (${prop.propertyId})`
+        : String(prop.propertyId),
+    }));
+  }, [ga4Status]);
+
+  const accounts = useMemo(() => {
+    if (isGa4) return ga4Accounts;
+    return accountData?.items || [];
+  }, [accountData, ga4Accounts, isGa4]);
+
+  const isGa4Connected = ga4Status?.status === "CONNECTED";
 
   useEffect(() => {
     if (!integrations.length) {
@@ -152,20 +174,22 @@ export default function ConnectDataSourceDialog({
     mutationFn: async () => {
       if (!brandId) throw new Error("Selecione uma marca.");
       if (!source) throw new Error("Selecione a fonte.");
-      if (!integrationId) throw new Error("Selecione a integração.");
+      if (!integrationId && !isGa4) throw new Error("Selecione a integração.");
       if (!accountId) throw new Error("Selecione a conta.");
       if (!displayName) throw new Error("Informe um nome de exibicao.");
+
+      const payload = {
+        source,
+        externalAccountId: accountId,
+        displayName,
+      };
+      if (!isGa4) payload.integrationId = integrationId;
 
       return base44.jsonFetch(
         `/reporting/brands/${brandId}/connections/link`,
         {
           method: "POST",
-          body: JSON.stringify({
-            source,
-            integrationId,
-            externalAccountId: accountId,
-            displayName,
-          }),
+          body: JSON.stringify(payload),
         }
       );
     },
@@ -206,31 +230,51 @@ export default function ConnectDataSourceDialog({
             </SelectNative>
           </div>
 
-          <div>
-            <Label>Integracao</Label>
-            <SelectNative
-              value={integrationId}
-              onChange={(event) => {
-                const value = event.target.value;
-                setIntegrationId(value);
-                setAccountId("");
-                setDisplayName("");
-              }}
-            >
-              <option value="">
-                {integrationsLoading
-                  ? "Carregando integracoes..."
-                  : integrations.length
-                  ? "Selecione"
-                  : "Nenhuma integracao conectada"}
-              </option>
-              {integrations.map((integration) => (
-                <option key={integration.id} value={integration.id}>
-                  {integration.providerName || integration.provider}
+          {isGa4 ? (
+            <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
+              {isGa4Connected
+                ? "Usando a conexão GA4 do usuário atual."
+                : "Conecte o GA4 na tela de integrações para liberar as propriedades."}
+              {!isGa4Connected ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-2"
+                  onClick={() => {
+                    window.location.href = "/integrations/ga4";
+                  }}
+                >
+                  Conectar GA4
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div>
+              <Label>Integracao</Label>
+              <SelectNative
+                value={integrationId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setIntegrationId(value);
+                  setAccountId("");
+                  setDisplayName("");
+                }}
+              >
+                <option value="">
+                  {integrationsLoading
+                    ? "Carregando integracoes..."
+                    : integrations.length
+                    ? "Selecione"
+                    : "Nenhuma integracao conectada"}
                 </option>
-              ))}
-            </SelectNative>
-          </div>
+                {integrations.map((integration) => (
+                  <option key={integration.id} value={integration.id}>
+                    {integration.providerName || integration.provider}
+                  </option>
+                ))}
+              </SelectNative>
+            </div>
+          )}
 
           <div>
             <Label>Conta</Label>
@@ -242,10 +286,10 @@ export default function ConnectDataSourceDialog({
                 const match = accounts.find((acc) => acc.id === value);
                 if (match) setDisplayName(match.displayName || "");
               }}
-              disabled={!integrationId}
+              disabled={(!integrationId && !isGa4) || (isGa4 && !isGa4Connected)}
             >
               <option value="">
-                {accountsLoading
+                {(isGa4 ? ga4Loading : accountsLoading)
                   ? "Carregando contas..."
                   : accounts.length
                   ? "Selecione"

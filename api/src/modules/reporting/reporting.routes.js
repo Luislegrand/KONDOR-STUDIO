@@ -24,6 +24,11 @@ router.get('/health', (req, res) => {
 router.get('/brands/:brandId/connections', allowViewer, connectionsController.listByBrand);
 router.post('/brands/:brandId/connections/link', allowEditor, connectionsController.link);
 router.get('/integrations/:integrationId/accounts', allowEditor, connectionsController.listAccounts);
+router.get(
+  '/connections/:connectionId/ga4/metadata',
+  allowViewer,
+  connectionsController.ga4Metadata,
+);
 router.get('/brand-groups', allowViewer, brandGroupsController.list);
 router.get('/brand-groups/:groupId/members', allowViewer, brandGroupsController.listMembers);
 router.get('/metric-catalog', allowViewer, metricCatalogController.list);

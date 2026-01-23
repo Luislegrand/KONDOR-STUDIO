@@ -10,12 +10,22 @@ const DATA_SOURCES = [
   'META_SOCIAL',
 ];
 
-const linkConnectionSchema = z.object({
-  source: z.enum(DATA_SOURCES),
-  integrationId: z.string().uuid(),
-  externalAccountId: z.string().trim().min(1),
-  displayName: z.string().trim().min(1),
-});
+const linkConnectionSchema = z
+  .object({
+    source: z.enum(DATA_SOURCES),
+    integrationId: z.string().uuid().optional().nullable(),
+    externalAccountId: z.string().trim().min(1),
+    displayName: z.string().trim().min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.source !== 'GA4' && !data.integrationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'integrationId é obrigatório',
+        path: ['integrationId'],
+      });
+    }
+  });
 
 module.exports = {
   DATA_SOURCES,

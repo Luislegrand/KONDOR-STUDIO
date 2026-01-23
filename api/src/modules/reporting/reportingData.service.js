@@ -5,6 +5,7 @@ const cache = require('./reportingCache.service');
 function normalizeResult(payload) {
   const series = Array.isArray(payload?.series) ? payload.series : [];
   const table = Array.isArray(payload?.table) ? payload.table : [];
+  const pie = Array.isArray(payload?.pie) ? payload.pie : [];
   const totals =
     payload && typeof payload.totals === 'object' && !Array.isArray(payload.totals)
       ? payload.totals
@@ -12,6 +13,7 @@ function normalizeResult(payload) {
   const normalized = {
     series,
     table,
+    pie,
     totals,
   };
   if (payload && payload.meta) normalized.meta = payload.meta;
