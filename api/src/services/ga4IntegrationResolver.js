@@ -53,6 +53,8 @@ async function resolveGa4IntegrationContext({
   if (!integration) {
     const err = new Error('Nenhuma integração GA4 conectada para esta propriedade');
     err.status = 400;
+    err.code = 'GA4_INTEGRATION_NOT_CONNECTED';
+    err.details = { propertyId: propertyKey };
     throw err;
   }
 

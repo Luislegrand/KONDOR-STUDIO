@@ -21,6 +21,25 @@ import EmptyStateCard from "./EmptyStateCard.jsx";
 import WidgetSkeleton from "./WidgetSkeleton.jsx";
 
 const CHART_COLORS = ["#0ea5e9", "#22c55e", "#f97316", "#a855f7", "#ef4444"];
+const CONNECT_ERROR_CODES = new Set([
+  "GA4_INTEGRATION_NOT_CONNECTED",
+  "GA4_NOT_CONNECTED",
+  "GA4_REAUTH_REQUIRED",
+  "CONNECTION_NOT_CONNECTED",
+]);
+
+function isConnectError(err) {
+  if (!err) return false;
+  const code = err?.data?.code || err?.code || null;
+  if (code && CONNECT_ERROR_CODES.has(code)) return true;
+  const message = String(err?.data?.error || err?.message || "").toLowerCase();
+  return (
+    (message.includes("ga4") && message.includes("conectad")) ||
+    message.includes("conexao nao esta connected") ||
+    message.includes("connection not connected") ||
+    message.includes("integration not connected")
+  );
+}
 
 function normalizeSeries(series, metrics) {
   if (!Array.isArray(series) || !series.length) return [];
@@ -282,6 +301,25 @@ export default function WidgetRenderer({
   }
 
   if (isError) {
+    if (isConnectError(error)) {
+      const reconnectHint = onEdit
+        ? "Clique no lapis no canto direito deste widget e associe a conta novamente."
+        : "Clique em Associar conta para selecionar a conta correta.";
+      return (
+        <EmptyStateCard
+          title="Acao necessaria - Conexao desconectada"
+          description={reconnectHint}
+          icon={Link2}
+          action={
+            onConnect ? (
+              <Button size="sm" variant="accent" onClick={() => onConnect()}>
+                Associar conta
+              </Button>
+            ) : null
+          }
+        />
+      );
+    }
     const apiDetails = error?.data?.details || null;
     const violationText =
       Array.isArray(apiDetails?.violations) && apiDetails.violations.length

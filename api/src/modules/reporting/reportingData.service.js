@@ -189,6 +189,7 @@ async function queryMetrics(tenantId, querySpec = {}) {
   if (connection.status && connection.status !== 'CONNECTED') {
     const err = new Error('Conexao nao esta CONNECTED');
     err.status = 400;
+    err.code = 'CONNECTION_NOT_CONNECTED';
     throw err;
   }
 
