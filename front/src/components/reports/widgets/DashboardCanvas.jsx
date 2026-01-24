@@ -14,23 +14,41 @@ export default function DashboardCanvas({
   rowHeight = 32,
   margin = [16, 16],
 }) {
+  const safeLayout = Array.isArray(layout) ? layout : [];
+  const safeItems = Array.isArray(items) ? items : [];
+  const safeWidth = Number.isFinite(width) ? width : 0;
+
+  if (!safeWidth) {
+    return (
+      <div
+        ref={containerRef}
+        className="flex min-h-[180px] items-center justify-center text-xs text-[var(--text-muted)]"
+      >
+        Carregando area de widgets...
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef}>
       <GridLayout
-        layout={layout}
+        layout={safeLayout}
         cols={12}
         rowHeight={rowHeight}
         margin={margin}
-        width={width}
+        width={safeWidth}
         isDraggable={isEditable}
         isResizable={isEditable}
         onLayoutChange={onLayoutChange}
       >
-        {items.map((item) => (
-          <div key={item.id} className="h-full">
-            {renderItem(item)}
-          </div>
-        ))}
+        {safeItems.map((item, index) => {
+          const key = item?.id || item?.i || `item-${index + 1}`;
+          return (
+            <div key={key} className="h-full">
+              {renderItem(item)}
+            </div>
+          );
+        })}
       </GridLayout>
     </div>
   );
