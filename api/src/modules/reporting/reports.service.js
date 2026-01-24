@@ -77,6 +77,16 @@ async function assertGroup(tenantId, groupId) {
   });
 }
 
+async function resolveBrandForGroup(tenantId, groupId) {
+  if (!tenantId || !groupId) return null;
+  const member = await prisma.brandGroupMember.findFirst({
+    where: { tenantId, groupId },
+    select: { brandId: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  return member?.brandId || null;
+}
+
 function buildWidgetPayloads(
   tenantId,
   reportId,
@@ -171,6 +181,16 @@ async function createReport(tenantId, payload) {
     throw err;
   }
 
+  let resolvedBrandId = payload.brandId || null;
+  if (!resolvedBrandId && payload.scope === 'GROUP' && payload.groupId) {
+    resolvedBrandId = await resolveBrandForGroup(tenantId, payload.groupId);
+    if (!resolvedBrandId) {
+      const err = new Error('Grupo sem marcas associadas');
+      err.status = 400;
+      throw err;
+    }
+  }
+
   const snapshotTemplate = {
     id: template.id,
     name: template.name,
@@ -185,7 +205,7 @@ async function createReport(tenantId, payload) {
 
   const params = {
     scope: payload.scope,
-    brandId: payload.brandId || null,
+    brandId: resolvedBrandId || null,
     groupId: payload.groupId || null,
     templateId: template.id,
   };
@@ -219,9 +239,9 @@ async function createReport(tenantId, payload) {
   });
 
   let connectionMap = null;
-  if (payload.brandId) {
+  if (resolvedBrandId) {
     const connections = await prisma.dataSourceConnection.findMany({
-      where: { tenantId, brandId: payload.brandId, status: 'CONNECTED' },
+      where: { tenantId, brandId: resolvedBrandId, status: 'CONNECTED' },
       orderBy: { createdAt: 'desc' },
     });
     connectionMap = new Map();

@@ -264,7 +264,10 @@ function WidgetConfigDialog({
 
   const availableConnections = useMemo(() => {
     const list = connectionsData?.items || [];
-    return list.filter((item) => (source ? item.source === source : true));
+    return list.filter(
+      (item) =>
+        item.status === "CONNECTED" && (source ? item.source === source : true)
+    );
   }, [connectionsData, source]);
 
   const previewRange = useMemo(() => buildDefaultDateRange(), []);

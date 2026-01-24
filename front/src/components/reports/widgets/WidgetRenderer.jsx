@@ -55,6 +55,33 @@ function buildChartData(seriesList) {
   );
 }
 
+function normalizeTableData(table) {
+  if (!table) return { columns: [], rows: [] };
+  if (Array.isArray(table.rows)) return table;
+  if (Array.isArray(table)) {
+    if (!table.length) return { columns: [], rows: [] };
+    const columns = Object.keys(table[0] || {}).map((key) => ({
+      key,
+      label: key,
+    }));
+    return { columns, rows: table };
+  }
+  return { columns: [], rows: [] };
+}
+
+function buildPieFromTotals(totals, metrics) {
+  const entries =
+    metrics && metrics.length
+      ? metrics.map((metric) => [metric, totals?.[metric]])
+      : Object.entries(totals || {});
+  return entries
+    .map(([name, value]) => ({
+      name,
+      value: typeof value === "number" ? value : Number(value) || 0,
+    }))
+    .filter((entry) => entry.value !== 0);
+}
+
 function formatValue(value, meta) {
   if (value === undefined || value === null || value === "") return "-";
   if (typeof value === "number") {
@@ -79,6 +106,7 @@ export default function WidgetRenderer({
   connectionId,
   enableQuery = true,
   forceMock = false,
+  dataOverride = null,
   onConnect,
   onEdit,
   variant = "default",
@@ -90,12 +118,14 @@ export default function WidgetRenderer({
   const hasSource = Boolean(source);
   const needsData = widgetType !== "TEXT" && widgetType !== "IMAGE";
   const hasMetrics = metrics.length > 0;
+  const hasOverride = dataOverride && typeof dataOverride === "object";
   const canFetch =
     enableQuery &&
     hasSource &&
     needsData &&
     hasMetrics &&
-    (Boolean(connectionId) || forceMock);
+    (Boolean(connectionId) || forceMock) &&
+    !hasOverride;
   const widgetFiltersKey = useMemo(
     () => JSON.stringify(widget?.filters || {}),
     [widget?.filters]
@@ -217,7 +247,7 @@ export default function WidgetRenderer({
     );
   }
 
-  if (!connectionId && !forceMock) {
+  if (!connectionId && !forceMock && !hasOverride) {
     const connectionHint = onEdit
       ? "Clique no lapis no canto direito deste widget e confirme se a conta do cliente/marca esta selecionada. Com a conta selecionada, clique em SALVAR para atualizar os dados."
       : "Clique em Associar conta para selecionar a conta correta.";
@@ -275,18 +305,35 @@ export default function WidgetRenderer({
     );
   }
 
-  const totals = data?.totals && typeof data.totals === "object" ? data.totals : {};
-  const seriesList = normalizeSeries(data?.series || [], metrics);
+  const resolvedData = hasOverride ? dataOverride : data;
+  const totals =
+    resolvedData?.totals && typeof resolvedData.totals === "object"
+      ? resolvedData.totals
+      : {};
+  const seriesList = normalizeSeries(resolvedData?.series || [], metrics);
   const chartData = buildChartData(seriesList);
-  const pieData = Array.isArray(data?.pie) ? data.pie : [];
-  const table = data?.table && Array.isArray(data.table.rows) ? data.table : null;
-  const hasTable = table && table.rows.length;
+  const rawPie = Array.isArray(resolvedData?.pie) ? resolvedData.pie : [];
+  const pieData = rawPie.length ? rawPie : buildPieFromTotals(totals, metrics);
+  const table = normalizeTableData(resolvedData?.table);
+  const hasTable = table.rows.length;
   const hasChart = chartData.length;
   const hasTotals = Object.keys(totals || {}).length > 0;
-  const meta = data?.meta || {};
+  const meta = resolvedData?.meta || {};
+  const metaWithCurrency =
+    meta?.currency || widget?.options?.currency
+      ? { ...meta, currency: meta.currency || widget?.options?.currency }
+      : meta;
   const compareMeta = meta?.compare || null;
 
   if (!hasChart && !hasTotals && !pieData.length && !hasTable) {
+    if (meta?.mocked) {
+      return (
+        <EmptyStateCard
+          title="Fonte ainda nao disponivel"
+          description="Os dados desta fonte ainda nao foram implementados."
+        />
+      );
+    }
     return (
       <EmptyStateCard
         title="Sem dados no periodo"
@@ -320,17 +367,17 @@ export default function WidgetRenderer({
       <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
         <p className="text-xs text-[var(--text-muted)]">{metricKey || "Metrica"}</p>
         <p className="mt-1 text-2xl font-semibold text-[var(--text)]">
-          {formatValue(value, meta)}
+          {formatValue(value, metaWithCurrency)}
         </p>
         {compareValue !== null && compareValue !== undefined ? (
           <div className="mt-2 text-xs text-[var(--text-muted)]">
             <span>
-              {compareMeta?.label || "Comparacao"}: {formatValue(compareValue, meta)}
+              {compareMeta?.label || "Comparacao"}: {formatValue(compareValue, metaWithCurrency)}
             </span>
             {delta !== null && deltaPct !== null ? (
               <span className="ml-2 font-semibold text-[var(--text)]">
                 {delta >= 0 ? "+" : ""}
-                {formatValue(delta, meta)} ({deltaPct.toFixed(1)}%)
+                {formatValue(delta, metaWithCurrency)} ({deltaPct.toFixed(1)}%)
               </span>
             ) : null}
           </div>
@@ -444,7 +491,7 @@ export default function WidgetRenderer({
               <tr key={index} className="border-t border-[var(--border)]">
                 {table.columns.map((column) => (
                   <td key={column.key} className="px-3 py-2 text-[var(--text)]">
-                    {formatValue(row[column.key], meta)}
+                    {formatValue(row[column.key], metaWithCurrency)}
                   </td>
                 ))}
               </tr>

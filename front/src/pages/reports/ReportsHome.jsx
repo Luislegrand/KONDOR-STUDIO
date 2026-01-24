@@ -108,10 +108,10 @@ export default function ReportsHome() {
     enabled: Boolean(selectedBrandId),
   });
 
-  const connections = useMemo(
-    () => connectionsData?.items || [],
-    [connectionsData]
-  );
+  const connections = useMemo(() => {
+    const items = connectionsData?.items || [];
+    return items.filter((item) => item.status === "CONNECTED");
+  }, [connectionsData]);
 
   const connectionsBySource = useMemo(() => {
     return connections.reduce((acc, connection) => {

@@ -156,7 +156,12 @@ async function syncProperties({ tenantId, userId }) {
     }
   }
 
-  if (!properties.length) return [];
+  if (!properties.length) {
+    await db.integrationGoogleGa4Property.deleteMany({
+      where: { integrationId: integration.id },
+    });
+    return [];
+  }
 
   await Promise.all(
     properties.map((prop) =>

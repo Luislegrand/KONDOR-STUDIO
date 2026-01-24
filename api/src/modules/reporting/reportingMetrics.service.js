@@ -167,7 +167,8 @@ function isEmptyPayload(payload) {
     : 0;
   const seriesCount = Array.isArray(payload.series) ? payload.series.length : 0;
   const tableCount = Array.isArray(payload.table) ? payload.table.length : 0;
-  return totals === 0 && seriesCount === 0 && tableCount === 0;
+  const pieCount = Array.isArray(payload.pie) ? payload.pie.length : 0;
+  return totals === 0 && seriesCount === 0 && tableCount === 0 && pieCount === 0;
 }
 
 function normalizeSeries(series = []) {
@@ -246,10 +247,14 @@ async function queryMetrics(tenantId, payload = {}) {
 
   const result = await reportingData.queryMetrics(tenantId, querySpec);
   const data = result?.data || {};
-  const shouldMock = Boolean(data?.meta?.mocked) || isEmptyPayload(data);
-  if (shouldMock) {
+
+  if (querySpec.forceMock) {
     const mock = buildMockPayload(querySpec, cacheKey);
     return formatResponse(mock, querySpec);
+  }
+
+  if (data?.meta?.mocked || isEmptyPayload(data)) {
+    return formatResponse(data, querySpec);
   }
 
   return formatResponse(data, querySpec);

@@ -5,8 +5,21 @@ const cache = require('./reportingCache.service');
 const DEFAULT_RANGE_DAYS =
   Number(process.env.REPORTING_DEFAULT_RANGE_DAYS) || 30;
 
+async function resolveBrandForGroup(tenantId, groupId) {
+  if (!tenantId || !groupId) return null;
+  const member = await prisma.brandGroupMember.findFirst({
+    where: { tenantId, groupId },
+    select: { brandId: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  return member?.brandId || null;
+}
+
 async function buildConnectionMapForReport(report, tenantId) {
-  const brandId = report?.brandId || report?.params?.brandId || null;
+  let brandId = report?.brandId || report?.params?.brandId || null;
+  if (!brandId && report?.groupId) {
+    brandId = await resolveBrandForGroup(tenantId, report.groupId);
+  }
   if (!brandId) return new Map();
   const connections = await prisma.dataSourceConnection.findMany({
     where: { tenantId, brandId, status: 'CONNECTED' },

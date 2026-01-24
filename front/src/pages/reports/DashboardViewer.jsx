@@ -115,6 +115,13 @@ export default function DashboardViewer() {
     }
   }, [dashboard, dateFrom, dateTo]);
 
+  useEffect(() => {
+    if (dashboard?.scope !== "GROUP") return;
+    if (globalBrandId) return;
+    if (!groupBrands.length) return;
+    setGlobalBrandId(groupBrands[0].id);
+  }, [dashboard?.scope, globalBrandId, groupBrands]);
+
   const widgets = useMemo(
     () => (dashboard?.widgetsSchema || []).map((w) => ({ ...w })),
     [dashboard]
@@ -145,7 +152,9 @@ export default function DashboardViewer() {
   const connectionsByBrand = useMemo(() => {
     const map = new Map();
     brandIds.forEach((brandId, index) => {
-      const items = connectionsQueries[index]?.data?.items || [];
+      const items = (connectionsQueries[index]?.data?.items || []).filter(
+        (item) => item.status === "CONNECTED"
+      );
       map.set(brandId, items);
     });
     return map;

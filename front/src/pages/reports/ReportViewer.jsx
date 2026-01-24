@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useContainerWidth } from "react-grid-layout";
@@ -64,6 +64,7 @@ export default function ReportViewer() {
     brandId: "",
     source: "META_ADS",
   });
+  const autoRefreshRef = useRef(false);
 
   const reportQueryKey = ["reporting-report", reportId];
   const { data: report, isLoading } = useQuery({
@@ -71,6 +72,12 @@ export default function ReportViewer() {
     queryFn: () => base44.reporting.getReport(reportId),
     refetchInterval: (data) =>
       data?.status === "GENERATING" ? 5000 : false,
+  });
+
+  const { data: snapshotsData } = useQuery({
+    queryKey: ["reporting-report-snapshots", reportId, report?.generatedAt || ""],
+    queryFn: () => base44.reporting.getReportSnapshots(reportId),
+    enabled: Boolean(reportId) && Boolean(report),
   });
 
   useEffect(() => {
@@ -115,6 +122,13 @@ export default function ReportViewer() {
     },
   });
 
+  useEffect(() => {
+    if (!report || autoRefreshRef.current) return;
+    if (report.status !== "DRAFT") return;
+    autoRefreshRef.current = true;
+    refreshMutation.mutate();
+  }, [report, refreshMutation]);
+
   const exportMutation = useMutation({
     mutationFn: async () => {
       setExportError("");
@@ -133,18 +147,29 @@ export default function ReportViewer() {
   });
 
   const widgets = useMemo(() => report?.widgets || [], [report]);
+  const snapshotsByWidget = useMemo(() => {
+    const map = new Map();
+    const items = snapshotsData?.items || [];
+    items.forEach((item) => {
+      if (item?.widgetId) map.set(item.widgetId, item);
+    });
+    return map;
+  }, [snapshotsData]);
   const reportingErrors = useMemo(() => {
     const errors = report?.params?.reporting?.errors;
     return Array.isArray(errors) ? errors : [];
   }, [report]);
 
+  const effectiveBrandId = report?.brandId || report?.params?.brandId || "";
   const { data: connectionsData } = useQuery({
-    queryKey: ["reporting-connections", report?.brandId],
-    queryFn: () => base44.reporting.listConnectionsByBrand(report.brandId),
-    enabled: Boolean(report?.brandId),
+    queryKey: ["reporting-connections", effectiveBrandId],
+    queryFn: () => base44.reporting.listConnectionsByBrand(effectiveBrandId),
+    enabled: Boolean(effectiveBrandId),
   });
 
-  const connections = connectionsData?.items || [];
+  const connections = (connectionsData?.items || []).filter(
+    (item) => item.status === "CONNECTED"
+  );
   const handleConnect = (brandId, source) => {
     if (!brandId || !source) return;
     setConnectDialog({ open: true, brandId, source });
@@ -269,12 +294,16 @@ export default function ReportViewer() {
                 widget?.connectionId ||
                 connections.find((item) => item.source === widget?.source)?.id ||
                 "";
+              const snapshot = snapshotsByWidget.get(widget.id);
+              const snapshotData = snapshot?.data || null;
 
               return (
                 <WidgetCard widget={widget} showActions={false}>
                   <WidgetRenderer
                     widget={widget}
                     connectionId={connection}
+                    dataOverride={snapshotData}
+                    enableQuery={!snapshotData}
                     filters={{
                       dateFrom: report?.dateFrom,
                       dateTo: report?.dateTo,
@@ -283,8 +312,8 @@ export default function ReportViewer() {
                       compareDateTo: report?.compareDateTo,
                     }}
                     onConnect={
-                      report?.brandId
-                        ? () => handleConnect(report?.brandId, widget?.source)
+                      effectiveBrandId
+                        ? () => handleConnect(effectiveBrandId, widget?.source)
                         : null
                     }
                   />
