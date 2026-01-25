@@ -19,7 +19,17 @@ import UnderlineTabs from "@/components/reports/UnderlineTabs.jsx";
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
 import WidgetCard from "@/components/reports/widgets/WidgetCard.jsx";
 import WidgetRenderer from "@/components/reports/widgets/WidgetRenderer.jsx";
-import { getWidgetTypeMeta } from "@/components/reports/widgets/widgetMeta.js";
+import { getSourceMeta, getWidgetTypeMeta } from "@/components/reports/widgets/widgetMeta.js";
+import {
+  DASHBOARD_TEMPLATES,
+  applyTemplate,
+  getRecommendedPresets,
+} from "@/components/reports/dashboards/dashboardTemplates.js";
+import {
+  createLayoutItem,
+  normalizeLayout,
+  normalizeWidgets,
+} from "@/components/reports/dashboards/dashboardUtils.js";
 import {
   filterConnected,
   hasConnectedForSource,
@@ -72,103 +82,6 @@ function createWidgetId() {
     return crypto.randomUUID();
   }
   return `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-}
-
-function isPlainObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value);
-}
-
-function buildLayoutFromWidgets(widgets = []) {
-  if (!Array.isArray(widgets)) return [];
-  return widgets.map((widget, index) => ({
-    i: String(widget?.id || widget?.i || `w-${index + 1}`),
-    x: (index * 4) % 12,
-    y: Math.floor(index / 3) * 4,
-    w: 4,
-    h: 4,
-  }));
-}
-
-function getNextY(layout) {
-  if (!Array.isArray(layout) || !layout.length) return 0;
-  return layout.reduce((max, item) => {
-    const y = Number.isFinite(item?.y) ? item.y : 0;
-    const h = Number.isFinite(item?.h) ? item.h : 0;
-    return Math.max(max, y + h);
-  }, 0);
-}
-
-function createLayoutItem(id, layout) {
-  const safeLayout = Array.isArray(layout) ? layout : [];
-  const nextY = getNextY(safeLayout);
-  const nextX = (safeLayout.length * 4) % 12;
-  return {
-    i: String(id),
-    x: nextX,
-    y: nextY,
-    w: 4,
-    h: 4,
-  };
-}
-
-function normalizeLayout(layout = [], widgets = []) {
-  const widgetList = Array.isArray(widgets) ? widgets : [];
-  if (!Array.isArray(layout) || !layout.length) {
-    return buildLayoutFromWidgets(widgetList);
-  }
-
-  const widgetIds = new Set(
-    widgetList.map((widget, index) => String(widget?.id || widget?.i || `w-${index + 1}`))
-  );
-  const seen = new Set();
-  const normalized = layout
-    .filter((item) => item && (item.i || item.id))
-    .map((item, index) => {
-      const i = String(item.i ?? item.id ?? `w-${index + 1}`);
-      const x = Number.isFinite(item.x) ? item.x : (index * 4) % 12;
-      const y = Number.isFinite(item.y) ? item.y : Math.floor(index / 3) * 4;
-      const w = Number.isFinite(item.w) && item.w > 0 ? item.w : 4;
-      const h = Number.isFinite(item.h) && item.h > 0 ? item.h : 4;
-      return { i, x, y, w, h };
-    })
-    .filter((item) => {
-      if (seen.has(item.i)) return false;
-      seen.add(item.i);
-      return widgetIds.size ? widgetIds.has(item.i) : true;
-    });
-
-  if (!normalized.length && widgetList.length) {
-    return buildLayoutFromWidgets(widgetList);
-  }
-  return normalized;
-}
-
-function normalizeWidgets(widgets = []) {
-  if (!Array.isArray(widgets)) return [];
-  return widgets
-    .filter((widget) => widget && typeof widget === "object")
-    .map((widget, index) => {
-      const base = isPlainObject(widget) ? { ...widget } : {};
-      const widgetType = base.widgetType || base.type || "KPI";
-      const id = base.id || base.i || `w-${index + 1}`;
-      return {
-        ...base,
-        id: String(id),
-        widgetType,
-        title:
-          base.title ||
-          `${getWidgetTypeMeta(widgetType)?.label || "Widget"} widget`,
-        source: base.source || "",
-        connectionId: base.connectionId || "",
-        brandId: base.brandId || "",
-        inheritBrand: base.inheritBrand !== false,
-        level: base.level || "",
-        breakdown: base.breakdown || "",
-        metrics: Array.isArray(base.metrics) ? base.metrics : [],
-        filters: isPlainObject(base.filters) ? base.filters : {},
-        options: isPlainObject(base.options) ? base.options : {},
-      };
-    });
 }
 
 function toDateKey(value) {
@@ -934,6 +847,8 @@ export default function DashboardBuilder() {
   const [widgets, setWidgets] = useState([]);
   const [widgetStatusMap, setWidgetStatusMap] = useState({});
   const [viewMode, setViewMode] = useState("edit");
+  const [showTemplatePicker, setShowTemplatePicker] = useState(isNew);
+  const [lastSelectedSource, setLastSelectedSource] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
   const [activeWidgetId, setActiveWidgetId] = useState(null);
   const [error, setError] = useState("");
@@ -1070,7 +985,13 @@ export default function DashboardBuilder() {
     setGlobalGroupId("");
     setLayout([]);
     setWidgets([]);
+    setShowTemplatePicker(true);
+    setLastSelectedSource("");
   }, [isNew, dashboardId]);
+
+  useEffect(() => {
+    if (!isNew) setShowTemplatePicker(false);
+  }, [isNew]);
 
   useEffect(() => {
     if (!widgets.length) return;
@@ -1197,6 +1118,99 @@ export default function DashboardBuilder() {
     });
   };
 
+  const recommendedSource = useMemo(() => {
+    if (lastSelectedSource) return lastSelectedSource;
+    const counts = new Map();
+    widgets.forEach((widget) => {
+      if (!widget?.source) return;
+      counts.set(widget.source, (counts.get(widget.source) || 0) + 1);
+    });
+    let topSource = "";
+    let topCount = 0;
+    counts.forEach((count, source) => {
+      if (count > topCount) {
+        topCount = count;
+        topSource = source;
+      }
+    });
+    return topSource;
+  }, [lastSelectedSource, widgets]);
+
+  const recommendedPresets = useMemo(
+    () => getRecommendedPresets(recommendedSource),
+    [recommendedSource]
+  );
+  const hasRecommendedPresets = Boolean(
+    recommendedPresets?.kpis?.length || recommendedPresets?.charts?.length
+  );
+  const recommendedSourceMeta = useMemo(
+    () => getSourceMeta(recommendedSource),
+    [recommendedSource]
+  );
+
+  const handleApplyTemplate = useCallback(
+    (templateId) => {
+      const result = applyTemplate(templateId, {
+        scope,
+        brandId,
+        groupId,
+        globalBrandId,
+        globalGroupId,
+      });
+      setName(result.name || "Novo dashboard");
+      setWidgets(result.widgets || []);
+      setLayout(result.layout || []);
+      setDateFrom(result.globalFiltersDefaults?.dateFrom || "");
+      setDateTo(result.globalFiltersDefaults?.dateTo || "");
+      setCompareMode(result.globalFiltersDefaults?.compareMode || "NONE");
+      setCompareDateFrom(result.globalFiltersDefaults?.compareDateFrom || "");
+      setCompareDateTo(result.globalFiltersDefaults?.compareDateTo || "");
+      setShowTemplatePicker(false);
+      const primarySource =
+        result.widgets?.find((item) => item?.source)?.source || "";
+      if (primarySource) setLastSelectedSource(primarySource);
+    },
+    [scope, brandId, groupId, globalBrandId, globalGroupId]
+  );
+
+  const buildPresetWidgets = useCallback(
+    (presetList) => {
+      if (!Array.isArray(presetList) || !presetList.length) return [];
+      const inheritBrand = scope === "BRAND" || Boolean(globalBrandId);
+      const baseWidgets = presetList.map((preset) => ({
+        ...preset,
+        id: createWidgetId(),
+        connectionId: "",
+        brandId: "",
+        inheritBrand,
+        filters: preset.filters || {},
+        options: preset.options || {},
+      }));
+      return normalizeWidgets(baseWidgets);
+    },
+    [scope, globalBrandId]
+  );
+
+  const addPresetWidgets = useCallback(
+    (presetList) => {
+      const normalized = buildPresetWidgets(presetList);
+      if (!normalized.length) return;
+      setWidgets((prev) => [...prev, ...normalized]);
+      setLayout((prev) => {
+        let next = Array.isArray(prev) ? [...prev] : [];
+        normalized.forEach((widget) => {
+          next = [...next, createLayoutItem(widget.id, next)];
+        });
+        return next;
+      });
+      setShowTemplatePicker(false);
+      if (normalized[0]?.source) {
+        setLastSelectedSource(normalized[0].source);
+      }
+    },
+    [buildPresetWidgets]
+  );
+
   const handleStatusChange = useCallback((widgetId, nextStatus) => {
     if (!widgetId) return;
     setWidgetStatusMap((prev) => {
@@ -1260,6 +1274,46 @@ export default function DashboardBuilder() {
         </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+        {isNew && showTemplatePicker ? (
+          <section className="rounded-[18px] border border-[var(--border)] bg-white px-6 py-6 shadow-[var(--shadow-sm)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text)]">
+                  Comece com um template
+                </h2>
+                <p className="text-sm text-[var(--text-muted)]">
+                  Escolha uma estrutura pronta e personalize depois.
+                </p>
+              </div>
+              <Button variant="ghost" onClick={() => setShowTemplatePicker(false)}>
+                Comecar do zero
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {DASHBOARD_TEMPLATES.map((template) => (
+                <div
+                  key={template.id}
+                  className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-sm)]"
+                >
+                  <p className="text-sm font-semibold text-[var(--text)]">
+                    {template.name}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {template.description}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => handleApplyTemplate(template.id)}
+                  >
+                    Usar template
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <aside className="space-y-4">
@@ -1426,6 +1480,39 @@ export default function DashboardBuilder() {
               </div>
             </div>
 
+            {hasRecommendedPresets ? (
+              <div className="rounded-[16px] border border-[var(--border)] bg-white px-4 py-4 shadow-[var(--shadow-sm)]">
+                <p className="text-sm font-semibold text-[var(--text)]">Recomendados</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {recommendedSourceMeta?.label
+                    ? `Sugestoes para ${recommendedSourceMeta.label}.`
+                    : "Sugestoes baseadas na fonte principal."}
+                </p>
+                <div className="mt-3 grid gap-2">
+                  {recommendedPresets?.kpis?.length ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="justify-start"
+                      onClick={() => addPresetWidgets(recommendedPresets.kpis)}
+                    >
+                      Adicionar KPIs essenciais
+                    </Button>
+                  ) : null}
+                  {recommendedPresets?.charts?.length ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="justify-start"
+                      onClick={() => addPresetWidgets(recommendedPresets.charts)}
+                    >
+                      Adicionar graficos essenciais
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-[16px] border border-[var(--border)] bg-white px-4 py-4 shadow-[var(--shadow-sm)]">
               <p className="text-sm font-semibold text-[var(--text)]">Widgets</p>
               <div className="mt-3 grid gap-2">
@@ -1521,6 +1608,7 @@ export default function DashboardBuilder() {
         onOpenChange={setConfigOpen}
         widget={activeWidget}
         onSave={(updated) => {
+          if (updated?.source) setLastSelectedSource(updated.source);
           setWidgets((prev) =>
             prev.map((widget) => (widget.id === updated.id ? updated : widget))
           );
