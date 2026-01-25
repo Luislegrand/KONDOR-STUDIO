@@ -1,5 +1,6 @@
+const { google } = require('googleapis');
+
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
 function normalizeScopes(value) {
   if (!value) return [];
@@ -29,47 +30,54 @@ function getOAuthConfig() {
   return { clientId, clientSecret, redirectUri, scopes };
 }
 
-function buildAuthUrl({ state }) {
-  const { clientId, redirectUri, scopes } = getOAuthConfig();
-  const url = new URL(AUTH_URL);
-  url.searchParams.set('client_id', clientId);
-  url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('access_type', 'offline');
-  url.searchParams.set('prompt', 'consent');
-  url.searchParams.set('scope', scopes.join(' '));
-  if (state) url.searchParams.set('state', state);
-  return url.toString();
+function createOAuthClient() {
+  const { clientId, clientSecret, redirectUri } = getOAuthConfig();
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+function assertAuthUrlParams(url) {
+  const parsed = new URL(url);
+  const required = {
+    prompt: 'consent',
+    access_type: 'offline',
+    include_granted_scopes: 'true',
+  };
+  const missing = Object.entries(required)
+    .filter(([key, value]) => parsed.searchParams.get(key) !== value)
+    .map(([key]) => key);
+  if (missing.length) {
+    const err = new Error(`GA4 OAuth URL missing params: ${missing.join(', ')}`);
+    err.status = 500;
+    throw err;
+  }
+  if (process.env.GA4_OAUTH_DEBUG === 'true') {
+    console.info('GA4 OAuth URL params', {
+      prompt: parsed.searchParams.get('prompt'),
+      access_type: parsed.searchParams.get('access_type'),
+      include_granted_scopes: parsed.searchParams.get('include_granted_scopes'),
+    });
+  }
+  return url;
+}
+
+function buildAuthUrl({ state, force } = {}) {
+  const { scopes } = getOAuthConfig();
+  const oauth2Client = createOAuthClient();
+  const url = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    prompt: force ? 'consent' : 'consent',
+    include_granted_scopes: true,
+    scope: scopes,
+    state,
+  });
+  return assertAuthUrlParams(url);
 }
 
 async function exchangeCodeForTokens(code) {
   if (!code) throw new Error('OAuth code missing');
-  const { clientId, clientSecret, redirectUri } = getOAuthConfig();
-
-  const body = new URLSearchParams({
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: 'authorization_code',
-  });
-
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = json?.error_description || json?.error || 'OAuth token exchange failed';
-    const err = new Error(message);
-    err.status = res.status;
-    err.data = json;
-    throw err;
-  }
-
-  return json;
+  const oauth2Client = createOAuthClient();
+  const response = await oauth2Client.getToken(code);
+  return response.tokens || {};
 }
 
 async function refreshAccessToken(refreshToken) {

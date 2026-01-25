@@ -18,6 +18,7 @@ router.post('/disconnect', controller.disconnect);
 router.get('/properties/sync', controller.propertiesSync);
 router.get('/properties', controller.propertiesList);
 router.post('/properties/select', validate(propertySelectSchema), controller.propertiesSelect);
+router.post('/demo-report', controller.demoReport);
 router.get('/metadata', controller.metadata);
 
 module.exports = router;

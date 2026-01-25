@@ -1,8 +1,7 @@
+const { google } = require('googleapis');
 const { prisma, useTenant } = require('../prisma');
 const ga4OAuthService = require('./ga4OAuthService');
 
-const ADMIN_API_URL =
-  process.env.GA4_ADMIN_API_URL || 'https://analyticsadmin.googleapis.com/v1/accountSummaries';
 const ADMIN_PAGE_SIZE = Number(process.env.GA4_ADMIN_PAGE_SIZE || 200);
 
 function extractErrorReason(payload) {
@@ -12,11 +11,15 @@ function extractErrorReason(payload) {
   return reasonEntry?.reason || null;
 }
 
-function mapError(res, payload) {
-  const message = payload?.error?.message || payload?.error || 'GA4 Admin API error';
+function mapGoogleError(error) {
+  const payload = error?.response?.data || {};
+  const message =
+    payload?.error?.message ||
+    error?.message ||
+    'GA4 Admin API error';
   const err = new Error(message);
-  err.status = res.status;
-  err.code = payload?.error?.status || 'GA4_ADMIN_ERROR';
+  err.status = error?.response?.status || error?.status || 500;
+  err.code = payload?.error?.status || error?.code || 'GA4_ADMIN_ERROR';
   err.reason = extractErrorReason(payload);
   return err;
 }
@@ -53,29 +56,27 @@ function buildMockProperties() {
 async function fetchAccountSummaries(accessToken) {
   const summaries = [];
   let pageToken = null;
+  const oauth2Client = new google.auth.OAuth2();
+  oauth2Client.setCredentials({ access_token: accessToken });
+  const client = google.analyticsadmin({
+    version: 'v1beta',
+    auth: oauth2Client,
+  });
 
   do {
-    const url = new URL(ADMIN_API_URL);
-    if (ADMIN_PAGE_SIZE) {
-      url.searchParams.set('pageSize', String(ADMIN_PAGE_SIZE));
+    try {
+      const response = await client.accountSummaries.list({
+        pageSize: ADMIN_PAGE_SIZE || undefined,
+        pageToken: pageToken || undefined,
+      });
+      const batch = Array.isArray(response.data?.accountSummaries)
+        ? response.data.accountSummaries
+        : [];
+      summaries.push(...batch);
+      pageToken = response.data?.nextPageToken || null;
+    } catch (error) {
+      throw mapGoogleError(error);
     }
-    if (pageToken) {
-      url.searchParams.set('pageToken', pageToken);
-    }
-
-    const res = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw mapError(res, json);
-
-    const batch = Array.isArray(json.accountSummaries)
-      ? json.accountSummaries
-      : [];
-    summaries.push(...batch);
-    pageToken = json.nextPageToken || null;
   } while (pageToken);
 
   return summaries;

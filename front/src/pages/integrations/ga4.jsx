@@ -7,6 +7,16 @@ import PageHeader from "@/components/ui/page-header.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 function useQueryParams() {
   const location = useLocation();
@@ -20,6 +30,8 @@ export default function Ga4IntegrationPage() {
   const [connectError, setConnectError] = useState("");
   const [disconnectError, setDisconnectError] = useState("");
   const [syncError, setSyncError] = useState("");
+  const [demoData, setDemoData] = useState(null);
+  const [demoError, setDemoError] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["ga4-status"],
@@ -42,7 +54,7 @@ export default function Ga4IntegrationPage() {
   }, [properties, selectedProperty, selectedPropertyId]);
 
   const connectMutation = useMutation({
-    mutationFn: () => base44.ga4.oauthStart(),
+    mutationFn: (options) => base44.ga4.oauthStart(options),
     onSuccess: (payload) => {
       setConnectError("");
       if (payload?.url) {
@@ -97,6 +109,24 @@ export default function Ga4IntegrationPage() {
   const errorParam = queryParams.get("error");
   const messageParam = queryParams.get("message");
 
+  const demoMutation = useMutation({
+    mutationFn: () =>
+      base44.ga4.demoReport(
+        selectedPropertyId ? { propertyId: selectedPropertyId } : {}
+      ),
+    onSuccess: (payload) => {
+      setDemoError("");
+      setDemoData(payload || null);
+    },
+    onError: (err) => {
+      const message =
+        err?.data?.error ||
+        err?.message ||
+        "Falha ao carregar demo report.";
+      setDemoError(message);
+    },
+  });
+
   const connectionBanner = useMemo(() => {
     if (connectedParam === "1") {
       return { tone: "success", text: "GA4 conectado com sucesso." };
@@ -109,6 +139,13 @@ export default function Ga4IntegrationPage() {
     }
     return null;
   }, [connectedParam, messageParam]);
+
+  useEffect(() => {
+    setDemoData(null);
+    setDemoError("");
+  }, [selectedPropertyId, status]);
+
+  const demoRows = demoData?.rows || [];
 
   return (
     <PageShell>
@@ -171,7 +208,7 @@ export default function Ga4IntegrationPage() {
                       <Button
                         onClick={() => {
                           setConnectError("");
-                          connectMutation.mutate();
+                          connectMutation.mutate({ force: true });
                         }}
                         disabled={connectMutation.isPending}
                       >
@@ -242,6 +279,69 @@ export default function Ga4IntegrationPage() {
                 ) : (
                   <p className="text-sm text-[var(--text-muted)]">
                     Nenhuma propriedade encontrada ainda.
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Demo GA4 (sessions + activeUsers)</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {status !== "CONNECTED" ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                Conecte o GA4 para gerar o demo report.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={() => demoMutation.mutate()}
+                    disabled={demoMutation.isPending}
+                  >
+                    {demoMutation.isPending
+                      ? "Gerando..."
+                      : "Gerar Dashboard Demo"}
+                  </Button>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Ultimos 7 dias
+                  </span>
+                </div>
+                {demoError ? (
+                  <p className="text-xs text-rose-600">{demoError}</p>
+                ) : null}
+                {demoRows.length ? (
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={demoRows}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="sessions"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="activeUsers"
+                          stroke="#16a34a"
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Clique em &quot;Gerar Dashboard Demo&quot; para ver os dados.
                   </p>
                 )}
               </>

@@ -1,5 +1,6 @@
 const ga4OAuthService = require('../services/ga4OAuthService');
 const ga4AdminService = require('../services/ga4AdminService');
+const ga4DataService = require('../services/ga4DataService');
 const ga4MetadataService = require('../services/ga4MetadataService');
 const { prisma, useTenant } = require('../prisma');
 
@@ -25,6 +26,18 @@ function normalizeGa4Error(error) {
     return 'Tokens invalidos ou expirados. Reconecte o GA4.';
   }
 
+  if (error?.code === 'GA4_REFRESH_TOKEN_MISSING' || lower.includes('refresh token')) {
+    return 'Refresh token ausente. Reconecte o GA4 com consentimento.';
+  }
+
+  if (lower.includes('redirect_uri_mismatch')) {
+    return 'redirect_uri_mismatch: verifique GOOGLE_OAUTH_REDIRECT_URI no Google Cloud.';
+  }
+
+  if (lower.includes('invalid_grant')) {
+    return 'Codigo expirado ou invalido. Tente conectar novamente.';
+  }
+
   if (error?.status === 403) {
     if (
       lower.includes('access not configured') ||
@@ -45,6 +58,41 @@ function normalizeGa4Error(error) {
   return message;
 }
 
+function formatGa4Date(value) {
+  const raw = String(value || '');
+  if (!/^\d{8}$/.test(raw)) return raw;
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6)}`;
+}
+
+function normalizeDemoRows(response) {
+  const dimensionHeaders = Array.isArray(response?.dimensionHeaders)
+    ? response.dimensionHeaders
+    : [];
+  const metricHeaders = Array.isArray(response?.metricHeaders)
+    ? response.metricHeaders
+    : [];
+  const rows = Array.isArray(response?.rows) ? response.rows : [];
+
+  const normalized = rows.map((row) => {
+    const item = {};
+    dimensionHeaders.forEach((dimension, idx) => {
+      const value = row.dimensions?.[idx] ?? null;
+      item[dimension] = dimension === 'date' ? formatGa4Date(value) : value;
+    });
+    metricHeaders.forEach((metric, idx) => {
+      const value = Number(row.metrics?.[idx] || 0);
+      item[metric] = Number.isFinite(value) ? value : 0;
+    });
+    return item;
+  });
+
+  return {
+    dimensions: dimensionHeaders,
+    metrics: metricHeaders,
+    rows: normalized,
+  };
+}
+
 module.exports = {
   async oauthStart(req, res) {
     try {
@@ -60,13 +108,16 @@ module.exports = {
       }
 
       const state = ga4OAuthService.buildState({ tenantId, userId });
-      const url = require('../lib/googleClient').buildAuthUrl({ state });
+      const force = req.query?.force === '1' || req.query?.force === 'true';
+      const url = require('../lib/googleClient').buildAuthUrl({ state, force });
       return res.json({ url });
     } catch (error) {
-      const message =
-        error?.message ||
-        'Failed to start GA4 OAuth';
-      console.error('GA4 oauthStart error:', error);
+      const message = error?.message || 'Failed to start GA4 OAuth';
+      console.error('GA4 oauthStart error:', {
+        message: error?.message,
+        code: error?.code,
+        status: error?.status,
+      });
       return res.status(error?.status || 500).json({ error: message });
     }
   },
@@ -98,11 +149,16 @@ module.exports = {
       const redirectUrl = buildRedirectUrl({ connected: 1 });
       return res.redirect(redirectUrl);
     } catch (error) {
-      console.error('GA4 oauthCallback error:', error);
+      const message = normalizeGa4Error(error);
+      console.error('GA4 oauthCallback error:', {
+        message: error?.message,
+        code: error?.code,
+        status: error?.status,
+      });
       const redirectUrl = buildRedirectUrl({
         connected: 0,
         error: error.code || 'oauth_failed',
-        message: error.message || 'OAuth failed',
+        message: message || 'OAuth failed',
       });
       return res.redirect(redirectUrl);
     }
@@ -275,6 +331,71 @@ module.exports = {
       return res
         .status(error.status || 500)
         .json({ error: error.message || 'Failed to select GA4 property' });
+    }
+  },
+
+  async demoReport(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const userId = req.user?.id;
+      const propertyId = req.body?.propertyId || null;
+      if (!tenantId || !userId) {
+        return res.status(400).json({ error: 'tenantId or userId missing' });
+      }
+
+      const integration = await req.db.integrationGoogleGa4.findFirst({
+        where: { tenantId: String(tenantId), userId: String(userId) },
+      });
+      if (!integration || integration.status !== 'CONNECTED') {
+        return res.status(400).json({ error: 'GA4 integration not connected' });
+      }
+
+      let selected = null;
+      if (propertyId) {
+        selected = await req.db.integrationGoogleGa4Property.findFirst({
+          where: {
+            integrationId: integration.id,
+            propertyId: String(propertyId),
+          },
+        });
+      } else {
+        selected = await ga4AdminService.getSelectedProperty({
+          tenantId,
+          userId,
+        });
+      }
+
+      if (!selected?.propertyId) {
+        return res.status(404).json({ error: 'GA4 property not found' });
+      }
+
+      const response = await ga4DataService.runReport({
+        tenantId,
+        userId,
+        propertyId: String(selected.propertyId),
+        payload: {
+          dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+          metrics: ['sessions', 'activeUsers'],
+          dimensions: ['date'],
+        },
+        rateKey: [tenantId, userId, selected.propertyId].join(':'),
+      });
+
+      const normalized = normalizeDemoRows(response);
+      return res.json({
+        propertyId: String(selected.propertyId),
+        ...normalized,
+      });
+    } catch (error) {
+      const message = normalizeGa4Error(error);
+      console.error('GA4 demoReport error:', {
+        message: error?.message,
+        code: error?.code,
+        status: error?.status,
+      });
+      return res
+        .status(error.status || 500)
+        .json({ error: message || 'Failed to run GA4 demo report' });
     }
   },
 

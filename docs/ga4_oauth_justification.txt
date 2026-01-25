@@ -1,0 +1,9 @@
+The Kondor Studio application allows users to connect their own Google Analytics 4 (GA4) accounts to visualize and analyze their analytics data inside custom dashboards.
+
+The application uses the analytics.readonly scope strictly for read-only access. This access is required so users can select metrics and dimensions such as sessions, users, events, and traffic sources and display them in charts and reports within the application.
+
+No data is modified, created, or deleted in the user's Google Analytics account. The application does not perform any write operations.
+
+The data accessed is only used to display analytics dashboards for the authenticated user who owns the connected GA4 property. No data is shared with third parties, sold, or used for advertising.
+
+Users explicitly initiate the OAuth connection and can revoke access at any time via their Google Account settings.

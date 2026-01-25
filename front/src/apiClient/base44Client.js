@@ -789,8 +789,9 @@ const Reporting = {
 // --------------------
 
 const GA4 = {
-  async oauthStart() {
-    return jsonFetch("/integrations/ga4/oauth/start", { method: "GET" });
+  async oauthStart(options = {}) {
+    const qs = buildQuery(options?.force ? { force: 1 } : {});
+    return jsonFetch(`/integrations/ga4/oauth/start${qs}`, { method: "GET" });
   },
 
   async status() {
@@ -820,6 +821,13 @@ const GA4 = {
   async metadata(propertyId) {
     const qs = buildQuery(propertyId ? { propertyId } : {});
     return jsonFetch(`/integrations/ga4/metadata${qs}`, { method: "GET" });
+  },
+
+  async demoReport(payload = {}) {
+    return jsonFetch("/integrations/ga4/demo-report", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
   },
 };
 
