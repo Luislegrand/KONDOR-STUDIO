@@ -215,8 +215,35 @@ export default function ConnectDataSourceDialog({
         }
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reporting-connections", brandId] });
+    onSuccess: async () => {
+      setError("");
+      setGa4SyncError("");
+      if (brandId) {
+        queryClient.invalidateQueries({ queryKey: ["reporting-connections", brandId] });
+        queryClient.invalidateQueries({
+          queryKey: ["reporting-widget-connections", brandId],
+        });
+        if (source) {
+          queryClient.invalidateQueries({
+            queryKey: ["reporting-integrations", brandId, source],
+          });
+          if (integrationId) {
+            queryClient.invalidateQueries({
+              queryKey: ["reporting-accounts", integrationId, source],
+            });
+          }
+        }
+        onOpenChange(false);
+        await queryClient.refetchQueries({
+          queryKey: ["reporting-connections", brandId],
+          type: "active",
+        });
+        await queryClient.refetchQueries({
+          queryKey: ["reporting-widget-connections", brandId],
+          type: "active",
+        });
+        return;
+      }
       onOpenChange(false);
     },
     onError: (err) => {

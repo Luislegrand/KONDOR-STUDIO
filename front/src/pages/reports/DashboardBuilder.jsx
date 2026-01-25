@@ -942,6 +942,20 @@ export default function DashboardBuilder() {
     source: "META_ADS",
   });
 
+  useEffect(() => {
+    if (connectDialog.open || !connectDialog.brandId) return;
+    const refreshConnections = async () => {
+      queryClient.invalidateQueries({
+        queryKey: ["reporting-connections", connectDialog.brandId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ["reporting-connections", connectDialog.brandId],
+        type: "active",
+      });
+    };
+    refreshConnections();
+  }, [connectDialog.open, connectDialog.brandId, queryClient]);
+
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ["reporting-dashboard", dashboardId],
     queryFn: () => base44.reporting.getDashboard(dashboardId),
