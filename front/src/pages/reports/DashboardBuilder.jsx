@@ -97,6 +97,17 @@ function buildDefaultDateRange() {
   return { dateFrom: toDateKey(from), dateTo: toDateKey(today) };
 }
 
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handle);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 function WidgetConfigDialog({
   open,
   onOpenChange,
@@ -341,6 +352,10 @@ function WidgetConfigDialog({
     .join(" | ");
   const shouldBlockPreview =
     isGa4Source && selectedMetrics.length > 0 && (hasCompatibilityIssue || ga4CompatibilityError);
+  const previewEnabled =
+    open &&
+    !shouldBlockPreview &&
+    Boolean(source && (level || widgetType === "TEXT" || widgetType === "IMAGE"));
 
   const handleCompatibilityFix = () => {
     if (!incompatMetrics.length && !incompatDimensions.length) return;
@@ -715,10 +730,10 @@ function WidgetConfigDialog({
                       widget={draft}
                       connectionId={previewConnectionId}
                       filters={previewRange}
-                      enableQuery={Boolean(
-                        source && (level || widgetType === "TEXT" || widgetType === "IMAGE")
-                      )}
+                      enableQuery={previewEnabled}
                       forceMock={!previewConnectionId}
+                      queryKeyPrefix="preview"
+                      staleTime={120 * 1000}
                       variant="mini"
                     />
                   )}
@@ -847,6 +862,7 @@ export default function DashboardBuilder() {
   const [widgets, setWidgets] = useState([]);
   const [widgetStatusMap, setWidgetStatusMap] = useState({});
   const [viewMode, setViewMode] = useState("edit");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(isNew);
   const [lastSelectedSource, setLastSelectedSource] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
@@ -857,6 +873,29 @@ export default function DashboardBuilder() {
     brandId: "",
     source: "META_ADS",
   });
+
+  const debouncedDateFrom = useDebouncedValue(dateFrom);
+  const debouncedDateTo = useDebouncedValue(dateTo);
+  const debouncedCompareMode = useDebouncedValue(compareMode);
+  const debouncedCompareDateFrom = useDebouncedValue(compareDateFrom);
+  const debouncedCompareDateTo = useDebouncedValue(compareDateTo);
+
+  const debouncedFilters = useMemo(
+    () => ({
+      dateFrom: debouncedDateFrom,
+      dateTo: debouncedDateTo,
+      compareMode: debouncedCompareMode,
+      compareDateFrom: debouncedCompareDateFrom,
+      compareDateTo: debouncedCompareDateTo,
+    }),
+    [
+      debouncedDateFrom,
+      debouncedDateTo,
+      debouncedCompareMode,
+      debouncedCompareDateFrom,
+      debouncedCompareDateTo,
+    ]
+  );
 
   useEffect(() => {
     if (connectDialog.open || !connectDialog.brandId) return;
@@ -1015,46 +1054,52 @@ export default function DashboardBuilder() {
     }
   }, [scope, brandId, groupId]);
 
-  const addWidget = (type) => {
-    const id = createWidgetId();
-    const label = WIDGET_TYPES.find((item) => item.key === type)?.label || "Widget";
-    const nextWidget = {
-      id,
-      widgetType: type,
-      title: `${label} widget`,
-      source: "",
-      connectionId: "",
-      brandId: "",
-      inheritBrand: scope === "BRAND" || Boolean(globalBrandId),
-      level: "",
-      breakdown: "",
-      metrics: [],
-      filters: {},
-      options: {},
-    };
-    setWidgets((prev) => [...prev, nextWidget]);
-    setLayout((prev) => [...prev, createLayoutItem(id, prev)]);
-    setActiveWidgetId(id);
-    setConfigOpen(true);
-  };
+  const addWidget = useCallback(
+    (type) => {
+      const id = createWidgetId();
+      const label = WIDGET_TYPES.find((item) => item.key === type)?.label || "Widget";
+      const nextWidget = {
+        id,
+        widgetType: type,
+        title: `${label} widget`,
+        source: "",
+        connectionId: "",
+        brandId: "",
+        inheritBrand: scope === "BRAND" || Boolean(globalBrandId),
+        level: "",
+        breakdown: "",
+        metrics: [],
+        filters: {},
+        options: {},
+      };
+      setWidgets((prev) => [...prev, nextWidget]);
+      setLayout((prev) => [...prev, createLayoutItem(id, prev)]);
+      setActiveWidgetId(id);
+      setConfigOpen(true);
+    },
+    [globalBrandId, scope]
+  );
 
-  const handleRemoveWidget = (widgetId) => {
+  const handleRemoveWidget = useCallback((widgetId) => {
     setWidgets((prev) => prev.filter((widget) => widget.id !== widgetId));
     setLayout((prev) => prev.filter((item) => item.i !== widgetId));
-  };
+  }, []);
 
-  const handleDuplicateWidget = (widgetId) => {
-    const sourceWidget = widgets.find((widget) => widget.id === widgetId);
-    if (!sourceWidget) return;
-    const id = createWidgetId();
-    const nextWidget = {
-      ...sourceWidget,
-      id,
-      title: sourceWidget.title ? `${sourceWidget.title} (copia)` : "Widget (copia)",
-    };
-    setWidgets((prev) => [...prev, nextWidget]);
-    setLayout((prev) => [...prev, createLayoutItem(id, prev)]);
-  };
+  const handleDuplicateWidget = useCallback(
+    (widgetId) => {
+      const sourceWidget = widgets.find((widget) => widget.id === widgetId);
+      if (!sourceWidget) return;
+      const id = createWidgetId();
+      const nextWidget = {
+        ...sourceWidget,
+        id,
+        title: sourceWidget.title ? `${sourceWidget.title} (copia)` : "Widget (copia)",
+      };
+      setWidgets((prev) => [...prev, nextWidget]);
+      setLayout((prev) => [...prev, createLayoutItem(id, prev)]);
+    },
+    [widgets]
+  );
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
@@ -1110,13 +1155,31 @@ export default function DashboardBuilder() {
     saveMutation.mutate(payload);
   };
 
-  const handleConnectDialog = (nextBrandId, source) => {
+  const handleConnectDialog = useCallback((nextBrandId, source) => {
     setConnectDialog({
       open: true,
       brandId: nextBrandId,
       source: source || "META_ADS",
     });
-  };
+  }, []);
+
+  const handleRefreshAll = useCallback(async () => {
+    if (!widgets.length || isRefreshing) return;
+    const widgetIds = new Set(widgets.map((widget) => String(widget.id)));
+    const predicate = (query) => {
+      const key = query.queryKey;
+      if (!Array.isArray(key) || key[0] !== "widgetData") return false;
+      return widgetIds.has(String(key[1] || ""));
+    };
+
+    try {
+      setIsRefreshing(true);
+      queryClient.invalidateQueries({ predicate });
+      await queryClient.refetchQueries({ predicate, type: "active" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, queryClient, widgets]);
 
   const recommendedSource = useMemo(() => {
     if (lastSelectedSource) return lastSelectedSource;
@@ -1219,6 +1282,65 @@ export default function DashboardBuilder() {
     });
   }, []);
 
+  const handleLayoutChange = useCallback((nextLayout) => {
+    setLayout(nextLayout);
+  }, []);
+
+  const renderCanvasItem = useCallback(
+    (widget) => {
+      const inheritBrand = widget?.inheritBrand !== false;
+      const effectiveInheritBrand = inheritBrand && Boolean(globalBrandId);
+      const brand = effectiveInheritBrand ? globalBrandId : widget?.brandId;
+      const rawConnections = brand ? connectionsByBrand.get(brand) || [] : [];
+      const connections = filterConnected(rawConnections);
+      const connectionId = pickConnectionId({
+        connections,
+        source: widget?.source,
+        preferredId: !effectiveInheritBrand ? widget?.connectionId : "",
+      });
+      const connectHandler =
+        brand && widget?.source
+          ? () => handleConnectDialog(brand, widget?.source)
+          : null;
+      const editHandler = () => {
+        setActiveWidgetId(widget.id);
+        setConfigOpen(true);
+      };
+
+      return (
+        <WidgetCard
+          widget={widget}
+          showActions={viewMode === "edit"}
+          status={widgetStatusMap[widget.id]}
+          onEdit={viewMode === "edit" ? editHandler : null}
+          onDuplicate={() => handleDuplicateWidget(widget.id)}
+          onRemove={() => handleRemoveWidget(widget.id)}
+        >
+          <WidgetRenderer
+            widget={widget}
+            connectionId={connectionId}
+            filters={debouncedFilters}
+            enableQuery
+            onConnect={connectHandler}
+            onEdit={viewMode === "edit" ? editHandler : null}
+            onStatusChange={(nextStatus) => handleStatusChange(widget.id, nextStatus)}
+          />
+        </WidgetCard>
+      );
+    },
+    [
+      connectionsByBrand,
+      debouncedFilters,
+      globalBrandId,
+      handleConnectDialog,
+      handleDuplicateWidget,
+      handleRemoveWidget,
+      handleStatusChange,
+      viewMode,
+      widgetStatusMap,
+    ]
+  );
+
   if (!isNew && isLoading) {
     return (
       <PageShell>
@@ -1259,6 +1381,13 @@ export default function DashboardBuilder() {
                 Preview
               </Button>
             </div>
+            <Button
+              variant="secondary"
+              onClick={handleRefreshAll}
+              disabled={isRefreshing || !widgets.length}
+            >
+              {isRefreshing ? "Atualizando..." : "Atualizar dados"}
+            </Button>
             <Button onClick={() => handleSave()} disabled={saveMutation.isLoading}>
               {saveMutation.isLoading ? "Salvando..." : "Salvar"}
             </Button>
@@ -1547,57 +1676,9 @@ export default function DashboardBuilder() {
               items={widgets}
               width={width}
               containerRef={containerRef}
-              onLayoutChange={(nextLayout) => setLayout(nextLayout)}
+              onLayoutChange={handleLayoutChange}
               isEditable={viewMode === "edit"}
-              renderItem={(widget) => {
-                const inheritBrand = widget?.inheritBrand !== false;
-                const effectiveInheritBrand = inheritBrand && Boolean(globalBrandId);
-                const brand = effectiveInheritBrand ? globalBrandId : widget?.brandId;
-                const rawConnections = brand ? connectionsByBrand.get(brand) || [] : [];
-                const connections = filterConnected(rawConnections);
-                const connectionId = pickConnectionId({
-                  connections,
-                  source: widget?.source,
-                  preferredId: !effectiveInheritBrand ? widget?.connectionId : "",
-                });
-                const connectHandler =
-                  brand && widget?.source
-                    ? () => handleConnectDialog(brand, widget?.source)
-                    : null;
-                const editHandler = () => {
-                  setActiveWidgetId(widget.id);
-                  setConfigOpen(true);
-                };
-
-                return (
-                  <WidgetCard
-                    widget={widget}
-                    showActions={viewMode === "edit"}
-                    status={widgetStatusMap[widget.id]}
-                    onEdit={viewMode === "edit" ? editHandler : null}
-                    onDuplicate={() => handleDuplicateWidget(widget.id)}
-                    onRemove={() => handleRemoveWidget(widget.id)}
-                  >
-                    <WidgetRenderer
-                      widget={widget}
-                      connectionId={connectionId}
-                      filters={{
-                        dateFrom,
-                        dateTo,
-                        compareMode,
-                        compareDateFrom,
-                        compareDateTo,
-                      }}
-                      enableQuery
-                      onConnect={connectHandler}
-                      onEdit={viewMode === "edit" ? editHandler : null}
-                      onStatusChange={(nextStatus) =>
-                        handleStatusChange(widget.id, nextStatus)
-                      }
-                    />
-                  </WidgetCard>
-                );
-              }}
+              renderItem={renderCanvasItem}
             />
           </section>
         </div>

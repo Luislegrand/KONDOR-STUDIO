@@ -15,7 +15,11 @@ import {
   YAxis,
 } from "recharts";
 import { base44 } from "@/apiClient/base44Client";
+import { createRequestQueue } from "@/utils/requestQueue.js";
 import { WidgetEmpty, WidgetSkeleton } from "./WidgetStates.jsx";
+import { buildWidgetQueryKey } from "./widgetQueryKey.js";
+
+const widgetRequestQueue = createRequestQueue({ concurrency: 5 });
 
 const CHART_COLORS = ["#0ea5e9", "#22c55e", "#f97316", "#a855f7", "#ef4444"];
 const CONNECT_ERROR_CODES = new Set([
@@ -116,7 +120,7 @@ function formatValue(value, meta) {
   return String(value);
 }
 
-export default function WidgetRenderer({
+const WidgetRenderer = React.memo(function WidgetRenderer({
   widget,
   filters = {},
   connectionId,
@@ -128,6 +132,8 @@ export default function WidgetRenderer({
   onEdit,
   onQuickRange,
   onStatusChange,
+  queryKeyPrefix = "widgetData",
+  staleTime = 60 * 1000,
   variant = "default",
 }) {
   const widgetType = widget?.widgetType || "KPI";
@@ -146,67 +152,57 @@ export default function WidgetRenderer({
     (Boolean(connectionId) || forceMock) &&
     !isGenerating &&
     !hasOverride;
-  const widgetFiltersKey = useMemo(
-    () => JSON.stringify(widget?.filters || {}),
-    [widget?.filters]
-  );
-
   const queryKey = useMemo(
-    () => [
-      "widgetData",
-      widget?.id,
-      source,
-      connectionId || "preview",
-      widgetType,
-      widget?.level,
-      breakdown,
-      metrics.join(","),
-      widgetFiltersKey,
-      filters?.dateFrom,
-      filters?.dateTo,
-      filters?.compareMode,
-      filters?.compareDateFrom,
-      filters?.compareDateTo,
-      forceMock ? "mock" : "live",
-    ],
+    () =>
+      buildWidgetQueryKey({
+        connectionId: connectionId || "",
+        widget,
+        filters,
+        forceMock,
+        prefix: queryKeyPrefix,
+      }),
     [
-      widget?.id,
-      widget?.level,
-      source,
       connectionId,
-      widgetType,
-      breakdown,
-      metrics,
-      widgetFiltersKey,
+      widget?.id,
+      widget?.source,
+      widget?.level,
+      widget?.breakdown,
+      widget?.widgetType,
+      widget?.metrics,
+      widget?.filters,
       filters?.dateFrom,
       filters?.dateTo,
       filters?.compareMode,
       filters?.compareDateFrom,
       filters?.compareDateTo,
       forceMock,
+      queryKeyPrefix,
     ]
   );
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey,
     queryFn: () =>
-      base44.reporting.queryMetrics({
-        source,
-        connectionId,
-        dateFrom: filters?.dateFrom,
-        dateTo: filters?.dateTo,
-        compareMode: filters?.compareMode,
-        compareDateFrom: filters?.compareDateFrom,
-        compareDateTo: filters?.compareDateTo,
-        level: widget?.level,
-        breakdown,
-        metrics,
-        filters: widget?.filters || {},
-        options: widget?.options || {},
-        widgetType,
-        forceMock,
-      }),
+      widgetRequestQueue.add(() =>
+        base44.reporting.queryMetrics({
+          source,
+          connectionId,
+          dateFrom: filters?.dateFrom,
+          dateTo: filters?.dateTo,
+          compareMode: filters?.compareMode,
+          compareDateFrom: filters?.compareDateFrom,
+          compareDateTo: filters?.compareDateTo,
+          level: widget?.level,
+          breakdown,
+          metrics,
+          filters: widget?.filters || {},
+          options: widget?.options || {},
+          widgetType,
+          forceMock,
+        })
+      ),
     enabled: canFetch,
+    staleTime,
     keepPreviousData: true,
   });
 
@@ -585,4 +581,6 @@ export default function WidgetRenderer({
       className={isMini ? "px-3 py-3" : ""}
     />
   );
-}
+});
+
+export default WidgetRenderer;

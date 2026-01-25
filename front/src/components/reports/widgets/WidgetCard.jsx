@@ -81,7 +81,7 @@ function WidgetMenu({ onEdit, onDuplicate, onRemove }) {
   );
 }
 
-export default function WidgetCard({
+const WidgetCard = React.memo(function WidgetCard({
   widget,
   children,
   className = "",
@@ -146,4 +146,6 @@ export default function WidgetCard({
       <div className="mt-4 flex-1">{children}</div>
     </div>
   );
-}
+});
+
+export default WidgetCard;
