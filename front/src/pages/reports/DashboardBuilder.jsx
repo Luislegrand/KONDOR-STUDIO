@@ -1044,19 +1044,17 @@ export default function DashboardBuilder() {
   }, [isNew]);
 
   useEffect(() => {
-    if (!autoRefreshMs) return;
-    const interval = setInterval(() => {
-      if (!isInteracting) {
-        handleRefreshAll();
-      }
-    }, autoRefreshMs);
-    return () => clearInterval(interval);
-  }, [autoRefreshMs, handleRefreshAll, isInteracting]);
-
-  useEffect(() => {
     if (!tvMode) return;
     if (viewMode !== "preview") setViewMode("preview");
   }, [tvMode, viewMode]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("tv-mode", tvMode);
+    return () => {
+      document.body.classList.remove("tv-mode");
+    };
+  }, [tvMode]);
 
   useEffect(() => {
     if (!tvMode) return;
@@ -1227,6 +1225,16 @@ export default function DashboardBuilder() {
       setIsRefreshing(false);
     }
   }, [isRefreshing, queryClient, widgets]);
+
+  useEffect(() => {
+    if (!autoRefreshMs) return;
+    const interval = setInterval(() => {
+      if (!isInteracting) {
+        handleRefreshAll();
+      }
+    }, autoRefreshMs);
+    return () => clearInterval(interval);
+  }, [autoRefreshMs, handleRefreshAll, isInteracting]);
 
   const recommendedSource = useMemo(() => {
     if (lastSelectedSource) return lastSelectedSource;

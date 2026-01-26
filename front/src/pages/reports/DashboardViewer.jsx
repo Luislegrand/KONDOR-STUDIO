@@ -222,6 +222,14 @@ export default function DashboardViewer() {
   }, [autoRefreshMs, handleRefreshAll]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("tv-mode", tvMode);
+    return () => {
+      document.body.classList.remove("tv-mode");
+    };
+  }, [tvMode]);
+
+  useEffect(() => {
     if (!tvMode) return;
     if (typeof document === "undefined") return;
     const handleFullscreenChange = () => {

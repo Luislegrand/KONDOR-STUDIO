@@ -116,7 +116,9 @@ export default function ConnectDataSourceDialog({
   });
 
   const integrations = useMemo(() => {
-    const items = integrationData?.items || [];
+    const items = Array.isArray(integrationData)
+      ? integrationData
+      : integrationData?.items || [];
     return filterIntegrations(source, items);
   }, [integrationData, source]);
 

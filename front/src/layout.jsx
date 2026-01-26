@@ -202,7 +202,7 @@ function LayoutContent() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--text)]">
-      <Sidebar className="hidden lg:flex">
+      <Sidebar className="hidden lg:flex kondor-main-sidebar">
         <SidebarHeader className={`border-[var(--border)] bg-white/80 backdrop-blur ${collapsed ? "px-3" : "px-4"}`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
