@@ -702,10 +702,6 @@ export function PostForm({
       alert("Selecione um cliente antes de salvar o post.");
       return;
     }
-    if (!formData.title.trim()) {
-      alert("Informe um título para o post.");
-      return;
-    }
     if (!file && !formData.media_url) {
       alert("Envie um arquivo de mídia antes de salvar.");
       return;
@@ -776,8 +772,16 @@ export function PostForm({
       const primaryPlatform =
         selectedPlatformsValue[0] || resolvePlatformValue(selectedIntegration);
 
+      const trimmedTitle = formData.title ? formData.title.trim() : "";
+      const fallbackTitle = trimmedTitle
+        ? trimmedTitle
+        : caption
+        ? caption.split("\n")[0].slice(0, 60)
+        : "Post sem titulo";
+
       const payload = {
         ...formData,
+        title: fallbackTitle,
         postKind: primaryPostKind,
         body: caption,
         caption,
