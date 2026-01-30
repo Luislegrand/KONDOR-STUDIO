@@ -79,7 +79,6 @@ const FLOW_STEPS = [
   { id: "post-step-3", step: "3", title: "Legenda", description: "Texto e hashtags" },
   { id: "post-step-4", step: "4", title: "Midia", description: "Upload e preview" },
   { id: "post-step-5", step: "5", title: "Agenda", description: "Data e recorrencia" },
-  { id: "post-step-6", step: "6", title: "Extras", description: "Configuracoes avancadas" },
 ];
 const STATUS_PREVIEW = {
   DRAFT: { label: "Rascunho", className: "bg-slate-100 text-slate-700" },
@@ -294,19 +293,9 @@ export function PostForm({
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
-  const [signature, setSignature] = useState("");
   const [scheduleSlots, setScheduleSlots] = useState([{ date: "", time: "" }]);
   const [recurrence, setRecurrence] = useState(normalizeRecurrence(null));
   const [showGeneratedSlots, setShowGeneratedSlots] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [showAiHelper, setShowAiHelper] = useState(false);
-  const [advancedFields, setAdvancedFields] = useState({
-    firstComment: "",
-    collaborator: "",
-    location: "",
-    altText: "",
-    disableComments: false,
-  });
   const fileInputRef = useRef(null);
   const isActive = open !== false;
   const scrollToStep = (stepId) => {
@@ -410,18 +399,9 @@ export function PostForm({
 
     setFormData(payload);
     setTagsInput(tagsValue);
-    setSignature(metadata.signature || "");
     setScheduleSlots(sortScheduleSlots(nextSlots));
     setRecurrence(normalizedRecurrence);
     setShowGeneratedSlots(false);
-    setAdvancedFields({
-      firstComment: metadata.firstComment || "",
-      collaborator: metadata.collaborator || "",
-      location: metadata.location || "",
-      altText: metadata.altText || "",
-      disableComments: Boolean(metadata.disableComments),
-    });
-    setAdvancedOpen(false);
     setFile(null);
     const initialMedia = payload.media_url
       ? resolveMediaUrl(payload.media_url)
@@ -462,9 +442,8 @@ export function PostForm({
   const postingIntegrations = React.useMemo(() => {
     return clientIntegrations.filter((integration) => {
       const kind = integration.settings?.kind || "";
-      if (kind === "meta_business" || kind === "instagram_only" || kind === "tiktok") {
-        return true;
-      }
+      if (kind === "meta_business") return true;
+      if (kind === "tiktok") return true;
       if (integration.provider === "TIKTOK") return true;
       return false;
     });
@@ -496,7 +475,6 @@ export function PostForm({
     if (!integration) return "Selecione uma rede";
     const kind = integration.settings?.kind;
     if (kind === "meta_business") return "Meta Business (Facebook/Instagram)";
-    if (kind === "instagram_only") return "Instagram";
     if (kind === "tiktok") return "TikTok";
     return integration.providerName || integration.provider || "Integração";
   };
@@ -504,7 +482,6 @@ export function PostForm({
   const resolvePlatformValue = (integration) => {
     if (!integration) return null;
     const kind = integration.settings?.kind;
-    if (kind === "instagram_only") return "instagram";
     if (kind === "tiktok") return "tiktok";
     if (kind === "meta_business") return "meta_business";
     return integration.provider || null;
@@ -527,7 +504,6 @@ export function PostForm({
         { value: "facebook", label: "Facebook" },
       ];
     }
-    if (kind === "instagram_only") return [{ value: "instagram", label: "Instagram" }];
     if (kind === "tiktok") return [{ value: "tiktok", label: "TikTok" }];
     return [];
   }, [selectedIntegration]);
@@ -686,17 +662,11 @@ export function PostForm({
     });
   };
 
-  const updateAdvancedField = (field, value) => {
-    setAdvancedFields((prev) => ({ ...prev, [field]: value }));
-  };
-
   const buildCaption = () => {
     const base = formData.body || "";
-    const signatureText = signature?.trim();
     const tags = parseTags(tagsInput).join(" ");
     const parts = [];
     if (base) parts.push(base);
-    if (signatureText) parts.push(signatureText);
     if (tags) parts.push(tags);
     return parts.join("\n\n");
   };
@@ -808,12 +778,6 @@ export function PostForm({
           ...(recurrencePayload && normalizedPostKinds.includes("story")
             ? { storySchedule: recurrencePayload }
             : {}),
-          signature: signature || null,
-          firstComment: advancedFields.firstComment || null,
-          collaborator: advancedFields.collaborator || null,
-          location: advancedFields.location || null,
-          altText: advancedFields.altText || null,
-          disableComments: advancedFields.disableComments || false,
         },
       };
 
@@ -947,9 +911,9 @@ export function PostForm({
                 title="Selecione canais"
                 subtitle="Escolha redes e tipos de post."
               >
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Rede social</Label>
+                    <Label>Plataforma</Label>
                     <SelectNative
                       value={formData.integrationId}
                       onChange={handleChange("integrationId")}
@@ -958,7 +922,7 @@ export function PostForm({
                       <option value="">
                         {formData.clientId
                           ? postingIntegrations.length
-                            ? "Selecione uma rede"
+                            ? "Selecione Meta Business ou TikTok"
                             : "Nenhuma integracao encontrada"
                           : "Selecione um cliente primeiro"}
                       </option>
@@ -993,7 +957,7 @@ export function PostForm({
                         Multi-selecao
                       </span>
                     </div>
-                    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-2">
+                    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                       {platformOptions.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {platformOptions.map((opt) => {
@@ -1023,13 +987,13 @@ export function PostForm({
                           })}
                         </div>
                       ) : (
-                        <div className="px-2 py-2 text-xs text-[var(--text-muted)]">
-                          Selecione uma rede para ver os canais.
+                        <div className="text-xs text-[var(--text-muted)]">
+                          Selecione uma plataforma para liberar os canais.
                         </div>
                       )}
                     </div>
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      Selecione mais de um canal para publicar o mesmo conteudo.
+                      Para Meta Business, voce pode selecionar mais de um canal.
                     </p>
                   </div>
                 </div>
@@ -1096,74 +1060,8 @@ export function PostForm({
                 id="post-step-3"
                 step="3"
                 title="Texto do post"
-                subtitle="Legenda, hashtags e IA para acelerar."
-                badge={
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-light)] px-2 py-1 text-[10px] font-semibold text-[var(--primary)]">
-                    <Sparkles className="h-3 w-3" />
-                    IA
-                  </span>
-                }
+                subtitle="Legenda e hashtags."
               >
-                <div className="rounded-[14px] border border-[var(--border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(109,40,217,0.08))] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[var(--primary)] shadow-[var(--shadow-sm)]">
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--text)]">
-                          Kondor IA
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          Gere legendas e variacoes com tom premium.
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      leftIcon={Sparkles}
-                      onClick={() => setShowAiHelper((prev) => !prev)}
-                    >
-                      Gerar com IA
-                    </Button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[10px] font-semibold text-[var(--text)]">
-                      CTA inteligente
-                    </span>
-                    <span className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[10px] font-semibold text-[var(--text)]">
-                      Tom premium
-                    </span>
-                    <span className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[10px] font-semibold text-[var(--text)]">
-                      Hashtags sugeridas
-                    </span>
-                  </div>
-                  {showAiHelper ? (
-                    <div className="mt-3 rounded-[12px] border border-[var(--border)] bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
-                      Ajuste o contexto do post para gerar legendas com IA (em breve).
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center rounded-[10px] border border-[var(--border)] bg-white p-1">
-                    <span className="px-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                      Tom
-                    </span>
-                    <button
-                      type="button"
-                      className="h-8 rounded-[8px] px-3 text-xs font-semibold text-[var(--primary)] bg-[var(--primary-light)]"
-                    >
-                      Todos
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    IA segue o tom selecionado.
-                  </p>
-                </div>
-
                 <Textarea
                   value={formData.body}
                   onChange={handleChange("body")}
@@ -1171,21 +1069,13 @@ export function PostForm({
                   rows={6}
                 />
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
                   <div className="space-y-2">
                     <Label>Hashtags</Label>
                     <Input
                       value={tagsInput}
                       onChange={(event) => setTagsInput(event.target.value)}
                       placeholder="#campanha #marca"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Assinatura</Label>
-                    <Input
-                      value={signature}
-                      onChange={(event) => setSignature(event.target.value)}
-                      placeholder="Assinatura do perfil"
                     />
                   </div>
                 </div>
@@ -1240,9 +1130,6 @@ export function PostForm({
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Button type="button" variant="secondary" size="sm" disabled leftIcon={ImageIcon}>
-                      Editor
-                    </Button>
                     <Button type="button" variant="secondary" size="sm" disabled leftIcon={Sparkles}>
                       Canva
                     </Button>
@@ -1270,8 +1157,8 @@ export function PostForm({
                 subtitle="Defina a data e configure repeticoes."
               >
                 <div className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
-                    <div className="space-y-2">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2 rounded-[12px] border border-[var(--border)] bg-white p-3">
                       <Label>{recurrence.enabled ? "Data de inicio" : "Data"}</Label>
                       <DateField
                         className="w-full"
@@ -1283,7 +1170,7 @@ export function PostForm({
                         onChange={handlePrimaryDateChange}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 rounded-[12px] border border-[var(--border)] bg-white p-3">
                       <Label>Horario</Label>
                       <TimeField
                         value={
@@ -1296,7 +1183,7 @@ export function PostForm({
                     </div>
                   </div>
 
-                  <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                  <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-white text-[var(--primary)] shadow-[var(--shadow-sm)]">
@@ -1392,105 +1279,9 @@ export function PostForm({
                 </div>
               </StepCard>
 
-              <StepCard
-                id="post-step-6"
-                step="6"
-                title="Configuracoes avancadas"
-                subtitle="Opcoes extras para o post."
-              >
-                <button
-                  type="button"
-                  onClick={() => setAdvancedOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-[10px] border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text)]"
-                >
-                  {advancedOpen ? "Ocultar opcoes" : "Abrir configuracoes"}
-                  {advancedOpen ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </button>
-                {advancedOpen ? (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Primeiro comentario</Label>
-                      <Textarea
-                        value={advancedFields.firstComment}
-                        onChange={(event) =>
-                          updateAdvancedField("firstComment", event.target.value)
-                        }
-                        rows={3}
-                        placeholder="Comentario fixo para o post"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Colaborador</Label>
-                      <Input
-                        value={advancedFields.collaborator}
-                        onChange={(event) =>
-                          updateAdvancedField("collaborator", event.target.value)
-                        }
-                        placeholder="@colaborador"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Localizacao</Label>
-                      <Input
-                        value={advancedFields.location}
-                        onChange={(event) =>
-                          updateAdvancedField("location", event.target.value)
-                        }
-                        placeholder="Cidade, endereco ou ponto"
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Texto alternativo</Label>
-                      <Input
-                        value={advancedFields.altText}
-                        onChange={(event) =>
-                          updateAdvancedField("altText", event.target.value)
-                        }
-                        placeholder="Descricao para acessibilidade"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 md:col-span-2">
-                      <Checkbox
-                        checked={advancedFields.disableComments}
-                        onCheckedChange={(value) =>
-                          updateAdvancedField("disableComments", Boolean(value))
-                        }
-                      />
-                      <span className="text-xs text-[var(--text-muted)]">
-                        Desativar comentarios
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </StepCard>
             </div>
 
             <aside className="space-y-4">
-              <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--text)]">
-                      Configuracoes avancadas
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      Primeiro comentario, localizacao, colaborador.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setAdvancedOpen((prev) => !prev)}
-                  >
-                    {advancedOpen ? "Fechar" : "Abrir"}
-                  </Button>
-                </div>
-              </div>
-
               <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1675,9 +1466,6 @@ export function PostForm({
 
           <div className="flex flex-wrap items-start gap-6">
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                Salvar
-              </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -1700,9 +1488,6 @@ export function PostForm({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                Destino do post
-              </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
