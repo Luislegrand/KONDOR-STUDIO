@@ -1134,11 +1134,19 @@ export function PostForm({
                               : "border-[var(--border)] hover:border-slate-300"
                           }`}
                         >
-                          <button
-                            type="button"
+                          <div
+                            role={network.disabled ? undefined : "button"}
+                            tabIndex={network.disabled ? -1 : 0}
                             onClick={() =>
                               network.disabled ? null : handleToggleNetwork(network.key)
                             }
+                            onKeyDown={(event) => {
+                              if (network.disabled) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleToggleNetwork(network.key);
+                              }
+                            }}
                             className="flex w-full items-center justify-between gap-3 text-left"
                           >
                             <div className="flex items-center gap-3">
@@ -1168,7 +1176,7 @@ export function PostForm({
                                 </span>
                               ) : null}
                             </div>
-                          </button>
+                          </div>
 
                           {isSelected ? (
                             <div className="mt-4 space-y-3 animate-fade-in-up">
