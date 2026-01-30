@@ -128,6 +128,12 @@ export default function IntegrationConnectDialog({
       }));
   }, [metaAccounts, isInstagramOnly]);
 
+  const hasMetaOauthConnection = useMemo(() => {
+    if (!isMetaProvider || !effectiveExisting) return false;
+    const status = String(effectiveExisting.status || "").toUpperCase();
+    return status === "CONNECTED";
+  }, [isMetaProvider, effectiveExisting]);
+
   useEffect(() => {
     if (!open) {
       if (selectedClientId) setSelectedClientId("");
@@ -512,11 +518,30 @@ export default function IntegrationConnectDialog({
                       }))
                     }
                     placeholder={field.placeholder}
-                    required={field.required}
+                    required={
+                      field.required &&
+                      !(
+                        isMetaProvider &&
+                        hasMetaOauthConnection &&
+                        field.name === "accessToken"
+                      )
+                    }
+                    disabled={
+                      isMetaProvider &&
+                      hasMetaOauthConnection &&
+                      field.name === "accessToken"
+                    }
                   />
                 )}
                 {field.helper ? (
                   <p className="text-[11px] text-gray-500">{field.helper}</p>
+                ) : null}
+                {isMetaProvider &&
+                hasMetaOauthConnection &&
+                field.name === "accessToken" ? (
+                  <p className="text-[11px] text-emerald-700">
+                    Conectado via Meta. O token já foi salvo automaticamente.
+                  </p>
                 ) : null}
               </div>
             ))}
