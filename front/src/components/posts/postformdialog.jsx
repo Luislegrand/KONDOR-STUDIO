@@ -693,8 +693,12 @@ export function PostForm({
   const buildCaption = () => {
     const base = formData.body || "";
     const signatureText = signature?.trim();
-    if (!signatureText) return base;
-    return base ? `${base}\n\n${signatureText}` : signatureText;
+    const tags = parseTags(tagsInput).join(" ");
+    const parts = [];
+    if (base) parts.push(base);
+    if (signatureText) parts.push(signatureText);
+    if (tags) parts.push(tags);
+    return parts.join("\n\n");
   };
 
   const submitPost = async (statusOverride) => {

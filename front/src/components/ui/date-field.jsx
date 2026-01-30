@@ -215,9 +215,7 @@ export function TimeField({
   step = 15,
   disabled = false,
 }) {
-  const containerRef = React.useRef(null);
-  const listRef = React.useRef(null);
-  const [open, setOpen] = React.useState(false);
+  const datalistId = React.useId();
 
   const times = React.useMemo(() => {
     const items = [];
@@ -229,38 +227,16 @@ export function TimeField({
     return items;
   }, [step]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    const handleKey = (event) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [open]);
-
-  React.useEffect(() => {
-    if (!open || !listRef.current) return;
-    if (!value) return;
-    const active = listRef.current.querySelector(`[data-value="${value}"]`);
-    if (active) active.scrollIntoView({ block: "center" });
-  }, [open, value]);
-
   return (
-    <div className={cn("relative", className)} ref={containerRef}>
+    <div className={cn("relative", className)}>
       <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        disabled={disabled}
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => emitChange(onChange, event.target.value)}
+        placeholder={placeholder}
+        step={60}
+        list={datalistId}
         className={cn(
           "flex h-10 w-full items-center rounded-[10px] border border-[var(--border)] bg-white px-3 pl-9 text-left text-sm text-[var(--text)] shadow-sm",
           "transition-[border-color,box-shadow,background-color] duration-[var(--motion-fast)] ease-[var(--ease-standard)]",
@@ -268,38 +244,14 @@ export function TimeField({
           disabled && "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-muted)]",
           inputClassName
         )}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+        disabled={disabled}
       >
-        <span className={value ? "" : "text-[var(--text-muted)]"}>
-          {value || placeholder}
-        </span>
-      </button>
-
-      {open && !disabled ? (
-        <div
-          ref={listRef}
-          className="absolute z-50 mt-2 max-h-64 w-[180px] overflow-y-auto rounded-[14px] border border-[var(--border)] bg-white py-2 shadow-[var(--shadow-md)] animate-fade-in-up"
-        >
-          {times.map((time) => (
-            <button
-              key={time}
-              type="button"
-              data-value={time}
-              onClick={() => {
-                emitChange(onChange, time);
-                setOpen(false);
-              }}
-              className={cn(
-                "w-full px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)]",
-                time === value && "bg-[var(--primary-light)] text-[var(--primary)]"
-              )}
-            >
-              {time}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      />
+      <datalist id={datalistId}>
+        {times.map((time) => (
+          <option key={time} value={time} />
+        ))}
+      </datalist>
     </div>
   );
 }

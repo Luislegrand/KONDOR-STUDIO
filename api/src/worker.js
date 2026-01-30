@@ -68,6 +68,17 @@ async function runPollOnce(jobModule, label) {
   }
 }
 
+let publishPollInFlight = false;
+async function runPublishPoll() {
+  if (publishPollInFlight) return;
+  publishPollInFlight = true;
+  try {
+    await runPollOnce(publishScheduledPostsJob, 'publishScheduledPostsJob');
+  } finally {
+    publishPollInFlight = false;
+  }
+}
+
 // ------------------------------------------------------
 // Workers das filas
 // ------------------------------------------------------
@@ -138,7 +149,7 @@ const publishingWorker = new Worker(
   publishingQueue.name,
   async (job) => {
     console.log('[publish] processing job', job.id, job.name);
-    await runPollOnce(publishScheduledPostsJob, 'publishScheduledPostsJob');
+    await runPublishPoll();
   },
   { connection },
 );
@@ -257,6 +268,17 @@ ensureRepeatableJobs().catch((err) => {
     err && err.stack ? err.stack : err,
   );
 });
+
+if (POSTS_PUBLISH_PERIOD_MS > 0) {
+  setInterval(() => {
+    runPublishPoll().catch((err) => {
+      console.error(
+        '[worker] erro ao executar publishScheduledPostsJob via interval:',
+        err && err.stack ? err.stack : err,
+      );
+    });
+  }, POSTS_PUBLISH_PERIOD_MS);
+}
 
 async function ensureScheduleJobs() {
   try {
