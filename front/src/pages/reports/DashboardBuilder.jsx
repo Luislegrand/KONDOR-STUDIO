@@ -401,7 +401,7 @@ function WidgetConfigDialog({
     () =>
       metrics.map((metric) => ({
         value: metric.metricKey,
-        label: metric.label || metric.metricKey,
+        label: `${metric.label || metric.metricKey}${metric.isCalculated ? " (calc)" : ""}`,
       })),
     [metrics]
   );

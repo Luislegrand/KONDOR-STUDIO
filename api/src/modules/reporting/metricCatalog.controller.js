@@ -55,7 +55,21 @@ function parseCreatePayload(body = {}) {
     throw err;
   }
 
-  return parsed.data;
+  const data = parsed.data;
+  if (data.isCalculated) {
+    if (data.type !== 'METRIC') {
+      const err = new Error('Metrica calculada deve ser do tipo METRIC');
+      err.status = 400;
+      throw err;
+    }
+    if (!data.formula || !String(data.formula).trim()) {
+      const err = new Error('Formula obrigatoria para metrica calculada');
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  return data;
 }
 
 module.exports = {

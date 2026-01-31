@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
+import Checkbox from "@/components/ui/checkbox.jsx";
 
 const SOURCE_OPTIONS = [
   { value: "META_ADS", label: "Meta Ads" },
@@ -40,6 +41,10 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
   const [label, setLabel] = useState("");
   const [charts, setCharts] = useState("");
   const [breakdowns, setBreakdowns] = useState("");
+  const [isCalculated, setIsCalculated] = useState(false);
+  const [formula, setFormula] = useState("");
+  const [format, setFormat] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -52,8 +57,18 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
     setLabel("");
     setCharts("");
     setBreakdowns("");
+    setIsCalculated(false);
+    setFormula("");
+    setFormat("");
+    setDescription("");
     setError("");
   }, [open, defaults.source, defaults.level, defaults.type]);
+
+  useEffect(() => {
+    if (isCalculated && type !== "METRIC") {
+      setType("METRIC");
+    }
+  }, [isCalculated, type]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -61,6 +76,9 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
       if (!level) throw new Error("Nivel obrigatorio.");
       if (!metricKey) throw new Error("Metric key obrigatoria.");
       if (!label) throw new Error("Label obrigatoria.");
+      if (isCalculated && !formula.trim()) {
+        throw new Error("Formula obrigatoria para metrica calculada.");
+      }
 
       return base44.reporting.createMetricCatalog({
         source,
@@ -68,10 +86,14 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
         metricKey,
         dimensionKey: dimensionKey || undefined,
         label,
-        type,
+        type: isCalculated ? "METRIC" : type,
         supportedCharts: splitCsv(charts),
         supportedBreakdowns: splitCsv(breakdowns),
         isDefault: false,
+        isCalculated,
+        formula: isCalculated ? formula.trim() : undefined,
+        format: format.trim() || undefined,
+        description: description.trim() || undefined,
       });
     },
     onSuccess: () => {
@@ -106,13 +128,22 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
             </div>
             <div>
               <Label>Tipo</Label>
-              <SelectNative value={type} onChange={(event) => setType(event.target.value)}>
+              <SelectNative
+                value={type}
+                onChange={(event) => setType(event.target.value)}
+                disabled={isCalculated}
+              >
                 {TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </SelectNative>
+              {isCalculated ? (
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                  Calculadas sao sempre metricas.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -141,6 +172,49 @@ function MetricCatalogDialog({ open, onOpenChange, defaults }) {
             <Label>Label</Label>
             <Input value={label} onChange={(event) => setLabel(event.target.value)} />
           </div>
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              checked={isCalculated}
+              onCheckedChange={(value) => setIsCalculated(Boolean(value))}
+            />
+            <div>
+              <p className="text-sm font-medium text-[var(--text)]">Metrica calculada</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Use chaves com {"{metric_key}"} para referenciar outras metricas. Ex:
+                {" {clicks} / {impressions} * 100"}.
+              </p>
+            </div>
+          </div>
+
+          {isCalculated ? (
+            <div className="space-y-3">
+              <div>
+                <Label>Formula</Label>
+                <Input
+                  value={formula}
+                  onChange={(event) => setFormula(event.target.value)}
+                  placeholder="{clicks} / {impressions} * 100"
+                />
+              </div>
+              <div>
+                <Label>Formato (opcional)</Label>
+                <Input
+                  value={format}
+                  onChange={(event) => setFormat(event.target.value)}
+                  placeholder="percent, currency, number"
+                />
+              </div>
+              <div>
+                <Label>Descricao (opcional)</Label>
+                <Input
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Taxa de clique"
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <Label>Supported charts (csv)</Label>
@@ -256,6 +330,16 @@ export default function MetricCatalogPanel() {
                   <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     Default
                   </span>
+                ) : null}
+                {item.isCalculated ? (
+                  <span className="ml-2 mt-1 inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                    Calculada
+                  </span>
+                ) : null}
+                {item.formula ? (
+                  <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+                    {item.formula}
+                  </p>
                 ) : null}
               </div>
             ))}

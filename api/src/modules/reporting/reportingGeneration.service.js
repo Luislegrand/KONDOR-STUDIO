@@ -1,5 +1,6 @@
 const { prisma } = require('../../prisma');
 const reportingData = require('./reportingData.service');
+const reportingCalculated = require('./reportingCalculated.service');
 const cache = require('./reportingCache.service');
 
 const DEFAULT_RANGE_DAYS =
@@ -140,21 +141,49 @@ async function generateReportData(tenantId, reportId) {
         continue;
       }
 
-      const result = await reportingData.queryMetrics(tenantId, {
-        source: widget.source,
-        connectionId,
-        dateFrom,
-        dateTo,
-        compareMode: report.compareMode,
-        compareDateFrom: report.compareDateFrom,
-        compareDateTo: report.compareDateTo,
-        level: widget.level,
-        breakdown: widget.breakdown,
-        metrics: Array.isArray(widget.metrics) ? widget.metrics : [],
-        filters: widget.filters || null,
-        options: widget.options || null,
-        widgetType: widget.widgetType,
-      });
+      const requestedMetrics = Array.isArray(widget.metrics) ? widget.metrics : [];
+      const calculatedConfig = await reportingCalculated.prepareCalculatedMetrics(
+        tenantId,
+        { source: widget.source, level: widget.level },
+        requestedMetrics,
+      );
+      const metricsToQuery =
+        calculatedConfig.baseMetrics && calculatedConfig.baseMetrics.length
+          ? calculatedConfig.baseMetrics
+          : requestedMetrics;
+
+      const emptyData = {
+        totals: {},
+        series: [],
+        table: [],
+        meta: { source: widget.source },
+      };
+
+      const result = metricsToQuery.length
+        ? await reportingData.queryMetrics(tenantId, {
+            source: widget.source,
+            connectionId,
+            dateFrom,
+            dateTo,
+            compareMode: report.compareMode,
+            compareDateFrom: report.compareDateFrom,
+            compareDateTo: report.compareDateTo,
+            level: widget.level,
+            breakdown: widget.breakdown,
+            metrics: metricsToQuery,
+            filters: widget.filters || null,
+            options: widget.options || null,
+            widgetType: widget.widgetType,
+          })
+        : { data: emptyData, cacheKey: null };
+
+      const applied = reportingCalculated.applyCalculatedMetricsToData(
+        { source: widget.source, level: widget.level },
+        result?.data || emptyData,
+        requestedMetrics,
+        calculatedConfig.calculatedDefs,
+      );
+      result.data = applied.data || result.data;
 
       const snapshotKey = cache.buildReportSnapshotKey(
         tenantId,

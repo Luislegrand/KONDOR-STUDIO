@@ -13,6 +13,10 @@ const createMetricSchema = z.object({
   supportedCharts: z.array(z.string().trim().min(1)).optional(),
   supportedBreakdowns: z.array(z.string().trim().min(1)).optional(),
   isDefault: z.boolean().optional(),
+  isCalculated: z.boolean().optional(),
+  formula: z.string().trim().optional(),
+  format: z.string().trim().optional(),
+  description: z.string().trim().optional(),
 });
 
 module.exports = {

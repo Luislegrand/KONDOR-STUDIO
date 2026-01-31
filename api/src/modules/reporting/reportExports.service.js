@@ -3,6 +3,7 @@ const uploadsService = require("../../services/uploadsService");
 const reportingData = require("./reportingData.service");
 const cache = require("./reportingCache.service");
 const reportingSnapshots = require("./reportingSnapshots.service");
+const reportingCalculated = require("./reportingCalculated.service");
 const { hasBrandScope, isBrandAllowed } = require("./reportingScope.service");
 
 function escapeHtml(value) {
@@ -97,24 +98,51 @@ async function ensureSnapshotsForReport(tenantId, report, scope) {
     }
 
     try {
-      const result = await reportingData.queryMetrics(
+      const requestedMetrics = Array.isArray(widget.metrics) ? widget.metrics : [];
+      const calculatedConfig = await reportingCalculated.prepareCalculatedMetrics(
         tenantId,
-        {
-          source: widget.source,
-          connectionId,
-          dateFrom: report.dateFrom,
-          dateTo: report.dateTo,
-          compareMode: report.compareMode,
-          compareDateFrom: report.compareDateFrom,
-          compareDateTo: report.compareDateTo,
-          level: widget.level,
-          breakdown: widget.breakdown,
-          metrics: Array.isArray(widget.metrics) ? widget.metrics : [],
-          filters: widget.filters || null,
-          options: widget.options || null,
-          widgetType: widget.widgetType,
-        },
-        scope
+        { source: widget.source, level: widget.level },
+        requestedMetrics
+      );
+      const metricsToQuery =
+        calculatedConfig.baseMetrics && calculatedConfig.baseMetrics.length
+          ? calculatedConfig.baseMetrics
+          : requestedMetrics;
+
+      const emptyData = {
+        totals: {},
+        series: [],
+        table: [],
+        meta: { source: widget.source },
+      };
+
+      const result = metricsToQuery.length
+        ? await reportingData.queryMetrics(
+            tenantId,
+            {
+              source: widget.source,
+              connectionId,
+              dateFrom: report.dateFrom,
+              dateTo: report.dateTo,
+              compareMode: report.compareMode,
+              compareDateFrom: report.compareDateFrom,
+              compareDateTo: report.compareDateTo,
+              level: widget.level,
+              breakdown: widget.breakdown,
+              metrics: metricsToQuery,
+              filters: widget.filters || null,
+              options: widget.options || null,
+              widgetType: widget.widgetType,
+            },
+            scope
+          )
+        : { data: emptyData, cacheKey: null };
+
+      const applied = reportingCalculated.applyCalculatedMetricsToData(
+        { source: widget.source, level: widget.level },
+        result?.data || emptyData,
+        requestedMetrics,
+        calculatedConfig.calculatedDefs
       );
 
       const snapshotKey = cache.buildReportSnapshotKey(
@@ -128,14 +156,14 @@ async function ensureSnapshotsForReport(tenantId, report, scope) {
         reportId: report.id,
         generatedAt,
         cacheKey: result.cacheKey,
-        data: result.data,
+        data: applied.data || result.data,
       };
       await cache.setReportSnapshot(snapshotKey, snapshotValue);
       snapshotByWidget.set(widget.id, {
         widgetId: widget.id,
         cacheKey: result.cacheKey,
         generatedAt,
-        data: result.data,
+        data: applied.data || result.data,
       });
     } catch (err) {
       snapshotByWidget.set(widget.id, {

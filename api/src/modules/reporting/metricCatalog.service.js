@@ -11,6 +11,27 @@ async function listCatalog(tenantId, { source, level, type }) {
   });
 }
 
+async function listCalculatedMetrics(tenantId, { source, level, metricKeys }) {
+  if (!tenantId || !source || !Array.isArray(metricKeys) || !metricKeys.length) {
+    return [];
+  }
+
+  const where = {
+    tenantId,
+    source,
+    type: 'METRIC',
+    isCalculated: true,
+    metricKey: { in: metricKeys },
+  };
+
+  if (level) where.level = level;
+
+  return prisma.metricCatalog.findMany({
+    where,
+    orderBy: [{ label: 'asc' }],
+  });
+}
+
 async function upsertMetric(tenantId, payload) {
   const dimensionKey =
     payload.type === 'DIMENSION'
@@ -38,6 +59,10 @@ async function upsertMetric(tenantId, payload) {
       supportedCharts: payload.supportedCharts || [],
       supportedBreakdowns: payload.supportedBreakdowns || [],
       isDefault: Boolean(payload.isDefault),
+      isCalculated: Boolean(payload.isCalculated),
+      formula: payload.formula || null,
+      format: payload.format || null,
+      description: payload.description || null,
     },
     update: {
       dimensionKey,
@@ -45,11 +70,16 @@ async function upsertMetric(tenantId, payload) {
       supportedCharts: payload.supportedCharts || [],
       supportedBreakdowns: payload.supportedBreakdowns || [],
       isDefault: Boolean(payload.isDefault),
+      isCalculated: Boolean(payload.isCalculated),
+      formula: payload.formula || null,
+      format: payload.format || null,
+      description: payload.description || null,
     },
   });
 }
 
 module.exports = {
   listCatalog,
+  listCalculatedMetrics,
   upsertMetric,
 };

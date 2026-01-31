@@ -1,6 +1,7 @@
 const cache = require('./reportingCache.service');
 const reportingData = require('./reportingData.service');
 const { DATA_SOURCES } = require('./connections.validators');
+const reportingCalculated = require('./reportingCalculated.service');
 
 const DEFAULT_POINTS = 14;
 
@@ -57,6 +58,7 @@ function normalizePayload(payload = {}) {
     forceMock,
   };
 }
+
 
 function toDate(value) {
   if (!value) return null;
@@ -220,6 +222,18 @@ function formatResponse(payload, querySpec = {}) {
 
 async function queryMetrics(tenantId, payload = {}, scope) {
   const querySpec = normalizePayload(payload);
+  const requestedMetrics = Array.isArray(querySpec.metrics)
+    ? [...querySpec.metrics]
+    : [];
+  const calculatedConfig = await reportingCalculated.prepareCalculatedMetrics(
+    tenantId,
+    querySpec,
+    requestedMetrics,
+  );
+
+  if (calculatedConfig.baseMetrics && calculatedConfig.baseMetrics.length) {
+    querySpec.metrics = calculatedConfig.baseMetrics;
+  }
   const cacheKey = cache.buildMetricsCacheKey({
     tenantId,
     source: querySpec.source,
@@ -234,9 +248,37 @@ async function queryMetrics(tenantId, payload = {}, scope) {
     widgetType: querySpec.widgetType || querySpec.type,
   });
 
+  if (!querySpec.metrics || !querySpec.metrics.length) {
+    const emptyData = {
+      totals: {},
+      series: [],
+      table: [],
+      meta: { source: querySpec.source },
+    };
+    const calculatedOnly = reportingCalculated.applyCalculatedMetricsToData(
+      querySpec,
+      emptyData,
+      requestedMetrics,
+      calculatedConfig.calculatedDefs,
+    );
+    return formatResponse(calculatedOnly.data || emptyData, {
+      ...querySpec,
+      metrics: requestedMetrics,
+    });
+  }
+
   if (querySpec.forceMock) {
     const mock = buildMockPayload(querySpec, cacheKey);
-    return formatResponse(mock, querySpec);
+    const calculatedMock = reportingCalculated.applyCalculatedMetricsToData(
+      querySpec,
+      mock,
+      requestedMetrics,
+      calculatedConfig.calculatedDefs,
+    );
+    return formatResponse(calculatedMock.data || mock, {
+      ...querySpec,
+      metrics: requestedMetrics,
+    });
   }
 
   if (!querySpec.connectionId) {
@@ -246,18 +288,21 @@ async function queryMetrics(tenantId, payload = {}, scope) {
   }
 
   const result = await reportingData.queryMetrics(tenantId, querySpec, scope);
-  const data = result?.data || {};
+  let data = result?.data || {};
 
-  if (querySpec.forceMock) {
-    const mock = buildMockPayload(querySpec, cacheKey);
-    return formatResponse(mock, querySpec);
-  }
+  const calculatedResult = reportingCalculated.applyCalculatedMetricsToData(
+    querySpec,
+    data,
+    requestedMetrics,
+    calculatedConfig.calculatedDefs,
+  );
+  data = calculatedResult.data || data;
 
   if (data?.meta?.mocked || isEmptyPayload(data)) {
-    return formatResponse(data, querySpec);
+    return formatResponse(data, { ...querySpec, metrics: requestedMetrics });
   }
 
-  return formatResponse(data, querySpec);
+  return formatResponse(data, { ...querySpec, metrics: requestedMetrics });
 }
 
 module.exports = {
