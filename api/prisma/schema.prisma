@@ -241,6 +241,7 @@ model Tenant {
   dashboards       Dashboard[]
   reportExports    ReportExport[]
   reportSchedules  ReportSchedule[]
+  reportDeliveries ReportDelivery[]
   auditLogs        AuditLog[]
   subscriptions    Subscription[]
   financialRecords FinancialRecord[]
@@ -451,6 +452,7 @@ model Client {
   reports          Report[]
   reportSchedules  ReportSchedule[]
   dashboards       Dashboard[]
+  reportDeliveries ReportDelivery[]
   metrics          Metric[]   @relation("ClientMetrics")
   competitors      Competitor[]
 
