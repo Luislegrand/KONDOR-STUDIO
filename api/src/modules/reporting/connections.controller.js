@@ -17,7 +17,11 @@ module.exports = {
   async listByBrand(req, res) {
     try {
       const { brandId } = req.params;
-      const connections = await connectionsService.listConnections(req.tenantId, brandId);
+      const connections = await connectionsService.listConnections(
+        req.tenantId,
+        brandId,
+        req.reportingScope,
+      );
       return res.json({ items: connections });
     } catch (err) {
       const status = err.status || 500;
@@ -31,6 +35,7 @@ module.exports = {
       const data = await connectionsService.getGa4Metadata(
         req.tenantId,
         connectionId,
+        req.reportingScope,
       );
       return res.json(data);
     } catch (err) {
@@ -46,6 +51,7 @@ module.exports = {
         req.tenantId,
         connectionId,
         req.body || {},
+        req.reportingScope,
       );
       return res.json(data);
     } catch (err) {
@@ -69,6 +75,7 @@ module.exports = {
         brandId,
         payload,
         req.user?.id,
+        req.reportingScope,
       );
       logReportingAction({
         tenantId: req.tenantId,
@@ -102,6 +109,7 @@ module.exports = {
         req.tenantId,
         integrationId,
         source,
+        req.reportingScope,
       );
       return res.json({ items });
     } catch (err) {

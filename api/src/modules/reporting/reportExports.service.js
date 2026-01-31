@@ -1,6 +1,9 @@
 const { prisma } = require("../../prisma");
 const uploadsService = require("../../services/uploadsService");
+const reportingData = require("./reportingData.service");
+const cache = require("./reportingCache.service");
 const reportingSnapshots = require("./reportingSnapshots.service");
+const { hasBrandScope, isBrandAllowed } = require("./reportingScope.service");
 
 function escapeHtml(value) {
   if (value === undefined || value === null) return "";
@@ -24,6 +27,136 @@ function slugify(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+async function resolveBrandForGroup(tenantId, groupId) {
+  if (!tenantId || !groupId) return null;
+  const member = await prisma.brandGroupMember.findFirst({
+    where: { tenantId, groupId },
+    select: { brandId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return member?.brandId || null;
+}
+
+async function resolveBrandForReport(tenantId, report) {
+  let brandId = report?.brandId || report?.params?.brandId || null;
+  if (!brandId && report?.groupId) {
+    brandId = await resolveBrandForGroup(tenantId, report.groupId);
+  }
+  return brandId || null;
+}
+
+async function buildConnectionMapForBrand(tenantId, brandId) {
+  if (!tenantId || !brandId) return new Map();
+  const connections = await prisma.dataSourceConnection.findMany({
+    where: { tenantId, brandId, status: "CONNECTED" },
+    orderBy: { createdAt: "desc" },
+  });
+  const map = new Map();
+  connections.forEach((connection) => {
+    if (!connection?.source) return;
+    if (!map.has(connection.source)) {
+      map.set(connection.source, connection.id);
+    }
+  });
+  return map;
+}
+
+async function ensureSnapshotsForReport(tenantId, report, scope) {
+  const snapshotList = await reportingSnapshots.listReportSnapshots(
+    tenantId,
+    report.id,
+    scope
+  );
+  const snapshotItems = snapshotList?.items || [];
+  const snapshotByWidget = new Map();
+  snapshotItems.forEach((item) => {
+    if (item?.widgetId) snapshotByWidget.set(item.widgetId, item);
+  });
+
+  const brandId = await resolveBrandForReport(tenantId, report);
+  const connectionMap = await buildConnectionMapForBrand(tenantId, brandId);
+  const widgets = Array.isArray(report.widgets) ? report.widgets : [];
+
+  for (const widget of widgets) {
+    if (!widget?.id) continue;
+    if (widget.widgetType === "TEXT" || widget.widgetType === "IMAGE") continue;
+    const existing = snapshotByWidget.get(widget.id);
+    if (existing && existing.data && typeof existing.data === "object") continue;
+    if (!widget.source || !Array.isArray(widget.metrics) || !widget.metrics.length) continue;
+
+    const connectionId = widget.connectionId || connectionMap.get(widget.source) || null;
+    if (!connectionId) {
+      snapshotByWidget.set(widget.id, {
+        ...(existing || {}),
+        widgetId: widget.id,
+        error: "Sem conexao para esta fonte.",
+      });
+      continue;
+    }
+
+    try {
+      const result = await reportingData.queryMetrics(
+        tenantId,
+        {
+          source: widget.source,
+          connectionId,
+          dateFrom: report.dateFrom,
+          dateTo: report.dateTo,
+          compareMode: report.compareMode,
+          compareDateFrom: report.compareDateFrom,
+          compareDateTo: report.compareDateTo,
+          level: widget.level,
+          breakdown: widget.breakdown,
+          metrics: Array.isArray(widget.metrics) ? widget.metrics : [],
+          filters: widget.filters || null,
+          options: widget.options || null,
+          widgetType: widget.widgetType,
+        },
+        scope
+      );
+
+      const snapshotKey = cache.buildReportSnapshotKey(
+        tenantId,
+        report.id,
+        widget.id
+      );
+      const generatedAt = new Date().toISOString();
+      const snapshotValue = {
+        widgetId: widget.id,
+        reportId: report.id,
+        generatedAt,
+        cacheKey: result.cacheKey,
+        data: result.data,
+      };
+      await cache.setReportSnapshot(snapshotKey, snapshotValue);
+      snapshotByWidget.set(widget.id, {
+        widgetId: widget.id,
+        cacheKey: result.cacheKey,
+        generatedAt,
+        data: result.data,
+      });
+    } catch (err) {
+      snapshotByWidget.set(widget.id, {
+        ...(existing || {}),
+        widgetId: widget.id,
+        error: err?.message || "Falha ao gerar snapshot.",
+      });
+    }
+  }
+
+  return {
+    reportId: report.id,
+    items: widgets.map((widget) =>
+      snapshotByWidget.get(widget.id) || {
+        widgetId: widget.id,
+        cacheKey: null,
+        generatedAt: null,
+        data: null,
+      }
+    ),
+  };
 }
 
 function renderTotals(totals = {}) {
@@ -79,6 +212,7 @@ function renderTable(table = []) {
 function renderWidget(widget, snapshot) {
   const title = widget.title || `Widget ${widget.id || ""}`.trim();
   const data = snapshot?.data || null;
+  const errorNote = snapshot?.error || data?.meta?.error || "";
   const totals = data?.totals || {};
   const table = data?.table || [];
   const series = data?.series || [];
@@ -96,6 +230,7 @@ function renderWidget(widget, snapshot) {
         </div>
       </div>
       <div class="widget-body">
+        ${errorNote ? `<p class="muted">Aviso: ${escapeHtml(errorNote)}</p>` : ""}
         ${renderTotals(totals)}
         ${renderTable(table)}
         ${
@@ -284,7 +419,7 @@ async function generatePdfFromHtml(html) {
   }
 }
 
-async function createReportExport(tenantId, reportId) {
+async function createReportExport(tenantId, reportId, scope) {
   const report = await prisma.report.findFirst({
     where: { id: reportId, tenantId },
     include: {
@@ -299,6 +434,11 @@ async function createReportExport(tenantId, reportId) {
     err.statusCode = 404;
     throw err;
   }
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, report.brandId)) {
+    const err = new Error("Acesso negado para este cliente");
+    err.statusCode = 403;
+    throw err;
+  }
 
   const exportRecord = await prisma.reportExport.create({
     data: {
@@ -310,7 +450,7 @@ async function createReportExport(tenantId, reportId) {
   });
 
   try {
-    const snapshots = await reportingSnapshots.listReportSnapshots(tenantId, report.id);
+    const snapshots = await ensureSnapshotsForReport(tenantId, report, scope);
     const html = renderReportHtml(report, snapshots?.items || []);
     const pdfBuffer = await generatePdfFromHtml(html);
 
@@ -378,7 +518,19 @@ async function createReportExport(tenantId, reportId) {
   }
 }
 
-async function listReportExports(tenantId, reportId) {
+async function listReportExports(tenantId, reportId, scope) {
+  if (hasBrandScope(scope)) {
+    const report = await prisma.report.findFirst({
+      where: { id: reportId, tenantId },
+      select: { brandId: true },
+    });
+    if (!report) return [];
+    if (!isBrandAllowed(scope, report.brandId)) {
+      const err = new Error("Acesso negado para este cliente");
+      err.statusCode = 403;
+      throw err;
+    }
+  }
   return prisma.reportExport.findMany({
     where: { tenantId, reportId },
     orderBy: { createdAt: "desc" },
@@ -386,12 +538,19 @@ async function listReportExports(tenantId, reportId) {
   });
 }
 
-async function getReportExport(tenantId, exportId) {
+async function getReportExport(tenantId, exportId, scope) {
   if (!exportId) return null;
-  return prisma.reportExport.findFirst({
+  const record = await prisma.reportExport.findFirst({
     where: { id: exportId, tenantId },
-    include: { file: true },
+    include: { file: true, report: true },
   });
+  if (!record) return null;
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, record.report?.brandId)) {
+    const err = new Error("Acesso negado para este cliente");
+    err.statusCode = 403;
+    throw err;
+  }
+  return record;
 }
 
 module.exports = {

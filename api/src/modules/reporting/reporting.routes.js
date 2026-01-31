@@ -12,10 +12,13 @@ const reportSchedulesController = require('./reportSchedules.controller');
 const templatesController = require('./templates.controller');
 const reportsController = require('./reports.controller');
 const { requireReportingRole } = require('./reportingAccess.middleware');
+const { attachReportingScope } = require('./reportingScope.service');
 
 const allowViewer = requireReportingRole('viewer');
 const allowEditor = requireReportingRole('editor');
 const allowAdmin = requireReportingRole('admin');
+
+router.use(attachReportingScope);
 
 router.get('/health', (req, res) => {
   return res.json({ ok: true, module: 'reporting' });

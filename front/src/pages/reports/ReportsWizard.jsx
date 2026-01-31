@@ -120,12 +120,41 @@ export default function ReportsWizard() {
   const [brandQuery, setBrandQuery] = useState("");
   const [groupQuery, setGroupQuery] = useState("");
 
+  const { data: meData } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allowedBrandIds = useMemo(() => {
+    const ids = meData?.reportingScope?.allowedBrandIds;
+    return Array.isArray(ids) ? ids.map(String) : null;
+  }, [meData]);
+
+  const isClientScoped = Array.isArray(allowedBrandIds);
+  const allowedBrandSet = useMemo(
+    () => (isClientScoped ? new Set(allowedBrandIds) : null),
+    [isClientScoped, allowedBrandIds]
+  );
+
+  const stepLabels = useMemo(() => {
+    if (isClientScoped) {
+      return ["Escopo", "Marca", "Template", "Periodo", "Revisao"];
+    }
+    return STEPS;
+  }, [isClientScoped]);
+
   useEffect(() => {
     setBrandId("");
     setGroupId("");
     setBrandQuery("");
     setGroupQuery("");
   }, [scope]);
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (scope !== "BRAND") setScope("BRAND");
+  }, [isClientScoped, scope]);
 
   useEffect(() => {
     if (datePreset === "CUSTOM") return;
@@ -155,6 +184,7 @@ export default function ReportsWizard() {
   const { data: groupsData } = useQuery({
     queryKey: ["reporting-brand-groups"],
     queryFn: () => base44.reporting.listBrandGroups(),
+    enabled: !isClientScoped,
   });
 
   const { data: templatesData, isLoading: templatesLoading } = useQuery({
@@ -166,13 +196,19 @@ export default function ReportsWizard() {
   const groups = groupsData?.items || [];
   const templates = templatesData?.items || [];
 
+  const scopedClients = useMemo(() => {
+    if (!isClientScoped) return clients;
+    if (!allowedBrandSet || !allowedBrandSet.size) return [];
+    return clients.filter((client) => allowedBrandSet.has(String(client.id)));
+  }, [clients, isClientScoped, allowedBrandSet]);
+
   const filteredClients = useMemo(() => {
-    if (!brandQuery.trim()) return clients;
+    if (!brandQuery.trim()) return scopedClients;
     const query = brandQuery.trim().toLowerCase();
-    return clients.filter((client) =>
+    return scopedClients.filter((client) =>
       String(client.name || "").toLowerCase().includes(query)
     );
-  }, [clients, brandQuery]);
+  }, [scopedClients, brandQuery]);
 
   const filteredGroups = useMemo(() => {
     if (!groupQuery.trim()) return groups;
@@ -196,6 +232,17 @@ export default function ReportsWizard() {
       dateTo: "",
     };
   }, [compareMode, compareFrom, compareTo, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (!scopedClients.length) {
+      if (brandId) setBrandId("");
+      return;
+    }
+    if (!brandId || !allowedBrandSet?.has(String(brandId))) {
+      setBrandId(scopedClients[0].id);
+    }
+  }, [isClientScoped, scopedClients, brandId, allowedBrandSet]);
 
   const canProceed = useMemo(() => {
     if (step === 0) return true;
@@ -262,7 +309,7 @@ export default function ReportsWizard() {
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
-          {STEPS.map((label, index) => (
+          {stepLabels.map((label, index) => (
             <span
               key={label}
               className={`rounded-full px-3 py-1 ${
@@ -282,7 +329,9 @@ export default function ReportsWizard() {
               Escolha o escopo
             </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Relatorios podem ser por marca ou por grupo.
+              {isClientScoped
+                ? "Relatorios sao gerados por marca."
+                : "Relatorios podem ser por marca ou por grupo."}
             </p>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <button
@@ -299,20 +348,22 @@ export default function ReportsWizard() {
                   Analise uma unica marca.
                 </p>
               </button>
-              <button
-                type="button"
-                onClick={() => setScope("GROUP")}
-                className={`rounded-[16px] border px-4 py-4 text-left transition ${
-                  scope === "GROUP"
-                    ? "border-[var(--primary)] bg-blue-50"
-                    : "border-[var(--border)] bg-[var(--surface)]"
-                }`}
-              >
-                <p className="text-sm font-semibold text-[var(--text)]">Grupo</p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Combine marcas em um grupo.
-                </p>
-              </button>
+              {!isClientScoped ? (
+                <button
+                  type="button"
+                  onClick={() => setScope("GROUP")}
+                  className={`rounded-[16px] border px-4 py-4 text-left transition ${
+                    scope === "GROUP"
+                      ? "border-[var(--primary)] bg-blue-50"
+                      : "border-[var(--border)] bg-[var(--surface)]"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-[var(--text)]">Grupo</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Combine marcas em um grupo.
+                  </p>
+                </button>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -517,7 +568,7 @@ export default function ReportsWizard() {
                 <p className="text-xs text-[var(--text-muted)]">Resumo</p>
                 <p className="mt-1 text-[var(--text)]">
                   {scope === "BRAND"
-                    ? `Marca: ${clients.find((client) => client.id === brandId)?.name || "-"}`
+                    ? `Marca: ${scopedClients.find((client) => client.id === brandId)?.name || "-"}`
                     : `Grupo: ${groups.find((group) => group.id === groupId)?.name || "-"}`}
                 </p>
                 <p className="text-[var(--text)]">

@@ -499,6 +499,10 @@ async function tryRefreshToken() {
   }
 }
 
+async function me() {
+  return jsonFetch("/auth/me", { method: "GET" });
+}
+
 // --------------------
 // Helpers gerais de CRUD
 // --------------------
@@ -1305,6 +1309,7 @@ export const base44 = {
     registerTenant,
     logout,
     tryRefreshToken,
+    me,
   },
   entities: {
     Client,

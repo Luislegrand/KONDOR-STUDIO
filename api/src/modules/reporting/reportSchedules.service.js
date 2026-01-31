@@ -8,6 +8,7 @@ const reportsService = require("./reports.service");
 const reportingGeneration = require("./reportingGeneration.service");
 const reportExportsService = require("./reportExports.service");
 const emailService = require("../../services/emailService");
+const { hasBrandScope, isBrandAllowed, assertBrandAccess } = require("./reportingScope.service");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -241,7 +242,7 @@ async function sendScheduleEmails({ schedule, report, exportResult }) {
   return { ok: true, results, recipients };
 }
 
-async function runSchedule(tenantId, scheduleId) {
+async function runSchedule(tenantId, scheduleId, scope) {
   const schedule = await prisma.reportSchedule.findFirst({
     where: { id: scheduleId, tenantId },
     include: {
@@ -255,6 +256,13 @@ async function runSchedule(tenantId, scheduleId) {
     const err = new Error("Agendamento nao encontrado");
     err.statusCode = 404;
     throw err;
+  }
+  if (hasBrandScope(scope)) {
+    if (schedule.scope !== "BRAND" || !isBrandAllowed(scope, schedule.brandId)) {
+      const err = new Error("Acesso negado para este cliente");
+      err.statusCode = 403;
+      throw err;
+    }
   }
 
   if (!schedule.isActive) {
@@ -282,18 +290,22 @@ async function runSchedule(tenantId, scheduleId) {
     dateTo,
   ).format("YYYY-MM-DD")}`;
 
-  const report = await reportsService.createReport(tenantId, {
-    name: reportName,
-    scope: schedule.scope,
-    brandId: schedule.brandId || null,
-    groupId: schedule.groupId || null,
-    templateId: schedule.templateId,
-    dateFrom,
-    dateTo,
-    compareMode,
-    compareDateFrom,
-    compareDateTo,
-  });
+  const report = await reportsService.createReport(
+    tenantId,
+    {
+      name: reportName,
+      scope: schedule.scope,
+      brandId: schedule.brandId || null,
+      groupId: schedule.groupId || null,
+      templateId: schedule.templateId,
+      dateFrom,
+      dateTo,
+      compareMode,
+      compareDateFrom,
+      compareDateTo,
+    },
+    scope,
+  );
 
   const generation = await reportingGeneration.generateReportData(
     tenantId,
@@ -303,6 +315,7 @@ async function runSchedule(tenantId, scheduleId) {
   const exportResult = await reportExportsService.createReportExport(
     tenantId,
     report.id,
+    scope,
   );
 
   let emailResult = { ok: false, skipped: true };
@@ -335,9 +348,12 @@ async function runSchedule(tenantId, scheduleId) {
   };
 }
 
-async function enqueueScheduleRun(tenantId, scheduleId) {
+async function enqueueScheduleRun(tenantId, scheduleId, scope) {
   if (!reportScheduleQueue) {
-    return runSchedule(tenantId, scheduleId);
+    return runSchedule(tenantId, scheduleId, scope);
+  }
+  if (hasBrandScope(scope)) {
+    await getSchedule(tenantId, scheduleId, scope);
   }
   return reportScheduleQueue.add(
     "report_schedule_run",
@@ -350,12 +366,16 @@ async function enqueueScheduleRun(tenantId, scheduleId) {
   );
 }
 
-async function listSchedules(tenantId, filters = {}) {
+async function listSchedules(tenantId, filters = {}, scope) {
   const where = { tenantId };
   if (filters.scope) where.scope = filters.scope;
   if (filters.brandId) where.brandId = filters.brandId;
   if (filters.groupId) where.groupId = filters.groupId;
   if (filters.isActive !== undefined) where.isActive = filters.isActive;
+  if (hasBrandScope(scope)) {
+    where.scope = "BRAND";
+    where.brandId = { in: scope.allowedBrandIds };
+  }
 
   return prisma.reportSchedule.findMany({
     where,
@@ -363,14 +383,29 @@ async function listSchedules(tenantId, filters = {}) {
   });
 }
 
-async function getSchedule(tenantId, id) {
+async function getSchedule(tenantId, id, scope) {
   if (!id) return null;
-  return prisma.reportSchedule.findFirst({
+  const schedule = await prisma.reportSchedule.findFirst({
     where: { id, tenantId },
   });
+  if (!schedule) return null;
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, schedule.brandId)) {
+    const err = new Error("Acesso negado para este cliente");
+    err.statusCode = 403;
+    throw err;
+  }
+  return schedule;
 }
 
-async function createSchedule(tenantId, payload) {
+async function createSchedule(tenantId, payload, scope) {
+  if (hasBrandScope(scope)) {
+    if (payload.scope !== "BRAND") {
+      const err = new Error("Escopo invalido para este cliente");
+      err.statusCode = 403;
+      throw err;
+    }
+    assertBrandAccess(payload.brandId, scope);
+  }
   const template = await assertTemplate(tenantId, payload.templateId);
   if (!template) {
     const err = new Error("Template nao encontrado");
@@ -415,11 +450,18 @@ async function createSchedule(tenantId, payload) {
   return schedule;
 }
 
-async function updateSchedule(tenantId, id, payload) {
+async function updateSchedule(tenantId, id, payload, scope) {
   const existing = await prisma.reportSchedule.findFirst({
     where: { id, tenantId },
   });
   if (!existing) return null;
+  if (hasBrandScope(scope)) {
+    if (existing.scope !== "BRAND" || !isBrandAllowed(scope, existing.brandId)) {
+      const err = new Error("Acesso negado para este cliente");
+      err.statusCode = 403;
+      throw err;
+    }
+  }
 
   const nextScope = payload.scope !== undefined ? payload.scope : existing.scope;
   const nextBrandId =
@@ -482,11 +524,18 @@ async function updateSchedule(tenantId, id, payload) {
   return schedule;
 }
 
-async function removeSchedule(tenantId, id) {
+async function removeSchedule(tenantId, id, scope) {
   const existing = await prisma.reportSchedule.findFirst({
     where: { id, tenantId },
   });
   if (!existing) return false;
+  if (hasBrandScope(scope)) {
+    if (existing.scope !== "BRAND" || !isBrandAllowed(scope, existing.brandId)) {
+      const err = new Error("Acesso negado para este cliente");
+      err.statusCode = 403;
+      throw err;
+    }
+  }
 
   await prisma.reportSchedule.delete({ where: { id } });
   await removeScheduleJob(id);

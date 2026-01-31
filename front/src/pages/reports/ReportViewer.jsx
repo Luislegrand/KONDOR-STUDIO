@@ -161,6 +161,15 @@ export default function ReportViewer() {
     const errors = report?.params?.reporting?.errors;
     return Array.isArray(errors) ? errors : [];
   }, [report]);
+  const hasConnectionErrors = useMemo(
+    () =>
+      reportingErrors.some((item) =>
+        String(item?.message || "")
+          .toLowerCase()
+          .includes("conexao")
+      ),
+    [reportingErrors]
+  );
 
   const effectiveBrandId = report?.brandId || report?.params?.brandId || "";
   const { data: connectionsData } = useQuery({
@@ -285,6 +294,12 @@ export default function ReportViewer() {
           <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             {reportingErrors.length} widget(s) com erro. Exemplo:{" "}
             {reportingErrors[0]?.message || "Falha ao consultar dados."}
+          </div>
+        ) : null}
+        {hasConnectionErrors ? (
+          <div className="rounded-[12px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+            Alguns widgets estao sem conexao. Abra o widget e associe uma conta
+            conectada para preencher os dados.
           </div>
         ) : null}
 

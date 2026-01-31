@@ -218,7 +218,7 @@ function formatResponse(payload, querySpec = {}) {
   return { totals, series, pie, table, meta };
 }
 
-async function queryMetrics(tenantId, payload = {}) {
+async function queryMetrics(tenantId, payload = {}, scope) {
   const querySpec = normalizePayload(payload);
   const cacheKey = cache.buildMetricsCacheKey({
     tenantId,
@@ -245,7 +245,7 @@ async function queryMetrics(tenantId, payload = {}) {
     throw err;
   }
 
-  const result = await reportingData.queryMetrics(tenantId, querySpec);
+  const result = await reportingData.queryMetrics(tenantId, querySpec, scope);
   const data = result?.data || {};
 
   if (querySpec.forceMock) {

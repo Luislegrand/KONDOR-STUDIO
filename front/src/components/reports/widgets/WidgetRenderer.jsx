@@ -425,13 +425,24 @@ const WidgetRenderer = React.memo(function WidgetRenderer({
   }
 
   if (noConnection || hasConnectIssue) {
+    const isForbidden =
+      hasAuthError &&
+      (error?.status === 403 ||
+        error?.data?.status === 403 ||
+        String(error?.data?.error || error?.message || "")
+          .toLowerCase()
+          .includes("acesso negado"));
     const connectionHint = onEdit
       ? "Clique no lapis no canto direito deste widget e selecione uma conta conectada."
       : "Associe uma conta para carregar os dados deste widget.";
+    const title = isForbidden ? "Acesso restrito" : "Associe uma conta";
+    const description = isForbidden
+      ? "Voce nao tem permissao para acessar esta marca ou conexao."
+      : connectionHint;
     return (
       <WidgetEmptyState
-        title="Associe uma conta"
-        description={connectionHint}
+        title={title}
+        description={description}
         actionLabel={onConnect ? "Associar conta" : ""}
         onAction={onConnect || undefined}
         variant="connection"

@@ -165,7 +165,11 @@ function WidgetConfigDialog({
     enabled: open && Boolean(source) && !isGa4Source,
   });
 
-  const { data: metricsData } = useQuery({
+  const {
+    data: metricsData,
+    isError: metricsError,
+    error: metricsErrorDetails,
+  } = useQuery({
     queryKey: ["reporting-metric-catalog", source, level, widgetType],
     queryFn: async () => {
       if (!source || !level) return { items: [] };
@@ -395,6 +399,64 @@ function WidgetConfigDialog({
       : hasConnectedForSource({ connections: availableConnections, source });
   const showConnectionAlert =
     source && canCheckConnection && !hasConnectionForSource && !alertDismissed;
+  const metricEmptyText = useMemo(() => {
+    if (widgetType === "TEXT" || widgetType === "IMAGE") {
+      return "Este widget nao usa metricas.";
+    }
+    if (!source) return "Selecione uma fonte para listar metricas.";
+    if (!level && !isGa4Source) {
+      return "Selecione um nivel para listar metricas.";
+    }
+    if (metricsError) {
+      const status = metricsErrorDetails?.status || metricsErrorDetails?.data?.status;
+      if (status === 403) {
+        return "Acesso restrito: voce nao tem permissao para ver essas metricas.";
+      }
+      return (
+        metricsErrorDetails?.data?.error ||
+        metricsErrorDetails?.message ||
+        "Nao foi possivel carregar o catalogo de metricas."
+      );
+    }
+    if (isGa4Source) {
+      if (ga4MetadataLoading) return "Carregando metadados do GA4...";
+      if (ga4MetadataError) {
+        return (
+          ga4MetadataErrorDetails?.data?.error ||
+          ga4MetadataErrorDetails?.message ||
+          "Nao foi possivel carregar as metricas do GA4."
+        );
+      }
+      if (!previewConnectionId) {
+        return "Conecte uma conta GA4 para listar metricas.";
+      }
+    }
+    const rawMetricsCount = metricsData?.items?.length || 0;
+    if (!isGa4Source && rawMetricsCount === 0) {
+      return "Catalogo vazio para esta fonte/nivel. Cadastre metricas no painel.";
+    }
+    if (!isGa4Source && rawMetricsCount > 0 && metrics.length === 0) {
+      return "Nenhuma metrica compativel com este tipo de widget.";
+    }
+    if (source && !hasConnectionForSource) {
+      return "Conecte uma conta para esta fonte.";
+    }
+    return "Nenhuma metrica encontrada para esta combinacao.";
+  }, [
+    widgetType,
+    source,
+    level,
+    metricsError,
+    metricsErrorDetails,
+    isGa4Source,
+    ga4MetadataLoading,
+    ga4MetadataError,
+    ga4MetadataErrorDetails,
+    previewConnectionId,
+    hasConnectionForSource,
+    metricsData,
+    metrics,
+  ]);
 
   if (!draft) {
     return (
@@ -631,6 +693,7 @@ function WidgetConfigDialog({
                   options={metricOptions}
                   value={selectedMetrics}
                   onChange={(next) => setDraft({ ...draft, metrics: next })}
+                  emptyText={metricEmptyText}
                 />
               </div>
 
@@ -879,6 +942,23 @@ export default function DashboardBuilder() {
     source: "META_ADS",
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allowedBrandIds = useMemo(() => {
+    const ids = meData?.reportingScope?.allowedBrandIds;
+    return Array.isArray(ids) ? ids.map(String) : null;
+  }, [meData]);
+
+  const isClientScoped = Array.isArray(allowedBrandIds);
+  const allowedBrandSet = useMemo(
+    () => (isClientScoped ? new Set(allowedBrandIds) : null),
+    [isClientScoped, allowedBrandIds]
+  );
+
   const debouncedDateFrom = useDebouncedValue(dateFrom);
   const debouncedDateTo = useDebouncedValue(dateTo);
   const debouncedCompareMode = useDebouncedValue(compareMode);
@@ -936,12 +1016,13 @@ export default function DashboardBuilder() {
   const { data: groupsData } = useQuery({
     queryKey: ["reporting-brand-groups"],
     queryFn: () => base44.reporting.listBrandGroups(),
+    enabled: !isClientScoped,
   });
 
   const { data: groupMembersData } = useQuery({
     queryKey: ["reporting-brand-group-members", groupId],
     queryFn: () => base44.reporting.listBrandGroupMembers(groupId),
-    enabled: Boolean(groupId),
+    enabled: Boolean(groupId) && !isClientScoped,
   });
 
   const clients = clientsData || [];
@@ -952,10 +1033,16 @@ export default function DashboardBuilder() {
     [groupMembers]
   );
 
+  const scopedClients = useMemo(() => {
+    if (!isClientScoped) return clients;
+    if (!allowedBrandSet || !allowedBrandSet.size) return [];
+    return clients.filter((client) => allowedBrandSet.has(String(client.id)));
+  }, [clients, isClientScoped, allowedBrandSet]);
+
   const availableBrands = useMemo(() => {
     if (scope === "GROUP") return groupBrands;
-    return clients;
-  }, [scope, groupBrands, clients]);
+    return scopedClients;
+  }, [scope, groupBrands, scopedClients]);
 
   const activeWidget = useMemo(
     () => widgets.find((widget) => widget.id === activeWidgetId) || null,
@@ -1018,6 +1105,24 @@ export default function DashboardBuilder() {
     setGlobalBrandId(filters.brandId || "");
     setGlobalGroupId(filters.groupId || "");
   }, [dashboard]);
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (scope !== "BRAND") setScope("BRAND");
+    if (groupId) setGroupId("");
+    if (globalGroupId) setGlobalGroupId("");
+  }, [isClientScoped, scope, groupId, globalGroupId]);
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (!scopedClients.length) {
+      if (brandId) setBrandId("");
+      return;
+    }
+    if (!brandId || !allowedBrandSet?.has(String(brandId))) {
+      setBrandId(scopedClients[0].id);
+    }
+  }, [isClientScoped, scopedClients, brandId, allowedBrandSet]);
 
   useEffect(() => {
     if (!isNew || dashboardId) return;
@@ -1258,6 +1363,13 @@ export default function DashboardBuilder() {
     () => getRecommendedPresets(recommendedSource),
     [recommendedSource]
   );
+  const needsGlobalBrand = useMemo(() => {
+    if (scope === "BRAND") return false;
+    if (scope === "GROUP") {
+      return !globalBrandId && Boolean(groupId);
+    }
+    return !globalBrandId;
+  }, [scope, globalBrandId, groupId]);
   const hasRecommendedPresets = Boolean(
     recommendedPresets?.kpis?.length || recommendedPresets?.charts?.length
   );
@@ -1501,6 +1613,12 @@ export default function DashboardBuilder() {
         </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {needsGlobalBrand && !tvMode ? (
+          <div className="rounded-[12px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+            Selecione uma marca global para carregar os dados (ou defina a marca
+            em cada widget).
+          </div>
+        ) : null}
 
         {isNew && showTemplatePicker ? (
           <section className="rounded-[18px] border border-[var(--border)] bg-white px-6 py-6 shadow-[var(--shadow-sm)]">
@@ -1640,9 +1758,15 @@ export default function DashboardBuilder() {
                       if (value !== "BRAND") setBrandId("");
                     }}
                   >
-                    <option value="TENANT">Tenant</option>
-                    <option value="BRAND">Marca</option>
-                    <option value="GROUP">Grupo</option>
+                    {isClientScoped ? (
+                      <option value="BRAND">Marca</option>
+                    ) : (
+                      <>
+                        <option value="TENANT">Tenant</option>
+                        <option value="BRAND">Marca</option>
+                        <option value="GROUP">Grupo</option>
+                      </>
+                    )}
                   </SelectNative>
                 </div>
 
@@ -1654,7 +1778,7 @@ export default function DashboardBuilder() {
                       onChange={(event) => setBrandId(event.target.value)}
                     >
                       <option value="">Selecione</option>
-                      {clients.map((client) => (
+                      {scopedClients.map((client) => (
                         <option key={client.id} value={client.id}>
                           {client.name}
                         </option>
@@ -1663,7 +1787,7 @@ export default function DashboardBuilder() {
                   </div>
                 ) : null}
 
-                {scope === "GROUP" ? (
+                {scope === "GROUP" && !isClientScoped ? (
                   <div>
                     <Label>Grupo</Label>
                     <SelectNative
@@ -1727,7 +1851,7 @@ export default function DashboardBuilder() {
                   </>
                 ) : null}
 
-                {scope === "TENANT" ? (
+                {scope === "TENANT" && !isClientScoped ? (
                   <>
                     <div>
                       <Label>Marca global (opcional)</Label>
@@ -1739,7 +1863,7 @@ export default function DashboardBuilder() {
                         }}
                       >
                         <option value="">Sem marca</option>
-                        {clients.map((client) => (
+                        {scopedClients.map((client) => (
                           <option key={client.id} value={client.id}>
                             {client.name}
                           </option>
@@ -1766,7 +1890,7 @@ export default function DashboardBuilder() {
                   </>
                 ) : null}
 
-                {scope === "GROUP" && groupBrands.length ? (
+                {scope === "GROUP" && groupBrands.length && !isClientScoped ? (
                   <div>
                     <Label>Marca global (opcional)</Label>
                     <SelectNative

@@ -46,7 +46,11 @@ module.exports = {
         brandId: req.query?.brandId || null,
         groupId: req.query?.groupId || null,
       };
-      const items = await dashboardsService.listDashboards(req.tenantId, filters);
+      const items = await dashboardsService.listDashboards(
+        req.tenantId,
+        filters,
+        req.reportingScope,
+      );
       return res.json({ items });
     } catch (err) {
       const status = err.status || 500;
@@ -56,7 +60,11 @@ module.exports = {
 
   async get(req, res) {
     try {
-      const dashboard = await dashboardsService.getDashboard(req.tenantId, req.params.id);
+      const dashboard = await dashboardsService.getDashboard(
+        req.tenantId,
+        req.params.id,
+        req.reportingScope,
+      );
       if (!dashboard) {
         return res.status(404).json({ error: 'Dashboard nao encontrado' });
       }
@@ -70,7 +78,11 @@ module.exports = {
   async create(req, res) {
     try {
       const payload = parsePayload(req.body || {});
-      const dashboard = await dashboardsService.createDashboard(req.tenantId, payload);
+      const dashboard = await dashboardsService.createDashboard(
+        req.tenantId,
+        payload,
+        req.reportingScope,
+      );
       logReportingAction({
         tenantId: req.tenantId,
         userId: req.user?.id,
@@ -98,6 +110,7 @@ module.exports = {
         req.tenantId,
         req.params.id,
         payload,
+        req.reportingScope,
       );
       if (!dashboard) {
         return res.status(404).json({ error: 'Dashboard nao encontrado' });
@@ -128,6 +141,7 @@ module.exports = {
         req.tenantId,
         req.params.id,
         req.body || {},
+        req.reportingScope,
       );
       if (!data) {
         return res.status(404).json({ error: 'Dashboard nao encontrado' });

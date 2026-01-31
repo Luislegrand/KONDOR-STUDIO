@@ -2,6 +2,7 @@ const { prisma } = require('../../prisma');
 const { getAdapter, getIntegrationKind } = require('./providers');
 const ga4MetadataService = require('../../services/ga4MetadataService');
 const { resolveGa4IntegrationContext } = require('../../services/ga4IntegrationResolver');
+const { assertBrandAccess, hasBrandScope, isBrandAllowed } = require('./reportingScope.service');
 
 const SOURCE_INTEGRATION_MAP = {
   META_ADS: { providers: ['META'], kinds: ['meta_ads'] },
@@ -56,7 +57,10 @@ function sanitizeIntegration(record) {
   return cloned;
 }
 
-async function assertBrand(tenantId, brandId) {
+async function assertBrand(tenantId, brandId, scope) {
+  if (scope) {
+    assertBrandAccess(brandId, scope);
+  }
   if (!tenantId || !brandId) return null;
   const brand = await prisma.client.findFirst({
     where: { id: brandId, tenantId },
@@ -76,8 +80,8 @@ function integrationMatchesSource(integration, source) {
   return rule.kinds.includes(kind);
 }
 
-async function listConnections(tenantId, brandId) {
-  const brand = await assertBrand(tenantId, brandId);
+async function listConnections(tenantId, brandId, scope) {
+  const brand = await assertBrand(tenantId, brandId, scope);
   if (!brand) {
     const err = new Error('Marca não encontrada');
     err.status = 404;
@@ -98,7 +102,7 @@ async function listConnections(tenantId, brandId) {
   }));
 }
 
-async function listIntegrationAccounts(tenantId, integrationId, source) {
+async function listIntegrationAccounts(tenantId, integrationId, source, scope) {
   if (!integrationId) {
     const err = new Error('integrationId é obrigatório');
     err.status = 400;
@@ -110,6 +114,11 @@ async function listIntegrationAccounts(tenantId, integrationId, source) {
   if (!integration) {
     const err = new Error('Integração não encontrada');
     err.status = 404;
+    throw err;
+  }
+  if (hasBrandScope(scope) && integration.clientId && !isBrandAllowed(scope, integration.clientId)) {
+    const err = new Error('Acesso negado para esta integração');
+    err.status = 403;
     throw err;
   }
 
@@ -130,8 +139,8 @@ async function listIntegrationAccounts(tenantId, integrationId, source) {
   return items || [];
 }
 
-async function linkConnection(tenantId, brandId, payload, userId) {
-  const brand = await assertBrand(tenantId, brandId);
+async function linkConnection(tenantId, brandId, payload, userId, scope) {
+  const brand = await assertBrand(tenantId, brandId, scope);
   if (!brand) {
     const err = new Error('Marca não encontrada');
     err.status = 404;
@@ -215,6 +224,11 @@ async function linkConnection(tenantId, brandId, payload, userId) {
     err.status = 404;
     throw err;
   }
+  if (hasBrandScope(scope) && integration.clientId && !isBrandAllowed(scope, integration.clientId)) {
+    const err = new Error('Acesso negado para esta integração');
+    err.status = 403;
+    throw err;
+  }
 
   if (integration.status !== 'CONNECTED') {
     const err = new Error('Integração não está CONNECTED');
@@ -284,16 +298,19 @@ async function linkConnection(tenantId, brandId, payload, userId) {
   });
 }
 
-async function getGa4Metadata(tenantId, connectionId) {
+async function getGa4Metadata(tenantId, connectionId, scope) {
   if (!connectionId) {
     const err = new Error('connectionId é obrigatório');
     err.status = 400;
     throw err;
   }
 
-  const connection = await prisma.dataSourceConnection.findFirst({
-    where: { id: connectionId, tenantId },
-  });
+  const where = { id: connectionId, tenantId };
+  if (hasBrandScope(scope)) {
+    where.brandId = { in: scope.allowedBrandIds };
+  }
+
+  const connection = await prisma.dataSourceConnection.findFirst({ where });
 
   if (!connection) {
     const err = new Error('Conexão não encontrada');
@@ -354,18 +371,21 @@ async function getGa4Metadata(tenantId, connectionId) {
   };
 }
 
-async function checkGa4Compatibility(tenantId, connectionId, payload = {}) {
+async function checkGa4Compatibility(tenantId, connectionId, payload = {}, scope) {
   if (!connectionId) {
     const err = new Error('connectionId é obrigatório');
     err.status = 400;
     throw err;
   }
 
+  const where = { id: connectionId, tenantId };
+  if (hasBrandScope(scope)) {
+    where.brandId = { in: scope.allowedBrandIds };
+  }
+
   const connection = await prisma.dataSourceConnection.findFirst({
-    where: { id: connectionId, tenantId },
-    include: {
-      integration: true,
-    },
+    where,
+    include: { integration: true },
   });
 
   if (!connection) {

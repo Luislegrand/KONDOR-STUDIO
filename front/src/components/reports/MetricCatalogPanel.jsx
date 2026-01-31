@@ -261,9 +261,10 @@ export default function MetricCatalogPanel() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-muted)]">
-            Nenhuma metrica encontrada para essa fonte.
-          </p>
+          <div className="rounded-[12px] border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-muted)]">
+            Nenhuma metrica encontrada para essa fonte/nivel. Cadastre uma metrica
+            para habilitar a selecao nos widgets.
+          </div>
         )}
       </div>
 

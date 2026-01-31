@@ -1,13 +1,19 @@
 const { prisma } = require('../../prisma');
 const cache = require('./reportingCache.service');
+const { hasBrandScope, isBrandAllowed } = require('./reportingScope.service');
 
-async function listReportSnapshots(tenantId, reportId) {
+async function listReportSnapshots(tenantId, reportId, scope) {
   const report = await prisma.report.findFirst({
     where: { id: reportId, tenantId },
     include: { widgets: true },
   });
 
   if (!report) return null;
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, report.brandId)) {
+    const err = new Error('Acesso negado para este cliente');
+    err.status = 403;
+    throw err;
+  }
 
   const widgets = Array.isArray(report.widgets) ? report.widgets : [];
   const items = [];

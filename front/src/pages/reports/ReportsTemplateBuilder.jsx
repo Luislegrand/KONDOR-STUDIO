@@ -114,7 +114,11 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
     enabled: open && Boolean(source) && !isGa4Source,
   });
 
-  const { data: metricsData } = useQuery({
+  const {
+    data: metricsData,
+    isError: metricsError,
+    error: metricsErrorDetails,
+  } = useQuery({
     queryKey: ["reporting-metric-catalog", source, level, widgetType],
     queryFn: async () => {
       if (!source || !level) return { items: [] };
@@ -143,7 +147,12 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
     ga4Status?.properties?.[0]?.propertyId ||
     "";
 
-  const { data: ga4Metadata } = useQuery({
+  const {
+    data: ga4Metadata,
+    isLoading: ga4MetadataLoading,
+    isError: ga4MetadataError,
+    error: ga4MetadataErrorDetails,
+  } = useQuery({
     queryKey: ["ga4-template-metadata", ga4PropertyId],
     queryFn: () => base44.ga4.metadata(ga4PropertyId),
     enabled: open && isGa4Source && Boolean(ga4PropertyId),
@@ -237,6 +246,60 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
       })),
     [metrics]
   );
+  const metricEmptyText = useMemo(() => {
+    if (widgetType === "TEXT" || widgetType === "IMAGE") {
+      return "Este widget nao usa metricas.";
+    }
+    if (!source) return "Selecione uma fonte para listar metricas.";
+    if (!level && !isGa4Source) {
+      return "Selecione um nivel para listar metricas.";
+    }
+    if (metricsError) {
+      const status = metricsErrorDetails?.status || metricsErrorDetails?.data?.status;
+      if (status === 403) {
+        return "Acesso restrito: voce nao tem permissao para ver essas metricas.";
+      }
+      return (
+        metricsErrorDetails?.data?.error ||
+        metricsErrorDetails?.message ||
+        "Nao foi possivel carregar o catalogo de metricas."
+      );
+    }
+    if (isGa4Source) {
+      if (!ga4PropertyId) {
+        return "Conecte o GA4 e selecione uma propriedade.";
+      }
+      if (ga4MetadataLoading) return "Carregando metadados do GA4...";
+      if (ga4MetadataError) {
+        return (
+          ga4MetadataErrorDetails?.data?.error ||
+          ga4MetadataErrorDetails?.message ||
+          "Nao foi possivel carregar as metricas do GA4."
+        );
+      }
+    }
+    const rawMetricsCount = metricsData?.items?.length || 0;
+    if (!isGa4Source && rawMetricsCount === 0) {
+      return "Catalogo vazio para esta fonte/nivel. Cadastre metricas no painel.";
+    }
+    if (!isGa4Source && rawMetricsCount > 0 && metrics.length === 0) {
+      return "Nenhuma metrica compativel com este tipo de widget.";
+    }
+    return "Nenhuma metrica encontrada para esta combinacao.";
+  }, [
+    widgetType,
+    source,
+    level,
+    metricsError,
+    metricsErrorDetails,
+    isGa4Source,
+    ga4PropertyId,
+    ga4MetadataLoading,
+    ga4MetadataError,
+    ga4MetadataErrorDetails,
+    metricsData,
+    metrics,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -349,6 +412,7 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
                   options={metricOptions}
                   value={selectedMetrics}
                   onChange={(next) => setDraft({ ...draft, metrics: next })}
+                  emptyText={metricEmptyText}
                 />
               </div>
 

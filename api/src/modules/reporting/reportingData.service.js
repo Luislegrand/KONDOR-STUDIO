@@ -142,17 +142,19 @@ function applyHideZero(payload, metrics) {
   };
 }
 
-async function resolveConnection(tenantId, connectionId) {
+async function resolveConnection(tenantId, connectionId, scope) {
   if (!tenantId || !connectionId) return null;
+  const where = { id: connectionId, tenantId };
+  if (scope?.allowedBrandIds) {
+    where.brandId = { in: scope.allowedBrandIds };
+  }
   return prisma.dataSourceConnection.findFirst({
-    where: { id: connectionId, tenantId },
-    include: {
-      integration: true,
-    },
+    where,
+    include: { integration: true },
   });
 }
 
-async function queryMetrics(tenantId, querySpec = {}) {
+async function queryMetrics(tenantId, querySpec = {}, scope) {
   const source = querySpec.source ? String(querySpec.source) : null;
   const connectionId = querySpec.connectionId ? String(querySpec.connectionId) : null;
 
@@ -179,7 +181,7 @@ async function queryMetrics(tenantId, querySpec = {}) {
     compareDateTo: querySpec.compareDateTo,
   });
 
-  const connection = await resolveConnection(tenantId, connectionId);
+  const connection = await resolveConnection(tenantId, connectionId, scope);
   if (!connection) {
     const err = new Error('Conexao nao encontrada');
     err.status = 404;

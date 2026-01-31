@@ -1,6 +1,7 @@
 const { prisma } = require('../../prisma');
 const templatesService = require('./templates.service');
 const reportingJobs = require('./reportingJobs.service');
+const { hasBrandScope, isBrandAllowed, assertBrandAccess } = require('./reportingScope.service');
 
 function toDate(value) {
   if (!value) return null;
@@ -133,12 +134,16 @@ function buildWidgetPayloads(
   });
 }
 
-async function listReports(tenantId, filters = {}) {
+async function listReports(tenantId, filters = {}, scope) {
   const where = { tenantId };
   if (filters.scope) where.scope = filters.scope;
   if (filters.brandId) where.brandId = filters.brandId;
   if (filters.groupId) where.groupId = filters.groupId;
   if (filters.status) where.status = filters.status;
+  if (hasBrandScope(scope)) {
+    where.scope = 'BRAND';
+    where.brandId = { in: scope.allowedBrandIds };
+  }
 
   return prisma.report.findMany({
     where,
@@ -146,8 +151,8 @@ async function listReports(tenantId, filters = {}) {
   });
 }
 
-async function getReport(tenantId, id) {
-  return prisma.report.findFirst({
+async function getReport(tenantId, id, scope) {
+  const report = await prisma.report.findFirst({
     where: { id, tenantId },
     include: {
       widgets: {
@@ -156,9 +161,24 @@ async function getReport(tenantId, id) {
       template: true,
     },
   });
+  if (!report) return null;
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, report.brandId)) {
+    const err = new Error('Acesso negado para este cliente');
+    err.status = 403;
+    throw err;
+  }
+  return report;
 }
 
-async function createReport(tenantId, payload) {
+async function createReport(tenantId, payload, scope) {
+  if (hasBrandScope(scope)) {
+    if (payload.scope !== 'BRAND') {
+      const err = new Error('Escopo invalido para este cliente');
+      err.status = 403;
+      throw err;
+    }
+    assertBrandAccess(payload.brandId, scope);
+  }
   const template = await templatesService.getTemplate(tenantId, payload.templateId);
   if (!template) {
     const err = new Error('Template nao encontrado');
@@ -267,11 +287,11 @@ async function createReport(tenantId, payload) {
     });
   }
 
-  return getReport(tenantId, report.id);
+  return getReport(tenantId, report.id, scope);
 }
 
-async function updateReportLayout(tenantId, reportId, widgets) {
-  const existing = await getReport(tenantId, reportId);
+async function updateReportLayout(tenantId, reportId, widgets, scope) {
+  const existing = await getReport(tenantId, reportId, scope);
   if (!existing) return null;
 
   const operations = widgets.map((item) =>
@@ -282,11 +302,11 @@ async function updateReportLayout(tenantId, reportId, widgets) {
   );
 
   await prisma.$transaction(operations);
-  return getReport(tenantId, reportId);
+  return getReport(tenantId, reportId, scope);
 }
 
-async function refreshReport(tenantId, reportId) {
-  const existing = await getReport(tenantId, reportId);
+async function refreshReport(tenantId, reportId, scope) {
+  const existing = await getReport(tenantId, reportId, scope);
   if (!existing) return null;
 
   await prisma.report.update({
@@ -295,11 +315,11 @@ async function refreshReport(tenantId, reportId) {
   });
 
   await reportingJobs.enqueueReportGeneration(tenantId, existing.id);
-  return getReport(tenantId, existing.id);
+  return getReport(tenantId, existing.id, scope);
 }
 
-async function updateReport(tenantId, reportId, payload = {}) {
-  const existing = await getReport(tenantId, reportId);
+async function updateReport(tenantId, reportId, payload = {}, scope) {
+  const existing = await getReport(tenantId, reportId, scope);
   if (!existing) return null;
 
   const nextName = payload.name ? String(payload.name) : existing.name;
@@ -345,11 +365,11 @@ async function updateReport(tenantId, reportId, payload = {}) {
     data,
   });
 
-  return getReport(tenantId, existing.id);
+  return getReport(tenantId, existing.id, scope);
 }
 
-async function removeReport(tenantId, reportId) {
-  const existing = await getReport(tenantId, reportId);
+async function removeReport(tenantId, reportId, scope) {
+  const existing = await getReport(tenantId, reportId, scope);
   if (!existing) return null;
   await prisma.report.delete({ where: { id: existing.id } });
   return existing;

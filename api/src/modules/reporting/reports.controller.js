@@ -183,7 +183,11 @@ module.exports = {
         groupId: req.query?.groupId || null,
         status: req.query?.status || null,
       };
-      const items = await reportsService.listReports(req.tenantId, filters);
+      const items = await reportsService.listReports(
+        req.tenantId,
+        filters,
+        req.reportingScope,
+      );
       return res.json({ items });
     } catch (err) {
       const status = err.status || 500;
@@ -193,7 +197,11 @@ module.exports = {
 
   async get(req, res) {
     try {
-      const report = await reportsService.getReport(req.tenantId, req.params.id);
+      const report = await reportsService.getReport(
+        req.tenantId,
+        req.params.id,
+        req.reportingScope,
+      );
       if (!report) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
       }
@@ -207,7 +215,11 @@ module.exports = {
   async create(req, res) {
     try {
       const payload = parseCreatePayload(req.body || {});
-      const report = await reportsService.createReport(req.tenantId, payload);
+      const report = await reportsService.createReport(
+        req.tenantId,
+        payload,
+        req.reportingScope,
+      );
       logReportingAction({
         tenantId: req.tenantId,
         userId: req.user?.id,
@@ -232,7 +244,12 @@ module.exports = {
   async update(req, res) {
     try {
       const payload = parseUpdatePayload(req.body || {});
-      const report = await reportsService.updateReport(req.tenantId, req.params.id, payload);
+      const report = await reportsService.updateReport(
+        req.tenantId,
+        req.params.id,
+        payload,
+        req.reportingScope,
+      );
       if (!report) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
       }
@@ -258,6 +275,7 @@ module.exports = {
         req.tenantId,
         req.params.id,
         payload.widgets,
+        req.reportingScope,
       );
       if (!report) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
@@ -282,7 +300,11 @@ module.exports = {
 
   async refresh(req, res) {
     try {
-      const report = await reportsService.refreshReport(req.tenantId, req.params.id);
+      const report = await reportsService.refreshReport(
+        req.tenantId,
+        req.params.id,
+        req.reportingScope,
+      );
       if (!report) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
       }
@@ -306,6 +328,7 @@ module.exports = {
       const data = await reportingSnapshots.listReportSnapshots(
         req.tenantId,
         req.params.id,
+        req.reportingScope,
       );
       if (!data) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
@@ -319,7 +342,11 @@ module.exports = {
 
   async remove(req, res) {
     try {
-      const report = await reportsService.removeReport(req.tenantId, req.params.id);
+      const report = await reportsService.removeReport(
+        req.tenantId,
+        req.params.id,
+        req.reportingScope,
+      );
       if (!report) {
         return res.status(404).json({ error: 'Relatorio nao encontrado' });
       }

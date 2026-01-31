@@ -3,7 +3,11 @@ const reportingMetricsService = require('./reportingMetrics.service');
 module.exports = {
   async query(req, res) {
     try {
-      const data = await reportingMetricsService.queryMetrics(req.tenantId, req.body || {});
+      const data = await reportingMetricsService.queryMetrics(
+        req.tenantId,
+        req.body || {},
+        req.reportingScope,
+      );
       return res.json(data);
     } catch (err) {
       const status = err.status || 500;

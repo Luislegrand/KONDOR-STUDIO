@@ -72,6 +72,23 @@ export default function DashboardViewer() {
     source: "META_ADS",
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allowedBrandIds = useMemo(() => {
+    const ids = meData?.reportingScope?.allowedBrandIds;
+    return Array.isArray(ids) ? ids.map(String) : null;
+  }, [meData]);
+
+  const isClientScoped = Array.isArray(allowedBrandIds);
+  const allowedBrandSet = useMemo(
+    () => (isClientScoped ? new Set(allowedBrandIds) : null),
+    [isClientScoped, allowedBrandIds]
+  );
+
   const { data: clientsData } = useQuery({
     queryKey: ["clients"],
     queryFn: () => base44.entities.Client.list(),
@@ -80,12 +97,13 @@ export default function DashboardViewer() {
   const { data: groupsData } = useQuery({
     queryKey: ["reporting-brand-groups"],
     queryFn: () => base44.reporting.listBrandGroups(),
+    enabled: !isClientScoped,
   });
 
   const { data: groupMembersData } = useQuery({
     queryKey: ["reporting-brand-group-members", dashboard?.groupId],
     queryFn: () => base44.reporting.listBrandGroupMembers(dashboard.groupId),
-    enabled: Boolean(dashboard?.groupId),
+    enabled: Boolean(dashboard?.groupId) && !isClientScoped,
   });
 
   const clients = clientsData || [];
@@ -95,6 +113,15 @@ export default function DashboardViewer() {
     () => groupMembers.map((member) => member.brand).filter(Boolean),
     [groupMembers]
   );
+  const scopedClients = useMemo(() => {
+    if (!isClientScoped) return clients;
+    if (!allowedBrandSet || !allowedBrandSet.size) return [];
+    return clients.filter((client) => allowedBrandSet.has(String(client.id)));
+  }, [clients, isClientScoped, allowedBrandSet]);
+  const selectableGroupBrands = useMemo(() => {
+    if (isClientScoped) return scopedClients;
+    return groupBrands;
+  }, [isClientScoped, scopedClients, groupBrands]);
 
   useEffect(() => {
     if (!dashboard) return;
@@ -121,6 +148,15 @@ export default function DashboardViewer() {
       setGlobalGroupId(filters.groupId || "");
     }
   }, [dashboard, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (!scopedClients.length) return;
+    const allowedIds = new Set(scopedClients.map((client) => String(client.id)));
+    if (!globalBrandId || !allowedIds.has(String(globalBrandId))) {
+      setGlobalBrandId(scopedClients[0].id);
+    }
+  }, [isClientScoped, scopedClients, globalBrandId]);
 
   useEffect(() => {
     if (dashboard?.scope !== "GROUP") return;
@@ -171,6 +207,12 @@ export default function DashboardViewer() {
     () => (lastDashboardUpdatedAt ? formatTimeAgo(lastDashboardUpdatedAt) : ""),
     [lastDashboardUpdatedAt]
   );
+  const needsGlobalBrand = useMemo(() => {
+    if (!dashboard) return false;
+    if (dashboard.scope === "BRAND") return false;
+    if (dashboard.scope === "GROUP") return !globalBrandId;
+    return !globalBrandId;
+  }, [dashboard, globalBrandId]);
 
   const handleConnect = (brandId, source) => {
     if (!brandId || !source) return;
@@ -398,6 +440,11 @@ export default function DashboardViewer() {
           </section>
         ) : (
           <section className="rounded-[18px] border border-[var(--border)] bg-white px-6 py-5 shadow-[var(--shadow-sm)]">
+            {needsGlobalBrand ? (
+              <div className="mb-4 rounded-[12px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                Selecione uma marca global para carregar os dados deste dashboard.
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-xs text-[var(--text-muted)]">Periodo inicial</p>
@@ -447,20 +494,22 @@ export default function DashboardViewer() {
                 <div>
                   <p className="text-xs text-[var(--text-muted)]">Marca</p>
                   <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]">
-                    {clients.find((client) => client.id === dashboard.brandId)?.name ||
+                    {scopedClients.find((client) => client.id === dashboard.brandId)?.name ||
                       "Marca definida"}
                   </div>
                 </div>
               ) : null}
               {dashboard.scope === "GROUP" ? (
                 <>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Grupo</p>
-                    <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]">
-                      {groups.find((group) => group.id === dashboard.groupId)?.name ||
-                        "Grupo definido"}
+                  {!isClientScoped ? (
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Grupo</p>
+                      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]">
+                        {groups.find((group) => group.id === dashboard.groupId)?.name ||
+                          "Grupo definido"}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Marca global</p>
                     <SelectNative
@@ -468,7 +517,7 @@ export default function DashboardViewer() {
                       onChange={(event) => setGlobalBrandId(event.target.value)}
                     >
                       <option value="">Sem marca</option>
-                      {groupBrands.map((brand) => (
+                      {selectableGroupBrands.map((brand) => (
                         <option key={brand.id} value={brand.id}>
                           {brand.name}
                         </option>
@@ -489,30 +538,32 @@ export default function DashboardViewer() {
                       }}
                     >
                       <option value="">Sem marca</option>
-                      {clients.map((client) => (
+                      {scopedClients.map((client) => (
                         <option key={client.id} value={client.id}>
                           {client.name}
                         </option>
                       ))}
                     </SelectNative>
                   </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Grupo global</p>
-                    <SelectNative
-                      value={globalGroupId}
-                      onChange={(event) => {
-                        setGlobalGroupId(event.target.value);
-                        if (event.target.value) setGlobalBrandId("");
-                      }}
-                    >
-                      <option value="">Sem grupo</option>
-                      {groups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </SelectNative>
-                  </div>
+                  {!isClientScoped ? (
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Grupo global</p>
+                      <SelectNative
+                        value={globalGroupId}
+                        onChange={(event) => {
+                          setGlobalGroupId(event.target.value);
+                          if (event.target.value) setGlobalBrandId("");
+                        }}
+                      >
+                        <option value="">Sem grupo</option>
+                        {groups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                      </SelectNative>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </div>

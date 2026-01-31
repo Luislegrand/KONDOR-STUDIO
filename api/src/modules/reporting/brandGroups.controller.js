@@ -1,8 +1,12 @@
 const brandGroupsService = require('./brandGroups.service');
+const { hasBrandScope } = require('./reportingScope.service');
 
 module.exports = {
   async list(req, res) {
     try {
+      if (hasBrandScope(req.reportingScope)) {
+        return res.json({ items: [] });
+      }
       const items = await brandGroupsService.listGroups(req.tenantId);
       return res.json({ items });
     } catch (err) {
@@ -13,6 +17,9 @@ module.exports = {
 
   async listMembers(req, res) {
     try {
+      if (hasBrandScope(req.reportingScope)) {
+        return res.status(403).json({ error: 'Acesso negado para este cliente' });
+      }
       const items = await brandGroupsService.listGroupMembers(
         req.tenantId,
         req.params.groupId,

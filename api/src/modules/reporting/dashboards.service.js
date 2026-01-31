@@ -1,6 +1,7 @@
 const { prisma } = require('../../prisma');
 const reportingData = require('./reportingData.service');
 const reportingGeneration = require('./reportingGeneration.service');
+const { hasBrandScope, isBrandAllowed, assertBrandAccess } = require('./reportingScope.service');
 
 function isPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
@@ -84,11 +85,15 @@ function buildLayout(layoutSchema, widgetsSchema) {
   }));
 }
 
-async function listDashboards(tenantId, filters = {}) {
+async function listDashboards(tenantId, filters = {}, scope) {
   const where = { tenantId };
   if (filters.scope) where.scope = filters.scope;
   if (filters.brandId) where.brandId = filters.brandId;
   if (filters.groupId) where.groupId = filters.groupId;
+  if (hasBrandScope(scope)) {
+    where.scope = 'BRAND';
+    where.brandId = { in: scope.allowedBrandIds };
+  }
 
   return prisma.dashboard.findMany({
     where,
@@ -96,13 +101,28 @@ async function listDashboards(tenantId, filters = {}) {
   });
 }
 
-async function getDashboard(tenantId, id) {
-  return prisma.dashboard.findFirst({
+async function getDashboard(tenantId, id, scope) {
+  const dashboard = await prisma.dashboard.findFirst({
     where: { id, tenantId },
   });
+  if (!dashboard) return null;
+  if (hasBrandScope(scope) && !isBrandAllowed(scope, dashboard.brandId)) {
+    const err = new Error('Acesso negado para este cliente');
+    err.status = 403;
+    throw err;
+  }
+  return dashboard;
 }
 
-async function createDashboard(tenantId, payload) {
+async function createDashboard(tenantId, payload, scope) {
+  if (hasBrandScope(scope)) {
+    if (payload.scope !== 'BRAND') {
+      const err = new Error('Escopo invalido para este cliente');
+      err.status = 403;
+      throw err;
+    }
+    assertBrandAccess(payload.brandId, scope);
+  }
   const layoutSchema = buildLayout(payload.layoutSchema, payload.widgetsSchema);
 
   return prisma.dashboard.create({
@@ -119,8 +139,8 @@ async function createDashboard(tenantId, payload) {
   });
 }
 
-async function updateDashboard(tenantId, id, payload) {
-  const existing = await getDashboard(tenantId, id);
+async function updateDashboard(tenantId, id, payload, scope) {
+  const existing = await getDashboard(tenantId, id, scope);
   if (!existing) return null;
 
   const data = {
@@ -143,8 +163,8 @@ async function updateDashboard(tenantId, id, payload) {
   });
 }
 
-async function queryDashboardData(tenantId, id, overrides = {}) {
-  const dashboard = await getDashboard(tenantId, id);
+async function queryDashboardData(tenantId, id, overrides = {}, scope) {
+  const dashboard = await getDashboard(tenantId, id, scope);
   if (!dashboard) return null;
 
   const globalFilters = resolveGlobalFilters(dashboard, overrides.filters);
@@ -198,6 +218,14 @@ async function queryDashboardData(tenantId, id, overrides = {}) {
     const widgetBrandId = widget?.brandId || null;
     const resolvedBrandId = inheritBrand ? effectiveBrandId : widgetBrandId;
 
+    if (!resolvedBrandId) {
+      results.push({
+        widgetId: widget?.id || null,
+        error: 'Selecione uma marca para este widget ou defina uma marca global',
+      });
+      continue;
+    }
+
     const resolvedConnectionId = await resolveConnectionForWidget({
       tenantId,
       source: widget.source,
@@ -239,7 +267,7 @@ async function queryDashboardData(tenantId, id, overrides = {}) {
           widget.filters,
         ),
         options: widget.options || null,
-      });
+      }, scope);
       results.push({
         widgetId: widget.id,
         data: response.data,

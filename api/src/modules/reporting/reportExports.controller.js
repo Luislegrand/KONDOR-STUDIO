@@ -5,7 +5,8 @@ module.exports = {
     try {
       const result = await reportExportsService.createReportExport(
         req.tenantId,
-        req.params.id
+        req.params.id,
+        req.reportingScope
       );
       return res.status(201).json(result);
     } catch (err) {
@@ -20,11 +21,13 @@ module.exports = {
     try {
       const items = await reportExportsService.listReportExports(
         req.tenantId,
-        req.params.id
+        req.params.id,
+        req.reportingScope
       );
       return res.json({ items });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao listar exportacoes" });
+      const status = err.statusCode || err.status || 500;
+      return res.status(status).json({ error: err.message || "Erro ao listar exportacoes" });
     }
   },
 
@@ -32,14 +35,16 @@ module.exports = {
     try {
       const record = await reportExportsService.getReportExport(
         req.tenantId,
-        req.params.exportId
+        req.params.exportId,
+        req.reportingScope
       );
       if (!record) {
         return res.status(404).json({ error: "Exportacao nao encontrada" });
       }
       return res.json(record);
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao buscar exportacao" });
+      const status = err.statusCode || err.status || 500;
+      return res.status(status).json({ error: err.message || "Erro ao buscar exportacao" });
     }
   },
 };

@@ -20,12 +20,20 @@ const TTL_BY_SOURCE = {
 };
 
 let redisClient;
+const memoryCache = new Map();
+let hasLoggedRedisError = false;
 
 function getRedisClient() {
   if (redisDisabled) return null;
   if (!redisClient) {
     const url = process.env.REDIS_URL || 'redis://localhost:6379';
     redisClient = new Redis(url);
+    redisClient.on('error', (err) => {
+      if (hasLoggedRedisError || process.env.NODE_ENV === 'test') return;
+      hasLoggedRedisError = true;
+      // Avoid crashing the process on Redis connection issues.
+      console.warn('[reportingCache] Redis error:', err?.message || err);
+    });
   }
   return redisClient;
 }
@@ -109,27 +117,60 @@ function buildReportSnapshotKey(tenantId, reportId, widgetId) {
     .join(':');
 }
 
-async function getCachedValue(key) {
-  const client = getRedisClient();
-  if (!client || !key) return null;
-  const raw = await client.get(key);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (_) {
+function getFromMemory(key) {
+  if (!key) return null;
+  const entry = memoryCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt && entry.expiresAt <= Date.now()) {
+    memoryCache.delete(key);
     return null;
   }
+  return entry.value;
+}
+
+function setToMemory(key, value, ttlSeconds) {
+  if (!key) return null;
+  const ttlMs = Number(ttlSeconds) ? Number(ttlSeconds) * 1000 : 0;
+  const expiresAt = ttlMs > 0 ? Date.now() + ttlMs : null;
+  memoryCache.set(key, { value, expiresAt });
+  return value;
+}
+
+async function getCachedValue(key) {
+  const client = getRedisClient();
+  if (!key) return null;
+  if (client) {
+    try {
+      const raw = await client.get(key);
+      if (raw) {
+        try {
+          return JSON.parse(raw);
+        } catch (_) {
+          return null;
+        }
+      }
+    } catch (_) {
+      // fallback to memory cache
+    }
+  }
+  return getFromMemory(key);
 }
 
 async function setCachedValue(key, value, ttlSeconds) {
   const client = getRedisClient();
-  if (!client || !key) return null;
+  if (!key) return null;
+  setToMemory(key, value, ttlSeconds);
   const payload = JSON.stringify(value ?? {});
   const ttl = Number(ttlSeconds) || null;
-  if (ttl && ttl > 0) {
-    return client.set(key, payload, 'EX', ttl);
+  if (!client) return null;
+  try {
+    if (ttl && ttl > 0) {
+      return client.set(key, payload, 'EX', ttl);
+    }
+    return client.set(key, payload);
+  } catch (_) {
+    return null;
   }
-  return client.set(key, payload);
 }
 
 function getTtlForSource(source) {

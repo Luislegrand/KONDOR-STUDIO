@@ -115,6 +115,23 @@ export default function ReportsHome() {
     compareDateTo: "",
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allowedBrandIds = useMemo(() => {
+    const ids = meData?.reportingScope?.allowedBrandIds;
+    return Array.isArray(ids) ? ids.map(String) : null;
+  }, [meData]);
+
+  const isClientScoped = Array.isArray(allowedBrandIds);
+  const allowedBrandSet = useMemo(
+    () => (isClientScoped ? new Set(allowedBrandIds) : null),
+    [isClientScoped, allowedBrandIds]
+  );
+
   useEffect(() => {
     if (!selectedBrandId && activeClientId) {
       setSelectedBrandId(activeClientId);
@@ -129,6 +146,7 @@ export default function ReportsHome() {
   const { data: groupsData } = useQuery({
     queryKey: ["reporting-brand-groups"],
     queryFn: () => base44.reporting.listBrandGroups(),
+    enabled: !isClientScoped,
   });
 
   const { data: reportsData, isLoading: reportsLoading } = useQuery({
@@ -159,14 +177,47 @@ export default function ReportsHome() {
     }, {});
   }, [connections]);
 
+  const scopedClients = useMemo(() => {
+    if (!isClientScoped) return clients;
+    if (!allowedBrandSet || !allowedBrandSet.size) return [];
+    return clients.filter((client) => allowedBrandSet.has(String(client.id)));
+  }, [clients, isClientScoped, allowedBrandSet]);
+
   const brandMap = useMemo(
-    () => new Map(clients.map((client) => [client.id, client.name])),
-    [clients]
+    () => new Map(scopedClients.map((client) => [client.id, client.name])),
+    [scopedClients]
   );
   const groupMap = useMemo(
     () => new Map((groupsData?.items || []).map((group) => [group.id, group.name])),
     [groupsData]
   );
+
+  useEffect(() => {
+    if (!isClientScoped) return;
+    if (!scopedClients.length) {
+      if (selectedBrandId) setSelectedBrandId("");
+      if (activeClientId) setActiveClientId("");
+      return;
+    }
+    const allowedIds = new Set(scopedClients.map((client) => String(client.id)));
+    const fallback = scopedClients[0].id;
+    if (selectedBrandId && !allowedIds.has(String(selectedBrandId))) {
+      setSelectedBrandId(fallback);
+    }
+    if (activeClientId && !allowedIds.has(String(activeClientId))) {
+      setActiveClientId(fallback);
+    }
+    if (!selectedBrandId && fallback) {
+      setSelectedBrandId(fallback);
+      setActiveClientId(fallback);
+    }
+  }, [
+    isClientScoped,
+    scopedClients,
+    selectedBrandId,
+    activeClientId,
+    setActiveClientId,
+  ]);
 
   const reports = reportsData?.items || [];
   const filteredReports = useMemo(() => {
@@ -251,8 +302,8 @@ export default function ReportsHome() {
   };
 
   const totalReports = reports.length;
-  const totalBrands = clients.length;
-  const totalGroups = groupsData?.items?.length || 0;
+  const totalBrands = scopedClients.length;
+  const totalGroups = isClientScoped ? 0 : groupsData?.items?.length || 0;
   const connectedCount = selectedBrandId ? connections.length : null;
   const connectionBadgeVariant =
     selectedBrandId && connectedCount
@@ -519,9 +570,9 @@ export default function ReportsHome() {
                   }}
                 >
                   <option value="">
-                    {clients.length ? "Selecione a marca" : "Sem marcas"}
+                    {scopedClients.length ? "Selecione a marca" : "Sem marcas"}
                   </option>
-                  {clients.map((client) => (
+                  {scopedClients.map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.name}
                     </option>

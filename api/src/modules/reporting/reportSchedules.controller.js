@@ -89,10 +89,15 @@ module.exports = {
             ? undefined
             : String(req.query.isActive) === "true",
       };
-      const items = await schedulesService.listSchedules(req.tenantId, filters);
+      const items = await schedulesService.listSchedules(
+        req.tenantId,
+        filters,
+        req.reportingScope,
+      );
       return res.json({ items });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao listar agendamentos" });
+      const status = err.statusCode || err.status || 500;
+      return res.status(status).json({ error: err.message || "Erro ao listar agendamentos" });
     }
   },
 
@@ -101,13 +106,15 @@ module.exports = {
       const schedule = await schedulesService.getSchedule(
         req.tenantId,
         req.params.id,
+        req.reportingScope,
       );
       if (!schedule) {
         return res.status(404).json({ error: "Agendamento nao encontrado" });
       }
       return res.json(schedule);
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao buscar agendamento" });
+      const status = err.statusCode || err.status || 500;
+      return res.status(status).json({ error: err.message || "Erro ao buscar agendamento" });
     }
   },
 
@@ -117,6 +124,7 @@ module.exports = {
       const schedule = await schedulesService.createSchedule(
         req.tenantId,
         payload,
+        req.reportingScope,
       );
       return res.status(201).json(schedule);
     } catch (err) {
@@ -134,6 +142,7 @@ module.exports = {
         req.tenantId,
         req.params.id,
         payload,
+        req.reportingScope,
       );
       if (!schedule) {
         return res.status(404).json({ error: "Agendamento nao encontrado" });
@@ -152,13 +161,15 @@ module.exports = {
       const removed = await schedulesService.removeSchedule(
         req.tenantId,
         req.params.id,
+        req.reportingScope,
       );
       if (!removed) {
         return res.status(404).json({ error: "Agendamento nao encontrado" });
       }
       return res.json({ ok: true });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao remover agendamento" });
+      const status = err.statusCode || err.status || 500;
+      return res.status(status).json({ error: err.message || "Erro ao remover agendamento" });
     }
   },
 
@@ -167,6 +178,7 @@ module.exports = {
       const result = await schedulesService.enqueueScheduleRun(
         req.tenantId,
         req.params.id,
+        req.reportingScope,
       );
       return res.json({ ok: true, result });
     } catch (err) {

@@ -22,6 +22,7 @@ const authMiddleware = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 const { loginSchema, clientLoginSchema } = require('../validators/authValidator');
 const mfaService = require('../services/mfaService');
+const { resolveAllowedBrandIds } = require('../modules/reporting/reportingScope.service');
 
 /**
  * Helper: parse expires strings like "30d", "7d", "24h" into a Date
@@ -533,7 +534,18 @@ router.get('/me', authMiddleware, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
-    return res.json({ user });
+    const reportingScope = await resolveAllowedBrandIds({
+      user: { id: user.id },
+      tenantId: user.tenantId,
+      isClientPortal: false,
+    });
+
+    return res.json({
+      user,
+      reportingScope: {
+        allowedBrandIds: reportingScope,
+      },
+    });
   } catch (err) {
     console.error('GET /auth/me error', err);
     return res.status(500).json({ error: 'Erro interno' });
