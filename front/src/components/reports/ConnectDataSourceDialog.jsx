@@ -79,6 +79,20 @@ function filterIntegrations(source, integrations = []) {
   });
 }
 
+function formatErrorMessage(err, fallback) {
+  if (!err) return fallback;
+  const raw = err?.data?.error ?? err?.message ?? err;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  if (raw && typeof raw === "object") {
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    try {
+      return JSON.stringify(raw);
+    } catch (error) {}
+  }
+  return fallback;
+}
+
 export default function ConnectDataSourceDialog({
   open,
   onOpenChange,
@@ -187,11 +201,9 @@ export default function ConnectDataSourceDialog({
       queryClient.invalidateQueries({ queryKey: ["ga4-status"] });
     },
     onError: (err) => {
-      const message =
-        err?.data?.error ||
-        err?.message ||
-        "Falha ao sincronizar propriedades GA4.";
-      setGa4SyncError(message);
+      setGa4SyncError(
+        formatErrorMessage(err, "Falha ao sincronizar propriedades GA4.")
+      );
     },
   });
 

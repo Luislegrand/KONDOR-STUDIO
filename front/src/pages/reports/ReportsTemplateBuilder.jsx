@@ -90,6 +90,20 @@ function normalizeWidgets(widgets = []) {
   return Array.isArray(widgets) ? widgets : [];
 }
 
+function formatErrorMessage(err, fallback) {
+  if (!err) return fallback;
+  const raw = err?.data?.error ?? err?.message ?? err;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  if (raw && typeof raw === "object") {
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    try {
+      return JSON.stringify(raw);
+    } catch (error) {}
+  }
+  return fallback;
+}
+
 function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
   const [draft, setDraft] = useState(widget);
   const [tab, setTab] = useState("main");
@@ -159,7 +173,7 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
   });
 
   const ga4Metrics = useMemo(() => {
-    const list = ga4Metadata?.metrics || [];
+    const list = Array.isArray(ga4Metadata?.metrics) ? ga4Metadata.metrics : [];
     return list.map((metric) => ({
       metricKey: metric.apiName,
       label: metric.uiName || metric.apiName,
@@ -167,7 +181,9 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
   }, [ga4Metadata]);
 
   const ga4Dimensions = useMemo(() => {
-    const list = ga4Metadata?.dimensions || [];
+    const list = Array.isArray(ga4Metadata?.dimensions)
+      ? ga4Metadata.dimensions
+      : [];
     return list.map((dimension) => ({
       metricKey: dimension.apiName,
       label: dimension.uiName || dimension.apiName,
@@ -272,9 +288,8 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
       }
       if (ga4MetadataLoading) return "Carregando metadados do GA4...";
       if (ga4MetadataError) {
-        return (
-          ga4MetadataErrorDetails?.data?.error ||
-          ga4MetadataErrorDetails?.message ||
+        return formatErrorMessage(
+          ga4MetadataErrorDetails,
           "Nao foi possivel carregar as metricas do GA4."
         );
       }

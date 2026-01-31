@@ -109,6 +109,20 @@ function useDebouncedValue(value, delay = 350) {
   return debouncedValue;
 }
 
+function formatErrorMessage(err, fallback) {
+  if (!err) return fallback;
+  const raw = err?.data?.error ?? err?.message ?? err;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  if (raw && typeof raw === "object") {
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    try {
+      return JSON.stringify(raw);
+    } catch (error) {}
+  }
+  return fallback;
+}
+
 function WidgetConfigDialog({
   open,
   onOpenChange,
@@ -240,7 +254,7 @@ function WidgetConfigDialog({
   });
 
   const ga4Metrics = useMemo(() => {
-    const list = ga4Metadata?.metrics || [];
+    const list = Array.isArray(ga4Metadata?.metrics) ? ga4Metadata.metrics : [];
     return list.map((metric) => ({
       metricKey: metric.apiName,
       label: metric.uiName || metric.apiName,
@@ -248,7 +262,9 @@ function WidgetConfigDialog({
   }, [ga4Metadata]);
 
   const ga4Dimensions = useMemo(() => {
-    const list = ga4Metadata?.dimensions || [];
+    const list = Array.isArray(ga4Metadata?.dimensions)
+      ? ga4Metadata.dimensions
+      : [];
     return list.map((dimension) => ({
       metricKey: dimension.apiName,
       label: dimension.uiName || dimension.apiName,
@@ -422,9 +438,8 @@ function WidgetConfigDialog({
     if (isGa4Source) {
       if (ga4MetadataLoading) return "Carregando metadados do GA4...";
       if (ga4MetadataError) {
-        return (
-          ga4MetadataErrorDetails?.data?.error ||
-          ga4MetadataErrorDetails?.message ||
+        return formatErrorMessage(
+          ga4MetadataErrorDetails,
           "Nao foi possivel carregar as metricas do GA4."
         );
       }
@@ -685,9 +700,10 @@ function WidgetConfigDialog({
                   <div className="mt-1 text-xs text-[var(--text-muted)]">
                     {ga4MetadataLoading
                       ? "Carregando metadados do GA4..."
-                      : ga4MetadataErrorDetails?.data?.error ||
-                        ga4MetadataErrorDetails?.message ||
-                        "Nao foi possivel carregar todas as metricas do GA4."}
+                      : formatErrorMessage(
+                          ga4MetadataErrorDetails,
+                          "Nao foi possivel carregar todas as metricas do GA4."
+                        )}
                   </div>
                 ) : null}
                 <MetricMultiSelect
@@ -727,9 +743,10 @@ function WidgetConfigDialog({
                   ) : null}
                   {ga4CompatibilityError ? (
                     <div className="text-xs text-red-600">
-                      {ga4CompatibilityErrorDetails?.data?.error ||
-                        ga4CompatibilityErrorDetails?.message ||
-                        "Erro ao validar combinacao GA4."}
+                      {formatErrorMessage(
+                        ga4CompatibilityErrorDetails,
+                        "Erro ao validar combinacao GA4."
+                      )}
                     </div>
                   ) : null}
                   {hasCompatibilityIssue ? (
