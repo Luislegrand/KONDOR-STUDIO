@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import logoHeader from "@/assets/logoheader.png";
+import BackButton from "@/components/ui/back-button.jsx";
 
 const navLinks = [
   { label: "Home", to: "/" },
@@ -44,13 +45,21 @@ export default function SiteHeader({ variant = "solid" }) {
   return (
     <header className={`${baseClass} sticky top-0 z-40`}>
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
-          <img
-            src={logoHeader}
-            alt="Kondor Studio"
-            className="h-10 w-auto drop-shadow-sm"
+        <div className="flex items-center gap-3">
+          <BackButton
+            fallback="/"
+            size="sm"
+            variant="outline"
+            labelClassName="hidden md:inline"
           />
-        </Link>
+          <Link to="/" className="flex items-center gap-3">
+            <img
+              src={logoHeader}
+              alt="Kondor Studio"
+              className="h-10 w-auto drop-shadow-sm"
+            />
+          </Link>
+        </div>
 
         <nav className="hidden md:flex items-center gap-6 text-sm">
           {navLinks.map((link) => (

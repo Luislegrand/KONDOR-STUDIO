@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/sidebar.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
+import BackButton from "@/components/ui/back-button.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
 
 const navGroups = [
@@ -290,6 +291,13 @@ function LayoutContent() {
       <div className="flex-1 flex min-h-0 flex-col">
         <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] bg-white/90 px-6 py-4 shadow-[var(--shadow-sm)] backdrop-blur">
           <div className="flex items-center gap-3">
+            <BackButton
+              fallback="/dashboard"
+              size="md"
+              variant="outline"
+              labelClassName="hidden md:inline"
+              className="h-10 px-3"
+            />
             <button
               type="button"
               onClick={toggleMobile}

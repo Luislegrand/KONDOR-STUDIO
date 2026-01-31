@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
+import BackButton from "@/components/ui/back-button.jsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.jsx";
 import {
   AlertTriangle,
@@ -435,6 +436,12 @@ function ClientTopbar({ clientName, onLogout }) {
     <header className="bg-white border-b border-slate-100">
       <div className="max-w-6xl mx-auto flex flex-col gap-4 px-4 py-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-6">
+          <BackButton
+            fallback="/client"
+            size="sm"
+            variant="outline"
+            labelClassName="hidden md:inline"
+          />
           <BrandLogo />
           <ClientNav />
         </div>
