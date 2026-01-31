@@ -512,7 +512,11 @@ export function applyTemplate(
       name: "Novo dashboard",
       widgets: [],
       layout: [],
-      globalFiltersDefaults: { ...buildDefaultDateRange(), compareMode: "NONE" },
+      globalFiltersDefaults: {
+        ...buildDefaultDateRange(),
+        compareMode: "NONE",
+        dimensionFilters: [],
+      },
     };
   }
 
@@ -529,6 +533,7 @@ export function applyTemplate(
       compareMode: "NONE",
       compareDateFrom: "",
       compareDateTo: "",
+      dimensionFilters: [],
       scope,
       brandId,
       groupId,

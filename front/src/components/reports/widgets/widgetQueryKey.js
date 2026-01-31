@@ -27,6 +27,7 @@ export function buildWidgetQueryKey({
     ? [...widget.metrics].map(String).sort()
     : [];
   const widgetFiltersKey = stableStringify(widget?.filters || {});
+  const dimensionFiltersKey = stableStringify(filters?.dimensionFilters || []);
 
   return [
     prefix,
@@ -37,6 +38,7 @@ export function buildWidgetQueryKey({
     widget?.widgetType || "",
     metrics,
     widgetFiltersKey,
+    dimensionFiltersKey,
     filters?.dateFrom || "",
     filters?.dateTo || "",
     filters?.compareMode || "",

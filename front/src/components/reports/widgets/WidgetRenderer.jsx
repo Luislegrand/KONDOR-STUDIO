@@ -139,6 +139,58 @@ function buildErrorMessage(err) {
   return descriptionParts.join(" ");
 }
 
+function normalizeDimensionFilterValues(values) {
+  if (!values) return [];
+  const list = Array.isArray(values) ? values : String(values).split(",");
+  const normalized = list
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return Array.from(new Set(normalized)).sort();
+}
+
+function normalizeDimensionFilter(filter) {
+  if (!filter || typeof filter !== "object") return null;
+  const key = String(filter.key || filter.dimension || filter.field || "").trim();
+  const operator = String(filter.operator || "IN").toUpperCase();
+  const values = normalizeDimensionFilterValues(filter.values || filter.value);
+  if (!key || !values.length) return null;
+  return {
+    ...filter,
+    key,
+    operator,
+    values,
+  };
+}
+
+function isFilterApplicable(filter, { source, level }) {
+  if (!filter) return false;
+  const filterSource = filter.source ? String(filter.source) : "";
+  const filterLevel = filter.level ? String(filter.level) : "";
+  if (filterSource && source && filterSource !== source) return false;
+  if (filterLevel && level && filterLevel !== level) return false;
+  return true;
+}
+
+function mergeDimensionFilters(widgetFilters, globalFilters, context) {
+  const merged = [
+    ...(Array.isArray(widgetFilters) ? widgetFilters : []),
+    ...(Array.isArray(globalFilters) ? globalFilters : []),
+  ]
+    .map(normalizeDimensionFilter)
+    .filter(Boolean)
+    .filter((filter) => isFilterApplicable(filter, context));
+
+  const deduped = [];
+  const seen = new Set();
+  merged.forEach((filter) => {
+    const signature = `${filter.key}|${filter.operator}|${filter.values.join(",")}`;
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    deduped.push(filter);
+  });
+  return deduped;
+}
+
 function isAuthError(err) {
   const status = err?.status || err?.data?.status || null;
   if (status === 401 || status === 403) return true;
@@ -170,6 +222,38 @@ const WidgetRenderer = React.memo(function WidgetRenderer({
   const needsData = widgetType !== "TEXT" && widgetType !== "IMAGE";
   const hasMetrics = metrics.length > 0;
   const hasOverride = dataOverride && typeof dataOverride === "object";
+  const widgetFilterPayload = useMemo(() => {
+    if (widget?.filters && typeof widget.filters === "object") return widget.filters;
+    return {};
+  }, [widget?.filters]);
+  const globalDimensionFilters = useMemo(
+    () => (Array.isArray(filters?.dimensionFilters) ? filters.dimensionFilters : []),
+    [filters?.dimensionFilters]
+  );
+  const mergedDimensionFilters = useMemo(
+    () =>
+      mergeDimensionFilters(widgetFilterPayload.dimensionFilters, globalDimensionFilters, {
+        source,
+        level: widget?.level,
+      }),
+    [widgetFilterPayload, globalDimensionFilters, source, widget?.level]
+  );
+  const queryFilters = useMemo(() => {
+    const base = { ...widgetFilterPayload };
+    if (mergedDimensionFilters.length) {
+      base.dimensionFilters = mergedDimensionFilters;
+    } else if (Object.prototype.hasOwnProperty.call(base, "dimensionFilters")) {
+      delete base.dimensionFilters;
+    }
+    return base;
+  }, [widgetFilterPayload, mergedDimensionFilters]);
+  const filtersForKey = useMemo(
+    () => ({
+      ...filters,
+      dimensionFilters: mergedDimensionFilters,
+    }),
+    [filters, mergedDimensionFilters]
+  );
   const canFetch =
     enableQuery &&
     hasSource &&
@@ -183,7 +267,7 @@ const WidgetRenderer = React.memo(function WidgetRenderer({
       buildWidgetQueryKey({
         connectionId: connectionId || "",
         widget,
-        filters,
+        filters: filtersForKey,
         forceMock,
         prefix: queryKeyPrefix,
       }),
@@ -195,12 +279,13 @@ const WidgetRenderer = React.memo(function WidgetRenderer({
       widget?.breakdown,
       widget?.widgetType,
       widget?.metrics,
-      widget?.filters,
-      filters?.dateFrom,
-      filters?.dateTo,
-      filters?.compareMode,
-      filters?.compareDateFrom,
-      filters?.compareDateTo,
+      widgetFilterPayload,
+      filtersForKey?.dateFrom,
+      filtersForKey?.dateTo,
+      filtersForKey?.compareMode,
+      filtersForKey?.compareDateFrom,
+      filtersForKey?.compareDateTo,
+      filtersForKey?.dimensionFilters,
       forceMock,
       queryKeyPrefix,
     ]
@@ -229,7 +314,7 @@ const WidgetRenderer = React.memo(function WidgetRenderer({
           level: widget?.level,
           breakdown,
           metrics,
-          filters: widget?.filters || {},
+          filters: queryFilters,
           options: widget?.options || {},
           widgetType,
           forceMock,

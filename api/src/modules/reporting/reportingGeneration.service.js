@@ -60,6 +60,12 @@ function resolveDateRange({ dateFrom, dateTo }, fallbackDays = DEFAULT_RANGE_DAY
 function mergeFilters(globalFilters, widgetFilters) {
   const isPlainObject = (value) =>
     value && typeof value === 'object' && !Array.isArray(value);
+  const mergeDimensionFilters = (base, extra) => {
+    const baseList = Array.isArray(base) ? base : [];
+    const extraList = Array.isArray(extra) ? extra : [];
+    if (!baseList.length && !extraList.length) return null;
+    return [...baseList, ...extraList];
+  };
 
   if (isPlainObject(globalFilters) && isPlainObject(widgetFilters)) {
     const {
@@ -68,9 +74,19 @@ function mergeFilters(globalFilters, widgetFilters) {
       compareMode,
       compareDateFrom,
       compareDateTo,
+      dimensionFilters,
       ...restGlobal
     } = globalFilters;
-    return { ...restGlobal, ...widgetFilters };
+    const { dimensionFilters: widgetDimensionFilters, ...restWidget } = widgetFilters;
+    const merged = { ...restGlobal, ...restWidget };
+    const mergedDimensionFilters = mergeDimensionFilters(
+      dimensionFilters,
+      widgetDimensionFilters,
+    );
+    if (mergedDimensionFilters && mergedDimensionFilters.length) {
+      merged.dimensionFilters = mergedDimensionFilters;
+    }
+    return merged;
   }
 
   if (isPlainObject(globalFilters)) {
@@ -80,9 +96,11 @@ function mergeFilters(globalFilters, widgetFilters) {
       compareMode,
       compareDateFrom,
       compareDateTo,
+      dimensionFilters,
       ...restGlobal
     } = globalFilters;
-    return restGlobal;
+    if (!dimensionFilters) return restGlobal;
+    return { ...restGlobal, dimensionFilters };
   }
 
   return widgetFilters || null;

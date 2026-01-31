@@ -10,6 +10,16 @@ function isPlainObject(value) {
 function mergeFilters(globalFilters, widgetFilters) {
   const normalizedGlobal = isPlainObject(globalFilters) ? globalFilters : {};
   const normalizedWidget = isPlainObject(widgetFilters) ? widgetFilters : {};
+  const mergeDimensionFilters = () => {
+    const globalList = Array.isArray(normalizedGlobal.dimensionFilters)
+      ? normalizedGlobal.dimensionFilters
+      : [];
+    const widgetList = Array.isArray(normalizedWidget.dimensionFilters)
+      ? normalizedWidget.dimensionFilters
+      : [];
+    if (!globalList.length && !widgetList.length) return null;
+    return [...globalList, ...widgetList];
+  };
   const {
     dateFrom,
     dateTo,
@@ -18,9 +28,16 @@ function mergeFilters(globalFilters, widgetFilters) {
     compareMode,
     compareDateFrom,
     compareDateTo,
+    dimensionFilters,
     ...restGlobal
   } = normalizedGlobal;
-  return { ...restGlobal, ...normalizedWidget };
+  const { dimensionFilters: widgetDimensionFilters, ...restWidget } = normalizedWidget;
+  const merged = { ...restGlobal, ...restWidget };
+  const mergedDimensionFilters = mergeDimensionFilters();
+  if (mergedDimensionFilters && mergedDimensionFilters.length) {
+    merged.dimensionFilters = mergedDimensionFilters;
+  }
+  return merged;
 }
 
 function resolveGlobalFilters(dashboard, overrides = {}) {

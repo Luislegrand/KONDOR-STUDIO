@@ -6,6 +6,7 @@ import PageShell from "@/components/ui/page-shell.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { DateField } from "@/components/ui/date-field.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
+import { Input } from "@/components/ui/input.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import ConnectDataSourceDialog from "@/components/reports/ConnectDataSourceDialog.jsx";
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
@@ -40,6 +41,44 @@ function buildLayout(widgets, layoutSchema) {
   }));
 }
 
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handle);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+function normalizeFilterValues(values) {
+  if (!values) return [];
+  const list = Array.isArray(values) ? values : String(values).split(",");
+  const normalized = list
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return Array.from(new Set(normalized)).sort();
+}
+
+function normalizeDimensionFilters(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((filter) => {
+      if (!filter || typeof filter !== "object") return null;
+      return {
+        id: filter.id || `filter-${Math.random().toString(36).slice(2, 8)}`,
+        label: filter.label || "",
+        source: filter.source || "",
+        level: filter.level || "",
+        key: filter.key || filter.dimension || filter.field || "",
+        operator: String(filter.operator || "IN").toUpperCase(),
+        values: normalizeFilterValues(filter.values || filter.value),
+      };
+    })
+    .filter(Boolean);
+}
+
 export default function DashboardViewer() {
   const { dashboardId } = useParams();
   const navigate = useNavigate();
@@ -61,6 +100,7 @@ export default function DashboardViewer() {
   const [compareDateTo, setCompareDateTo] = useState("");
   const [globalBrandId, setGlobalBrandId] = useState("");
   const [globalGroupId, setGlobalGroupId] = useState("");
+  const [dimensionFilters, setDimensionFilters] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshOption, setAutoRefreshOption] = useState("OFF");
   const [lastDashboardUpdatedAt, setLastDashboardUpdatedAt] = useState(null);
@@ -71,6 +111,7 @@ export default function DashboardViewer() {
     brandId: "",
     source: "META_ADS",
   });
+  const debouncedDimensionFilters = useDebouncedValue(dimensionFilters);
 
   const { data: meData } = useQuery({
     queryKey: ["auth-me"],
@@ -147,6 +188,7 @@ export default function DashboardViewer() {
       setGlobalBrandId(filters.brandId || "");
       setGlobalGroupId(filters.groupId || "");
     }
+    setDimensionFilters(normalizeDimensionFilters(filters.dimensionFilters || []));
   }, [dashboard, dateFrom, dateTo]);
 
   useEffect(() => {
@@ -567,6 +609,34 @@ export default function DashboardViewer() {
                 </>
               ) : null}
             </div>
+            {dimensionFilters.length ? (
+              <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {dimensionFilters.map((filter) => (
+                  <div key={filter.id}>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {filter.label || filter.key || "Filtro"}
+                      {filter.operator === "NOT_IN" ? " (excluir)" : ""}
+                    </p>
+                    <Input
+                      value={filter.values.join(", ")}
+                      onChange={(event) =>
+                        setDimensionFilters((prev) =>
+                          prev.map((item) =>
+                            item.id === filter.id
+                              ? {
+                                  ...item,
+                                  values: normalizeFilterValues(event.target.value),
+                                }
+                              : item
+                          )
+                        )
+                      }
+                      placeholder="Digite valores separados por vírgula"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
         )}
 
@@ -609,6 +679,7 @@ export default function DashboardViewer() {
                         compareMode,
                         compareDateFrom,
                         compareDateTo,
+                        dimensionFilters: debouncedDimensionFilters,
                       }}
                       onConnect={connectHandler}
                       onStatusChange={(nextStatus) =>

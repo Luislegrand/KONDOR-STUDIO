@@ -64,6 +64,11 @@ const COMPARE_OPTIONS = [
   { value: "CUSTOM", label: "Personalizado" },
 ];
 
+const DIMENSION_FILTER_OPERATORS = [
+  { value: "IN", label: "Inclui" },
+  { value: "NOT_IN", label: "Exclui" },
+];
+
 const LEVEL_LABELS = {
   ACCOUNT: "Conta",
   CUSTOMER: "Conta",
@@ -83,6 +88,52 @@ function createWidgetId() {
     return crypto.randomUUID();
   }
   return `widget-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
+function createFilterId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `filter-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
+function normalizeFilterValues(values) {
+  if (!values) return [];
+  const list = Array.isArray(values) ? values : String(values).split(",");
+  const normalized = list
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return Array.from(new Set(normalized)).sort();
+}
+
+function normalizeDimensionFilters(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((filter) => {
+      if (!filter || typeof filter !== "object") return null;
+      return {
+        id: filter.id || createFilterId(),
+        label: filter.label || "",
+        source: filter.source || "",
+        level: filter.level || "",
+        key: filter.key || filter.dimension || filter.field || "",
+        operator: String(filter.operator || "IN").toUpperCase(),
+        values: normalizeFilterValues(filter.values || filter.value),
+      };
+    })
+    .filter(Boolean);
+}
+
+function createDimensionFilter() {
+  return {
+    id: createFilterId(),
+    label: "",
+    source: "",
+    level: "",
+    key: "",
+    operator: "IN",
+    values: [],
+  };
 }
 
 function toDateKey(value) {
@@ -939,6 +990,7 @@ export default function DashboardBuilder() {
   const [compareMode, setCompareMode] = useState("NONE");
   const [compareDateFrom, setCompareDateFrom] = useState("");
   const [compareDateTo, setCompareDateTo] = useState("");
+  const [dimensionFilters, setDimensionFilters] = useState([]);
   const [layout, setLayout] = useState([]);
   const [widgets, setWidgets] = useState([]);
   const [widgetStatusMap, setWidgetStatusMap] = useState({});
@@ -981,6 +1033,7 @@ export default function DashboardBuilder() {
   const debouncedCompareMode = useDebouncedValue(compareMode);
   const debouncedCompareDateFrom = useDebouncedValue(compareDateFrom);
   const debouncedCompareDateTo = useDebouncedValue(compareDateTo);
+  const debouncedDimensionFilters = useDebouncedValue(dimensionFilters);
 
   const debouncedFilters = useMemo(
     () => ({
@@ -989,6 +1042,7 @@ export default function DashboardBuilder() {
       compareMode: debouncedCompareMode,
       compareDateFrom: debouncedCompareDateFrom,
       compareDateTo: debouncedCompareDateTo,
+      dimensionFilters: debouncedDimensionFilters,
     }),
     [
       debouncedDateFrom,
@@ -996,6 +1050,7 @@ export default function DashboardBuilder() {
       debouncedCompareMode,
       debouncedCompareDateFrom,
       debouncedCompareDateTo,
+      debouncedDimensionFilters,
     ]
   );
 
@@ -1121,6 +1176,7 @@ export default function DashboardBuilder() {
     setCompareDateTo(filters.compareDateTo || "");
     setGlobalBrandId(filters.brandId || "");
     setGlobalGroupId(filters.groupId || "");
+    setDimensionFilters(normalizeDimensionFilters(filters.dimensionFilters || []));
   }, [dashboard]);
 
   useEffect(() => {
@@ -1155,6 +1211,7 @@ export default function DashboardBuilder() {
     setCompareDateTo("");
     setGlobalBrandId("");
     setGlobalGroupId("");
+    setDimensionFilters([]);
     setLayout([]);
     setWidgets([]);
     setShowTemplatePicker(true);
@@ -1315,6 +1372,7 @@ export default function DashboardBuilder() {
         compareDateTo: compareMode === "CUSTOM" ? compareDateTo : null,
         brandId: scope !== "BRAND" ? globalBrandId : brandId,
         groupId: scope === "TENANT" ? globalGroupId : groupId,
+        dimensionFilters: normalizeDimensionFilters(dimensionFilters),
       },
     };
 
@@ -1416,6 +1474,9 @@ export default function DashboardBuilder() {
       setCompareMode(result.globalFiltersDefaults?.compareMode || "NONE");
       setCompareDateFrom(result.globalFiltersDefaults?.compareDateFrom || "");
       setCompareDateTo(result.globalFiltersDefaults?.compareDateTo || "");
+      setDimensionFilters(
+        normalizeDimensionFilters(result.globalFiltersDefaults?.dimensionFilters || [])
+      );
       setShowTemplatePicker(false);
       const primarySource =
         result.widgets?.find((item) => item?.source)?.source || "";
@@ -1923,6 +1984,173 @@ export default function DashboardBuilder() {
                     </SelectNative>
                   </div>
                 ) : null}
+
+                <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text)]">
+                        Filtros de dimensao
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Aplique filtros globais (ex: campanha, adset, cidade).
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        setDimensionFilters((prev) => [...prev, createDimensionFilter()])
+                      }
+                    >
+                      Adicionar
+                    </Button>
+                  </div>
+
+                  {dimensionFilters.length ? (
+                    <div className="mt-3 space-y-3">
+                      {dimensionFilters.map((filter) => (
+                        <div
+                          key={filter.id}
+                          className="rounded-[12px] border border-[var(--border)] bg-white px-3 py-3"
+                        >
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                              <Label>Label</Label>
+                              <Input
+                                value={filter.label}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? { ...item, label: event.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="Campanha"
+                              />
+                            </div>
+                            <div>
+                              <Label>Fonte</Label>
+                              <SelectNative
+                                value={filter.source || ""}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? { ...item, source: event.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                              >
+                                <option value="">Todas</option>
+                                {SOURCE_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </SelectNative>
+                            </div>
+                            <div>
+                              <Label>Nivel</Label>
+                              <Input
+                                value={filter.level}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? { ...item, level: event.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="CAMPAIGN"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-3">
+                            <div>
+                              <Label>Dimensao (key)</Label>
+                              <Input
+                                value={filter.key}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? { ...item, key: event.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="campaignName"
+                              />
+                            </div>
+                            <div>
+                              <Label>Operador</Label>
+                              <SelectNative
+                                value={filter.operator || "IN"}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? { ...item, operator: event.target.value }
+                                        : item
+                                    )
+                                  )
+                                }
+                              >
+                                {DIMENSION_FILTER_OPERATORS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </SelectNative>
+                            </div>
+                            <div>
+                              <Label>Valores (CSV)</Label>
+                              <Input
+                                value={filter.values.join(", ")}
+                                onChange={(event) =>
+                                  setDimensionFilters((prev) =>
+                                    prev.map((item) =>
+                                      item.id === filter.id
+                                        ? {
+                                            ...item,
+                                            values: normalizeFilterValues(event.target.value),
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="Brand, Produto"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setDimensionFilters((prev) =>
+                                  prev.filter((item) => item.id !== filter.id)
+                                )
+                              }
+                            >
+                              Remover
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">
+                      Nenhum filtro adicional configurado.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 

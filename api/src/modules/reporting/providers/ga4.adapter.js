@@ -50,6 +50,59 @@ function buildDimensionFilterFromEntries(entries) {
   return { andGroup: { expressions } };
 }
 
+function buildDimensionFilterFromDimensionFilters(filters = []) {
+  if (!Array.isArray(filters) || !filters.length) return null;
+
+  const expressions = filters
+    .map((filter) => {
+      if (!filter || typeof filter !== 'object') return null;
+      const key = normalizeString(filter.key || filter.dimension || filter.field);
+      if (!key) return null;
+      const rawValues = Array.isArray(filter.values)
+        ? filter.values
+        : filter.value
+          ? [filter.value]
+          : [];
+      const values = rawValues
+        .map((value) => String(value).trim())
+        .filter(Boolean);
+      if (!values.length) return null;
+
+      const baseExpression =
+        values.length > 1
+          ? {
+              filter: {
+                fieldName: key,
+                inListFilter: {
+                  values,
+                  caseSensitive: false,
+                },
+              },
+            }
+          : {
+              filter: {
+                fieldName: key,
+                stringFilter: {
+                  matchType: 'EXACT',
+                  value: values[0],
+                  caseSensitive: false,
+                },
+              },
+            };
+
+      if (String(filter.operator || 'IN').toUpperCase() === 'NOT_IN') {
+        return { notExpression: baseExpression };
+      }
+
+      return baseExpression;
+    })
+    .filter(Boolean);
+
+  if (!expressions.length) return null;
+  if (expressions.length === 1) return expressions[0];
+  return { andGroup: { expressions } };
+}
+
 function resolveGa4Filters(filters) {
   if (!filters || typeof filters !== 'object') {
     return { dimensionFilter: null, metricFilter: null };
@@ -76,11 +129,22 @@ function resolveGa4Filters(filters) {
     };
   }
 
+  const dimensionFilters = Array.isArray(filters.dimensionFilters)
+    ? filters.dimensionFilters
+    : [];
+  if (dimensionFilters.length) {
+    const built = buildDimensionFilterFromDimensionFilters(dimensionFilters);
+    if (built) {
+      return { dimensionFilter: built, metricFilter: null };
+    }
+  }
+
   const reserved = new Set([
     'dimensionFilter',
     'metricFilter',
     'ga4DimensionFilter',
     'ga4MetricFilter',
+    'dimensionFilters',
     'ga4',
     'brandId',
     'groupId',
