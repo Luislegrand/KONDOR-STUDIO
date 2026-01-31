@@ -813,7 +813,6 @@ function WidgetConfigDialog({
                       connectionId={previewConnectionId}
                       filters={previewRange}
                       enableQuery={previewEnabled}
-                      forceMock={!previewConnectionId}
                       queryKeyPrefix="preview"
                       staleTime={120 * 1000}
                       variant="mini"

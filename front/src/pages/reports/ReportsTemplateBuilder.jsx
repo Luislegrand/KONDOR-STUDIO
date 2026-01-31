@@ -479,7 +479,6 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
                     enableQuery={Boolean(
                       source && (level || widgetType === "TEXT" || widgetType === "IMAGE")
                     )}
-                    forceMock
                     variant="mini"
                   />
                 </div>
@@ -580,7 +579,6 @@ function PreviewDialog({ open, onOpenChange, widgets, layout }) {
                   widget={widget}
                   filters={previewRange}
                   enableQuery={Boolean(widget?.source)}
-                  forceMock
                   variant="mini"
                 />
               </WidgetCard>
@@ -873,7 +871,6 @@ export default function ReportsTemplateBuilder() {
                         dateTo: new Date().toISOString().slice(0, 10),
                       }}
                       enableQuery={Boolean(widget?.source)}
-                      forceMock
                       variant="mini"
                       onEdit={editHandler}
                     />
