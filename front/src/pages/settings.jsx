@@ -10,6 +10,7 @@ import PageHeader from "@/components/ui/page-header.jsx";
 import { Upload, Palette, Building2, CreditCard, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { applyTenantTheme } from "@/utils/theme.js";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -28,24 +29,34 @@ export default function Settings() {
   }, []);
 
   const loadTenant = async () => {
-    const tenants = await base44.entities.Tenant.list();
-    if (tenants.length > 0) {
-      const t = tenants[0];
-      setTenant(t);
-      setFormData({
-        agency_name: t.agency_name || "",
-        primary_color: t.primary_color || "#A78BFA",
-        accent_color: t.accent_color || "#39FF14",
-        logo_url: t.logo_url || ""
-      });
-    }
+    const t = await base44.entities.Tenant.getCurrent();
+    if (!t) return;
+    setTenant(t);
+    setFormData({
+      agency_name: t.agency_name || "",
+      primary_color: t.primary_color || "#A78BFA",
+      accent_color: t.accent_color || "#39FF14",
+      logo_url: t.logo_url || ""
+    });
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data) => base44.entities.Tenant.update(tenant.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant'] });
-      loadTenant();
+    mutationFn: (data) => base44.entities.Tenant.update(data),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["tenant"] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-theme"] });
+      if (updated) {
+        setTenant(updated);
+        setFormData({
+          agency_name: updated.agency_name || "",
+          primary_color: updated.primary_color || "#A78BFA",
+          accent_color: updated.accent_color || "#39FF14",
+          logo_url: updated.logo_url || ""
+        });
+        applyTenantTheme(updated);
+      } else {
+        loadTenant();
+      }
     }
   });
 

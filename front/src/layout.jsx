@@ -42,6 +42,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { SelectNative } from "@/components/ui/select-native.jsx";
 import BackButton from "@/components/ui/back-button.jsx";
 import { useActiveClient } from "@/hooks/useActiveClient.js";
+import { useTenantTheme } from "@/hooks/useTenantTheme.js";
+import { resolveTenantBranding } from "@/utils/theme.js";
 
 const navGroups = [
   {
@@ -120,6 +122,10 @@ function LayoutContent() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const flatNav = useMemo(() => flattenNav(navGroups), []);
+  const { tenant } = useTenantTheme();
+  const branding = resolveTenantBranding(tenant || {});
+  const agencyLogo = branding.logoUrl || logoHeader;
+  const agencyName = branding.name || "Kondor Studio";
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
@@ -205,9 +211,9 @@ function LayoutContent() {
     <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--text)]">
       <Sidebar className="hidden lg:flex kondor-main-sidebar">
         <SidebarHeader className={`border-[var(--border)] bg-white/80 backdrop-blur ${collapsed ? "px-3" : "px-4"}`}>
-          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <img src={logoHeader} alt="Kondor Studio" className="h-9 w-auto" />
+              <img src={agencyLogo} alt={agencyName} className="h-9 w-auto" />
             </div>
             <SidebarTrigger className="border-[var(--border)] text-[var(--text-muted)]">
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -374,7 +380,7 @@ function LayoutContent() {
               />
               <div className="absolute inset-y-0 left-0 w-72 max-w-full bg-[var(--surface)] shadow-2xl">
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-4">
-                  <img src={logoHeader} alt="Kondor Studio" className="h-8 w-auto" />
+                  <img src={agencyLogo} alt={agencyName} className="h-8 w-auto" />
                   <button
                     type="button"
                     onClick={closeMobile}

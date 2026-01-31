@@ -8,6 +8,7 @@ const dashboardsController = require('./dashboards.controller');
 const metricCatalogController = require('./metricCatalog.controller');
 const reportingMetricsController = require('./reportingMetrics.controller');
 const reportExportsController = require('./reportExports.controller');
+const reportDeliveriesController = require('./reportDeliveries.controller');
 const reportSchedulesController = require('./reportSchedules.controller');
 const templatesController = require('./templates.controller');
 const reportsController = require('./reports.controller');
@@ -71,6 +72,8 @@ router.delete('/reports/:id', allowEditor, reportsController.remove);
 router.get('/reports/:id/exports', allowViewer, reportExportsController.list);
 router.post('/reports/:id/exports', allowEditor, reportExportsController.create);
 router.get('/report-exports/:exportId', allowViewer, reportExportsController.get);
+router.get('/reports/:id/deliveries', allowViewer, reportDeliveriesController.list);
+router.post('/reports/:id/deliveries', allowEditor, reportDeliveriesController.create);
 
 router.get('/schedules', allowAdmin, reportSchedulesController.list);
 router.get('/schedules/:id', allowAdmin, reportSchedulesController.get);

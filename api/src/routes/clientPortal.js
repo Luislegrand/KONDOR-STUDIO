@@ -78,8 +78,40 @@ async function clientAuth(req, res, next) {
 
 // === Rotas ===
 router.get('/me', clientAuth, async (req, res) => {
-  const client = req.client;
-  return res.json({ client });
+  try {
+    const client = req.client;
+    let tenant = null;
+
+    if (client?.tenantId) {
+      const record = await prisma.tenant.findUnique({
+        where: { id: client.tenantId },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          settings: true,
+        },
+      });
+
+      if (record) {
+        const settings = record.settings || {};
+        tenant = {
+          id: record.id,
+          slug: record.slug,
+          name: record.name,
+          agency_name: settings.agency_name || record.name,
+          primary_color: settings.primary_color || '#A78BFA',
+          accent_color: settings.accent_color || '#39FF14',
+          logo_url: settings.logo_url || null,
+        };
+      }
+    }
+
+    return res.json({ client, tenant });
+  } catch (err) {
+    console.error('GET /client-portal/me error:', err);
+    return res.status(500).json({ error: 'Erro ao carregar dados do portal.' });
+  }
 });
 
 router.get('/posts', clientAuth, async (req, res) => {

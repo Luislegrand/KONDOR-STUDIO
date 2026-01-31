@@ -38,6 +38,7 @@ import {
 import { base44 } from "@/apiClient/base44Client";
 import logoHeader from "@/assets/logoheader.png";
 import { isVideoMedia, resolveMediaUrl } from "@/lib/media.js";
+import { applyTenantTheme, resolveTenantBranding } from "@/utils/theme.js";
 
 const ClientPortalContext = createContext(null);
 
@@ -106,6 +107,13 @@ export default function ClientPortalLayout() {
     queryFn: () => fetchClient("/client-portal/me"),
     retry: false,
   });
+
+  const tenant = meData?.tenant || null;
+
+  useEffect(() => {
+    if (!tenant) return;
+    applyTenantTheme(tenant);
+  }, [tenant]);
 
   useEffect(() => {
     if (!meError) return;
@@ -372,6 +380,7 @@ export default function ClientPortalLayout() {
 
   const contextValue = {
     client,
+    tenant,
     posts,
     metrics,
     approvals,
@@ -402,7 +411,7 @@ export default function ClientPortalLayout() {
 function ClientPortalScaffold() {
   const { client, actions } = useClientPortal();
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[var(--background)]">
       <ClientTopbar clientName={client?.name || "Conta"} onLogout={actions.logout} />
       <PageContainer>
         <Outlet />
@@ -413,7 +422,7 @@ function ClientPortalScaffold() {
 
 function ClientTopbar({ clientName, onLogout }) {
   return (
-    <header className="bg-white border-b border-slate-100">
+    <header className="bg-[var(--surface)] border-b border-[var(--border)]">
       <div className="max-w-6xl mx-auto flex flex-col gap-4 px-4 py-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-6">
           <BackButton
@@ -432,9 +441,12 @@ function ClientTopbar({ clientName, onLogout }) {
 }
 
 function BrandLogo() {
+  const { tenant } = useClientPortal();
+  const branding = resolveTenantBranding(tenant || {});
+  const logoSrc = branding.logoUrl || logoHeader;
   return (
     <div className="flex items-center gap-3">
-      <img src={logoHeader} alt="Kondor" className="h-10 w-auto" />
+      <img src={logoSrc} alt={branding.name || "Kondor"} className="h-10 w-auto" />
     </div>
   );
 }
@@ -447,7 +459,7 @@ function ClientNav() {
   ];
 
   return (
-    <nav className="flex items-center gap-1 rounded-full bg-purple-50/70 p-1 text-sm">
+    <nav className="flex items-center gap-1 rounded-full bg-[var(--primary-light)] p-1 text-sm">
       {links.map((link) => (
         <NavLink
           key={link.to}
@@ -457,8 +469,8 @@ function ClientNav() {
             [
               "px-4 py-2 rounded-full font-medium transition-colors",
               isActive
-                ? "bg-purple-600 text-white shadow"
-                : "text-slate-500 hover:text-purple-700",
+                ? "bg-[var(--primary)] text-white shadow"
+                : "text-[var(--text-muted)] hover:text-[var(--primary)]",
             ].join(" ")
           }
         >
@@ -471,8 +483,8 @@ function ClientNav() {
 
 function ClientAccountMenu({ clientName, onLogout }) {
   return (
-    <div className="flex items-center gap-4 text-sm text-slate-600">
-      <span className="font-medium text-slate-900">{clientName}</span>
+    <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
+      <span className="font-medium text-[var(--text)]">{clientName}</span>
       <Button type="button" onClick={onLogout} className="px-4 py-2">
         Sair
       </Button>
@@ -686,7 +698,7 @@ function QuickAlertsCard({ pending, awaiting, refused }) {
             className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm text-slate-700 hover:border-slate-200 hover:bg-slate-50"
           >
             <span>{alert.label}</span>
-            <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-semibold text-white">
+            <span className="rounded-full bg-[var(--primary)] px-3 py-1 text-xs font-semibold text-white">
               {alert.value}
             </span>
           </Link>
@@ -844,7 +856,7 @@ function RecentPostsCard({ posts, approvalsByPostId, onApprove, onRequestChanges
                 {approval && adjustmentState.postId === post.id && (
                   <div className="mt-4 w-full rounded-xl border border-slate-100 bg-slate-50/60 p-4">
                     <textarea
-                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]"
                       rows={3}
                       placeholder="Descreva o ajuste desejado"
                       value={adjustmentState.notes}
@@ -1039,7 +1051,7 @@ function KanbanCard({ post, approval, onApprove, onRequestChanges, onReject, onP
       {approval && isAdjusting && (
         <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
           <textarea
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]"
             rows={3}
             placeholder="Descreva o ajuste desejado"
             value={notes}
@@ -1181,7 +1193,7 @@ function PostPreviewModal({ post, approval, onClose, onApprove, onReject, onRequ
             {approval && isAdjusting && (
               <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
                 <textarea
-                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]"
                   rows={3}
                   placeholder="Descreva o ajuste desejado"
                   value={notes}

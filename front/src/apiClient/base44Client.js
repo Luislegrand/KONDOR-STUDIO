@@ -784,6 +784,19 @@ const Reporting = {
     return jsonFetch(`/reporting/report-exports/${exportId}`, { method: "GET" });
   },
 
+  async listReportDeliveries(id) {
+    if (!id) throw new Error("reportId obrigatorio");
+    return jsonFetch(`/reporting/reports/${id}/deliveries`, { method: "GET" });
+  },
+
+  async createReportDelivery(id, payload = {}) {
+    if (!id) throw new Error("reportId obrigatorio");
+    return jsonFetch(`/reporting/reports/${id}/deliveries`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
   async listDashboards(params = {}) {
     const qs = buildQuery(params);
     return jsonFetch(`/reporting/dashboards${qs}`, { method: "GET" });

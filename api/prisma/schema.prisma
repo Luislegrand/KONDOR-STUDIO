@@ -147,6 +147,18 @@ enum ReportExportStatus {
   ERROR
 }
 
+enum ReportDeliveryChannel {
+  WHATSAPP
+  EMAIL
+}
+
+enum ReportDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 enum ReportScheduleFrequency {
   WEEKLY
   MONTHLY
@@ -749,6 +761,7 @@ model Report {
   generatedAt DateTime?
   widgets     ReportWidget[]
   exports     ReportExport[]
+  deliveries  ReportDelivery[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -932,6 +945,7 @@ model ReportExport {
   fileId    String?
   file      Upload? @relation("ReportExportFile", fields: [fileId], references: [id], onDelete: SetNull)
   meta      Json?
+  deliveries ReportDelivery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -940,6 +954,35 @@ model ReportExport {
   @@index([reportId])
   @@index([status])
   @@map("report_exports")
+}
+
+model ReportDelivery {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  exportId  String?
+  export    ReportExport? @relation(fields: [exportId], references: [id], onDelete: SetNull)
+  brandId   String?
+  brand     Client?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  channel   ReportDeliveryChannel
+  status    ReportDeliveryStatus @default(PENDING)
+  to        String?
+  payload   Json?
+  providerResult Json?
+  error     String?
+  scheduledAt DateTime?
+  sentAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([reportId])
+  @@index([brandId])
+  @@index([status])
+  @@map("report_deliveries")
 }
 
 model ReportSchedule {
