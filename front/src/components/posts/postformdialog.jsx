@@ -964,7 +964,8 @@ export function PostForm({
         ? caption.split("\n")[0].slice(0, 60)
         : "Post sem titulo";
 
-      const payloads = selectedNetworks.map((network) => {
+      const payloads = [];
+      selectedNetworks.forEach((network) => {
         const account = selectedAccountsByNetwork[network];
         if (!account?.integrationId) return null;
         const formats = networkFormatsMap[network] || [];
@@ -973,38 +974,40 @@ export function PostForm({
           platformAccounts && platformAccounts[network]
             ? { [network]: platformAccounts[network] }
             : {};
-        const perNetworkMetadata = {
-          ...(statusPayload.metadata || {}),
-          scheduleSlots: cleanedSlots,
-          postKind: formats[0] || primaryPostKind,
-          postKinds: formats,
-          platforms: [network],
-          ...(Object.keys(perNetworkAccounts).length
-            ? { platformAccounts: perNetworkAccounts }
-            : {}),
-          ...(recurrencePayload ? { recurrence: recurrencePayload } : {}),
-          ...(recurrencePayload && formats.includes("story")
-            ? { storySchedule: recurrencePayload }
-            : {}),
-        };
+        formats.forEach((format) => {
+          const perNetworkMetadata = {
+            ...(statusPayload.metadata || {}),
+            scheduleSlots: cleanedSlots,
+            postKind: format,
+            postKinds: [format],
+            platforms: [network],
+            ...(Object.keys(perNetworkAccounts).length
+              ? { platformAccounts: perNetworkAccounts }
+              : {}),
+            ...(recurrencePayload ? { recurrence: recurrencePayload } : {}),
+            ...(recurrencePayload && format === "story"
+              ? { storySchedule: recurrencePayload }
+              : {}),
+          };
 
-        return {
-          ...formData,
-          title: fallbackTitle,
-          postKind: formats[0] || primaryPostKind,
-          body: caption,
-          caption,
-          media_url: mediaUrlToSave,
-          status: statusPayload.status,
-          tags: parseTags(tagsInput),
-          integrationId: account.integrationId,
-          integrationKind: integration?.settings?.kind || null,
-          integrationProvider: integration?.provider || null,
-          platform: network,
-          scheduledDate,
-          publishedDate: chosenStatus === "DONE" ? new Date().toISOString() : null,
-          metadata: perNetworkMetadata,
-        };
+          payloads.push({
+            ...formData,
+            title: fallbackTitle,
+            postKind: format,
+            body: caption,
+            caption,
+            media_url: mediaUrlToSave,
+            status: statusPayload.status,
+            tags: parseTags(tagsInput),
+            integrationId: account.integrationId,
+            integrationKind: integration?.settings?.kind || null,
+            integrationProvider: integration?.provider || null,
+            platform: network,
+            scheduledDate,
+            publishedDate: chosenStatus === "DONE" ? new Date().toISOString() : null,
+            metadata: perNetworkMetadata,
+          });
+        });
       });
 
       if (onSubmit) {
