@@ -242,18 +242,15 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
     }
   }, [open, source, level, levels]);
 
-  if (!draft) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
-          <div className="text-sm text-[var(--text-muted)]">Carregando widget...</div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  const selectedMetrics = Array.isArray(draft.metrics) ? draft.metrics : [];
-  const options = draft.options && typeof draft.options === "object" ? draft.options : {};
+  const selectedMetrics = useMemo(
+    () => (Array.isArray(draft?.metrics) ? draft.metrics : []),
+    [draft]
+  );
+  const options = useMemo(
+    () =>
+      draft?.options && typeof draft.options === "object" ? draft.options : {},
+    [draft]
+  );
   const metricOptions = useMemo(
     () =>
       metrics.map((metric) => ({
@@ -316,6 +313,16 @@ function WidgetConfigDialog({ open, onOpenChange, widget, onSave }) {
     metricsData,
     metrics,
   ]);
+
+  if (!draft) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <div className="text-sm text-[var(--text-muted)]">Carregando widget...</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
