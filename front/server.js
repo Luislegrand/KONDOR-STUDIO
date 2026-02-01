@@ -17,6 +17,11 @@ const mountPath = basePath === "/" ? "" : basePath.slice(0, -1);
 const app = express();
 app.disable("x-powered-by");
 
+const setNoStore = (res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.set("CDN-Cache-Control", "no-store");
+};
+
 const assetPath = `${mountPath}/assets`;
 app.use(
   assetPath,
@@ -26,21 +31,32 @@ app.use(
   })
 );
 
+app.get(`${assetPath}/*`, (req, res) => {
+  setNoStore(res);
+  res.status(404).send("Not found");
+});
+
 app.use(
   mountPath || "/",
   express.static(distDir, {
     etag: true,
     maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        setNoStore(res);
+      }
+    },
   })
 );
 
 const fallbackRoute = mountPath ? `${mountPath}/*` : "*";
 app.get(fallbackRoute, (req, res) => {
   if (req.path.includes(".") && req.path !== "/") {
-    res.status(404).set("Cache-Control", "no-store").send("Not found");
+    setNoStore(res);
+    res.status(404).send("Not found");
     return;
   }
-  res.set("Cache-Control", "no-store");
+  setNoStore(res);
   res.sendFile(path.join(distDir, "index.html"));
 });
 
