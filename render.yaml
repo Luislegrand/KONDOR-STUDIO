@@ -654,7 +654,7 @@ services:
 
     startCommand: |
       npm install -g serve
-      serve -s dist -l 3000
+      serve -s dist -l 3000 -c 0
 
     envVars:
       - key: NODE_ENV
@@ -670,6 +670,8 @@ services:
       - key: VITE_APP_API_URL
         sync: false
       - key: VITE_PUBLIC_APP_URL
+        sync: false
+      - key: VITE_BASE_PATH
         sync: false
       - key: VITE_PERSIST_TOKENS
         sync: false

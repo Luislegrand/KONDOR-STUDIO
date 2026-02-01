@@ -4,8 +4,21 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const rawBase = env.VITE_BASE_PATH || env.VITE_PUBLIC_APP_URL || "";
+  let base = "/";
+
+  if (rawBase) {
+    try {
+      base = new URL(rawBase).pathname || "/";
+    } catch (err) {
+      base = rawBase;
+    }
+    if (!base.startsWith("/")) base = `/${base}`;
+    if (!base.endsWith("/")) base += "/";
+  }
 
   return {
+    base,
     plugins: [react()],
     resolve: {
       alias: {
