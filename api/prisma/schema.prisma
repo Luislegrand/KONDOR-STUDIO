@@ -1139,6 +1139,32 @@ model BrandSourceConnection {
   @@map("brand_source_connection")
 }
 
+model FactKondorMetricsDaily {
+  id         String             @id @default(uuid())
+  tenantId   String
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId    String
+  brand      Client             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  date       DateTime           @db.Date
+  platform   BrandSourcePlatform
+  accountId  String
+  campaignId String?
+  adsetId    String?
+  adId       String?
+  currency   String
+  impressions BigInt
+  clicks     BigInt
+  spend      Decimal            @db.Decimal(18, 6)
+  conversions Decimal           @db.Decimal(18, 6)
+  revenue    Decimal            @db.Decimal(18, 6)
+  sessions   BigInt?
+  leads      BigInt?
+
+  @@index([tenantId, brandId, date])
+  @@index([tenantId, brandId, platform, date])
+  @@map("fact_kondor_metrics_daily")
+}
+
 model Plan {
   id          String          @id @default(uuid())
   key         String          @unique // internal key e.g. "pro_monthly"

@@ -6,9 +6,11 @@ const tenantMiddleware = require("../middleware/tenant");
 const metricsService = require("../services/metricsService");
 const automationEngine = require("../services/automationEngine");
 const { prisma } = require("../prisma");
+const metricsQueryRoutes = require("../modules/metrics/metrics.routes");
 
 router.use(authMiddleware);
 router.use(tenantMiddleware);
+router.use("/", metricsQueryRoutes);
 
 /**
  * GET /metrics
