@@ -1,0 +1,350 @@
+process.env.NODE_ENV = 'test';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { randomUUID } = require('crypto');
+const express = require('express');
+const request = require('supertest');
+
+function mockModule(path, exports) {
+  const resolved = require.resolve(path);
+  require.cache[resolved] = { exports };
+}
+
+function resetModule(path) {
+  const resolved = require.resolve(path);
+  delete require.cache[resolved];
+}
+
+function buildLayout() {
+  return {
+    theme: {
+      mode: 'light',
+      brandColor: '#F59E0B',
+      accentColor: '#22C55E',
+      bg: '#FFFFFF',
+      text: '#0F172A',
+      mutedText: '#64748B',
+      cardBg: '#FFFFFF',
+      border: '#E2E8F0',
+      radius: 16,
+    },
+    globalFilters: {
+      dateRange: { preset: 'last_7_days' },
+      platforms: [],
+      accounts: [],
+      compareTo: null,
+      autoRefreshSec: 0,
+    },
+    widgets: [],
+  };
+}
+
+function createFakePrisma() {
+  const state = {
+    dashboards: [],
+    versions: [],
+    clients: [],
+    brandGroups: [],
+  };
+  const prisma = {
+    client: {
+      findFirst: async ({ where }) => {
+        const found = state.clients.find(
+          (item) => item.id === where.id && item.tenantId === where.tenantId,
+        );
+        return found ? { id: found.id } : null;
+      },
+    },
+    brandGroup: {
+      findFirst: async ({ where }) => {
+        const found = state.brandGroups.find(
+          (item) => item.id === where.id && item.tenantId === where.tenantId,
+        );
+        return found ? { id: found.id } : null;
+      },
+    },
+    reportDashboard: {
+      create: async ({ data }) => {
+        const dashboard = {
+          id: randomUUID(),
+          tenantId: data.tenantId,
+          brandId: data.brandId,
+          groupId: data.groupId ?? null,
+          name: data.name,
+          status: data.status ?? 'DRAFT',
+          publishedVersionId: data.publishedVersionId ?? null,
+          createdByUserId: data.createdByUserId ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.dashboards.push(dashboard);
+        return { ...dashboard };
+      },
+      findFirst: async ({ where, include }) => {
+        const found = state.dashboards.find(
+          (item) => item.id === where.id && item.tenantId === where.tenantId,
+        );
+        if (!found) return null;
+        const result = { ...found };
+        if (include?.publishedVersion) {
+          result.publishedVersion =
+            state.versions.find((item) => item.id === found.publishedVersionId) ||
+            null;
+        }
+        return result;
+      },
+      findMany: async ({ where, orderBy }) => {
+        let items = state.dashboards.filter((item) => item.tenantId === where.tenantId);
+        if (where.brandId) {
+          items = items.filter((item) => item.brandId === where.brandId);
+        }
+        if (where.groupId) {
+          items = items.filter((item) => item.groupId === where.groupId);
+        }
+        if (where.status) {
+          items = items.filter((item) => item.status === where.status);
+        }
+        if (where.publishedVersionId && where.publishedVersionId.not !== undefined) {
+          items = items.filter((item) => item.publishedVersionId !== null);
+        }
+        if (orderBy?.updatedAt === 'desc') {
+          items = items.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+        }
+        return items.map((item) => ({ ...item }));
+      },
+      update: async ({ where, data }) => {
+        const index = state.dashboards.findIndex((item) => item.id === where.id);
+        if (index === -1) return null;
+        const updated = {
+          ...state.dashboards[index],
+          ...data,
+          updatedAt: new Date(),
+        };
+        state.dashboards[index] = updated;
+        return { ...updated };
+      },
+    },
+    reportDashboardVersion: {
+      create: async ({ data }) => {
+        const version = {
+          id: randomUUID(),
+          dashboardId: data.dashboardId,
+          versionNumber: data.versionNumber,
+          layoutJson: data.layoutJson,
+          createdByUserId: data.createdByUserId ?? null,
+          createdAt: new Date(),
+        };
+        state.versions.push(version);
+        return { ...version };
+      },
+      findFirst: async ({ where, orderBy }) => {
+        let items = state.versions.filter((item) => {
+          if (where.id && item.id !== where.id) return false;
+          if (where.dashboardId && item.dashboardId !== where.dashboardId) return false;
+          return true;
+        });
+        if (!items.length) return null;
+        if (orderBy?.versionNumber === 'desc') {
+          items = items.slice().sort((a, b) => b.versionNumber - a.versionNumber);
+        }
+        return { ...items[0] };
+      },
+      findMany: async ({ where, orderBy }) => {
+        let items = state.versions.filter((item) => item.dashboardId === where.dashboardId);
+        if (orderBy?.versionNumber === 'desc') {
+          items = items.slice().sort((a, b) => b.versionNumber - a.versionNumber);
+        }
+        return items.map((item) => ({ ...item }));
+      },
+    },
+    $transaction: async (fn) => fn(prisma),
+  };
+
+  return { prisma, state };
+}
+
+function buildApp() {
+  const { prisma, state } = createFakePrisma();
+
+  mockModule('../src/prisma', { prisma });
+  mockModule('../src/middleware/auth', (req, _res, next) => {
+    const role = req.headers['x-role'] || 'ADMIN';
+    const tenantId = req.headers['x-tenant-id'] || 'tenant-1';
+    req.user = { id: 'user-1', role, tenantId };
+    req.tenantId = tenantId;
+    next();
+  });
+  mockModule('../src/middleware/tenant', (req, _res, next) => {
+    req.tenantId = req.tenantId || req.user?.tenantId || 'tenant-1';
+    req.db = {};
+    next();
+  });
+
+  resetModule('../src/modules/reports/dashboards.service');
+  resetModule('../src/modules/reports/dashboards.controller');
+  resetModule('../src/modules/reports/dashboards.routes');
+  resetModule('../src/routes/reportsDashboards');
+
+  const router = require('../src/routes/reportsDashboards');
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/reports/dashboards', router);
+  return { app, prisma, state };
+}
+
+test('create dashboard creates version 1', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Meu Dashboard', brandId });
+
+  assert.equal(createRes.statusCode, 201);
+  assert.equal(createRes.body.latestVersion.versionNumber, 1);
+
+  const versionsRes = await request(app)
+    .get(`/api/reports/dashboards/${createRes.body.id}/versions`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(versionsRes.statusCode, 200);
+  assert.equal(versionsRes.body.items[0].versionNumber, 1);
+});
+
+test('create version increments version_number', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard', brandId });
+
+  const versionRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/versions`)
+    .set('x-role', 'MEMBER')
+    .send({ layoutJson: buildLayout() });
+
+  assert.equal(versionRes.statusCode, 201);
+  assert.equal(versionRes.body.versionNumber, 2);
+});
+
+test('publish rejects invalid layout', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard', brandId });
+
+  const invalidVersionId = randomUUID();
+
+  state.versions.push({
+    id: invalidVersionId,
+    dashboardId: createRes.body.id,
+    versionNumber: 2,
+    layoutJson: {},
+    createdByUserId: 'user-1',
+    createdAt: new Date(),
+  });
+
+  const publishRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: invalidVersionId });
+
+  assert.equal(publishRes.statusCode, 400);
+  assert.equal(publishRes.body.error.code, 'INVALID_LAYOUT');
+});
+
+test('rollback updates published_version_id', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard', brandId });
+
+  const version1Id = createRes.body.latestVersion.id;
+
+  const versionRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/versions`)
+    .set('x-role', 'MEMBER')
+    .send({ layoutJson: buildLayout() });
+
+  const version2Id = versionRes.body.id;
+
+  const publishRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: version2Id });
+
+  assert.equal(publishRes.statusCode, 200);
+  assert.equal(publishRes.body.publishedVersionId, version2Id);
+
+  const rollbackRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/rollback`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: version1Id });
+
+  assert.equal(rollbackRes.statusCode, 200);
+  assert.equal(rollbackRes.body.publishedVersionId, version1Id);
+});
+
+test('viewer cannot publish or rollback', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard', brandId });
+
+  const publishRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'CLIENT')
+    .send({ versionId: createRes.body.latestVersion.id });
+
+  assert.equal(publishRes.statusCode, 403);
+
+  const rollbackRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/rollback`)
+    .set('x-role', 'CLIENT')
+    .send({ versionId: createRes.body.latestVersion.id });
+
+  assert.equal(rollbackRes.statusCode, 403);
+});
+
+test('tenant isolation prevents cross-tenant access', async () => {
+  const { app, prisma, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-2' });
+
+  const otherDashboard = await prisma.reportDashboard.create({
+    data: {
+      tenantId: 'tenant-2',
+      brandId,
+      groupId: null,
+      name: 'Outro tenant',
+      status: 'DRAFT',
+      createdByUserId: 'user-2',
+    },
+  });
+
+  const res = await request(app)
+    .get(`/api/reports/dashboards/${otherDashboard.id}`)
+    .set('x-role', 'ADMIN')
+    .set('x-tenant-id', 'tenant-1');
+
+  assert.equal(res.statusCode, 404);
+});
