@@ -583,6 +583,92 @@ const METRIC_CATALOG_SEEDS = [
   },
 ];
 
+
+const METRICS_CATALOG_V2_SEEDS = [
+  {
+    key: "spend",
+    label: "Spend",
+    description: "Investimento total",
+    format: "CURRENCY",
+  },
+  {
+    key: "impressions",
+    label: "Impressions",
+    description: "Quantidade de impressões",
+    format: "NUMBER",
+  },
+  {
+    key: "clicks",
+    label: "Clicks",
+    description: "Quantidade de cliques",
+    format: "NUMBER",
+  },
+  {
+    key: "conversions",
+    label: "Conversions",
+    description: "Conversões atribuídas",
+    format: "NUMBER",
+  },
+  {
+    key: "revenue",
+    label: "Revenue",
+    description: "Receita atribuída",
+    format: "CURRENCY",
+  },
+  {
+    key: "sessions",
+    label: "Sessions",
+    description: "Sessões (GA4)",
+    format: "NUMBER",
+  },
+  {
+    key: "leads",
+    label: "Leads",
+    description: "Leads gerados",
+    format: "NUMBER",
+  },
+  {
+    key: "ctr",
+    label: "CTR",
+    description: "Click-through rate",
+    format: "PERCENT",
+    formula: "clicks / impressions",
+    requiredFields: ["clicks", "impressions"],
+  },
+  {
+    key: "cpc",
+    label: "CPC",
+    description: "Custo por clique",
+    format: "CURRENCY",
+    formula: "spend / clicks",
+    requiredFields: ["spend", "clicks"],
+  },
+  {
+    key: "cpm",
+    label: "CPM",
+    description: "Custo por mil impressões",
+    format: "CURRENCY",
+    formula: "(spend / impressions) * 1000",
+    requiredFields: ["spend", "impressions"],
+  },
+  {
+    key: "cpa",
+    label: "CPA",
+    description: "Custo por aquisição",
+    format: "CURRENCY",
+    formula: "spend / conversions",
+    requiredFields: ["spend", "conversions"],
+  },
+  {
+    key: "roas",
+    label: "ROAS",
+    description: "Retorno sobre investimento em mídia",
+    format: "RATIO",
+    formula: "revenue / spend",
+    requiredFields: ["revenue", "spend"],
+  },
+];
+
 async function seedReportTemplates(tenantId) {
   for (const template of REPORT_TEMPLATE_SEEDS) {
     const existing = await prisma.reportTemplate.findFirst({
@@ -655,6 +741,30 @@ async function seedReportingAssets() {
     await seedMetricCatalog(tenant.id);
   }
 }
+
+async function seedMetricsCatalogV2() {
+  for (const entry of METRICS_CATALOG_V2_SEEDS) {
+    await prisma.metricsCatalog.upsert({
+      where: { key: entry.key },
+      create: {
+        key: entry.key,
+        label: entry.label,
+        description: entry.description,
+        format: entry.format,
+        formula: entry.formula || null,
+        requiredFields: entry.requiredFields || null,
+      },
+      update: {
+        label: entry.label,
+        description: entry.description,
+        format: entry.format,
+        formula: entry.formula || null,
+        requiredFields: entry.requiredFields || null,
+      },
+    });
+  }
+}
+
 
 async function upsertPlans() {
   const plans = [
@@ -886,6 +996,7 @@ async function main() {
   const { tenant, admin, adminPassword } = await ensureTenantAndAdmin(starterPlan);
   const superAdmin = await ensureSuperAdmin();
   await seedReportingAssets();
+  await seedMetricsCatalogV2();
 
   console.log("[seed] OK.");
   console.log("[seed] Tenant:", { id: tenant.id, slug: tenant.slug, name: tenant.name });

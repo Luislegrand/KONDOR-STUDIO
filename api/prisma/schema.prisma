@@ -164,6 +164,36 @@ enum ReportScheduleFrequency {
   MONTHLY
 }
 
+enum ReportDashboardStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum MetricsCatalogFormat {
+  NUMBER
+  CURRENCY
+  PERCENT
+  RATIO
+  DURATION
+}
+
+enum BrandSourcePlatform {
+  META_ADS
+  GOOGLE_ADS
+  TIKTOK_ADS
+  LINKEDIN_ADS
+  GA4
+  GMB
+  FB_IG
+}
+
+enum BrandSourceConnectionStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
 enum BillingInterval {
   MONTHLY
   YEARLY
@@ -1015,6 +1045,98 @@ model ReportSchedule {
   @@index([scope])
   @@index([frequency])
   @@map("report_schedules")
+}
+
+model ReportDashboard {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId            String
+  brand              Client                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  groupId            String?
+  group              BrandGroup?            @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  name               String
+  status             ReportDashboardStatus  @default(DRAFT)
+  publishedVersionId String?
+  publishedVersion   ReportDashboardVersion? @relation("ReportDashboardPublished", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+  createdByUserId    String
+  createdBy          User                   @relation("ReportDashboardAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions           ReportDashboardVersion[] @relation("ReportDashboardVersions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([brandId])
+  @@index([groupId])
+  @@index([status])
+  @@map("report_dashboard")
+}
+
+model ReportDashboardVersion {
+  id              String @id @default(uuid())
+  dashboardId     String
+  dashboard       ReportDashboard @relation("ReportDashboardVersions", fields: [dashboardId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  layoutJson      Json
+  createdByUserId String
+  createdBy       User   @relation("ReportDashboardVersionAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+
+  @@unique([dashboardId, versionNumber])
+  @@index([dashboardId])
+  @@map("report_dashboard_version")
+}
+
+model ReportTemplateV2 {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  category  String
+  layoutJson Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("report_template")
+}
+
+model MetricsCatalog {
+  id            String               @id @default(uuid())
+  key           String               @unique
+  label         String
+  description   String
+  format        MetricsCatalogFormat
+  formula       String?
+  requiredFields Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("metrics_catalog")
+}
+
+model BrandSourceConnection {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId             String
+  brand               Client                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  platform            BrandSourcePlatform
+  externalAccountId   String
+  externalAccountName String
+  status              BrandSourceConnectionStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, platform, externalAccountId])
+  @@index([tenantId])
+  @@index([brandId])
+  @@index([platform])
+  @@map("brand_source_connection")
 }
 
 model Plan {
