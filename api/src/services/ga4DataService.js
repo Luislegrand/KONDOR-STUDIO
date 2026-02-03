@@ -1,3 +1,4 @@
+const { prisma } = require('../prisma');
 const ga4OAuthService = require('./ga4OAuthService');
 const ga4MetadataService = require('./ga4MetadataService');
 const ga4QuotaCache = require('./ga4QuotaCacheService');
@@ -229,6 +230,24 @@ function buildMockReport(payload) {
   };
 }
 
+async function assertSelectedProperty({ tenantId, propertyId }) {
+  if (!tenantId || !propertyId) return null;
+  const selected = await prisma.integrationGoogleGa4Property.findFirst({
+    where: {
+      tenantId: String(tenantId),
+      propertyId: String(propertyId),
+      isSelected: true,
+    },
+  });
+  if (!selected) {
+    const err = new Error('GA4 property not selected');
+    err.status = 400;
+    err.code = 'GA4_PROPERTY_NOT_SELECTED';
+    throw err;
+  }
+  return selected;
+}
+
 async function validateAgainstMetadata({ tenantId, userId, propertyId, metrics, dimensions }) {
   const metadata = await ga4MetadataService.getMetadata({
     tenantId,
@@ -270,6 +289,8 @@ async function runReport({
   if (ga4OAuthService.isMockMode()) {
     return buildMockReport(normalized);
   }
+
+  await assertSelectedProperty({ tenantId, propertyId });
 
   await validateAgainstMetadata({
     tenantId,
@@ -370,6 +391,8 @@ async function checkCompatibility({
       meta: { mocked: true },
     };
   }
+
+  await assertSelectedProperty({ tenantId, propertyId });
 
   try {
     await validateAgainstMetadata({

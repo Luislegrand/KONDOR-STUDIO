@@ -177,7 +177,7 @@ module.exports = {
       }
 
       const db = req.db || useTenant(tenantId);
-      const integrationFilter = { userId: String(userId) };
+      const integrationFilter = { tenantId: String(tenantId) };
       let integrations = await db.integrationGoogleGa4.findMany({
         where: integrationFilter,
       });
@@ -233,12 +233,13 @@ module.exports = {
       }
 
       const integration = await req.db.integrationGoogleGa4.findFirst({
-        where: { tenantId: String(tenantId), userId: String(userId) },
+        where: { tenantId: String(tenantId) },
       });
 
       if (!integration) {
         return res.json({
           status: 'DISCONNECTED',
+          googleAccountEmail: null,
           properties: [],
           selectedProperty: null,
         });
@@ -265,6 +266,7 @@ module.exports = {
       return res.json({
         status: integration.status,
         lastError: integration.lastError || null,
+        googleAccountEmail: integration.googleAccountEmail || null,
         properties,
         selectedProperty,
       });
@@ -348,7 +350,7 @@ module.exports = {
       }
 
       const integration = await req.db.integrationGoogleGa4.findFirst({
-        where: { tenantId: String(tenantId), userId: String(userId) },
+        where: { tenantId: String(tenantId) },
       });
       if (!integration || integration.status !== 'CONNECTED') {
         return res.status(400).json({ error: 'GA4 integration not connected' });

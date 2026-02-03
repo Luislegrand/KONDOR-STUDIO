@@ -45,9 +45,9 @@ function verifyState(state) {
 }
 
 function normalizeScope(scope) {
-  if (!scope) return '';
-  if (Array.isArray(scope)) return scope.join(' ');
-  return String(scope);
+  const normalized = googleClient.normalizeScopes(scope);
+  const scopes = googleClient.applyScopePolicy(normalized);
+  return scopes.join(' ');
 }
 
 function buildReauthError() {
@@ -84,7 +84,7 @@ function resolveExpiry(tokenResponse) {
 async function ensureMockIntegration(tenantId, userId) {
   const db = useTenant(tenantId);
   const existing = await db.integrationGoogleGa4.findFirst({
-    where: { tenantId: String(tenantId), userId: String(userId) },
+    where: { tenantId: String(tenantId) },
   });
 
   if (existing && existing.status === 'CONNECTED') return existing;
@@ -95,9 +95,7 @@ async function ensureMockIntegration(tenantId, userId) {
     accessToken: encrypt('mock_access_token'),
     refreshTokenEnc: encrypt('mock_refresh_token'),
     tokenExpiry: new Date(Date.now() + 3600 * 1000),
-    scope:
-      process.env.GOOGLE_OAUTH_SCOPES ||
-      'https://www.googleapis.com/auth/analytics.readonly',
+    scope: googleClient.getOAuthScopes().join(' '),
     status: 'CONNECTED',
     lastError: null,
   };
@@ -112,17 +110,16 @@ async function ensureMockIntegration(tenantId, userId) {
   return db.integrationGoogleGa4.create({ data });
 }
 
-async function getIntegration(tenantId, userId) {
-  return prisma.integrationGoogleGa4.findFirst({
+async function getIntegration(tenantId) {
+  return prisma.integrationGoogleGa4.findUnique({
     where: {
       tenantId: String(tenantId),
-      userId: String(userId),
     },
   });
 }
 
 async function markIntegrationError(tenantId, userId, message) {
-  const existing = await getIntegration(tenantId, userId);
+  const existing = await getIntegration(tenantId);
   if (!existing) return null;
   const nextStatus =
     existing.status === 'CONNECTED'
@@ -142,7 +139,7 @@ async function resetIntegration(
   message,
   { status = 'ERROR', clearTokens = true } = {}
 ) {
-  const existing = await getIntegration(tenantId, userId);
+  const existing = await getIntegration(tenantId);
   if (!existing) return null;
   return prisma.integrationGoogleGa4.update({
     where: { id: existing.id },
@@ -162,7 +159,7 @@ async function markIntegrationNeedsReconnect(
   message,
   { clearTokens = true, clearRefreshToken = false } = {}
 ) {
-  const existing = await getIntegration(tenantId, userId);
+  const existing = await getIntegration(tenantId);
   if (!existing) return null;
   return prisma.integrationGoogleGa4.update({
     where: { id: existing.id },
@@ -187,7 +184,7 @@ async function upsertIntegration({
 }) {
   const db = useTenant(tenantId);
   const existing = await db.integrationGoogleGa4.findFirst({
-    where: { tenantId: String(tenantId), userId: String(userId) },
+    where: { tenantId: String(tenantId) },
   });
 
   const data = {
@@ -219,7 +216,9 @@ async function exchangeCode({ code, state }) {
 
   const payload = verifyState(state);
   const tokenResponse = await googleClient.exchangeCodeForTokens(code);
-  const scope = normalizeScope(tokenResponse.scope || process.env.GOOGLE_OAUTH_SCOPES);
+  const scope = normalizeScope(
+    tokenResponse.scope || googleClient.getOAuthScopes()
+  );
   const tokenExpiry = resolveExpiry(tokenResponse);
 
   let accessTokenEnc = null;
@@ -227,7 +226,7 @@ async function exchangeCode({ code, state }) {
     accessTokenEnc = encrypt(String(tokenResponse.access_token));
   }
 
-  const existing = await getIntegration(payload.tenantId, payload.userId);
+  const existing = await getIntegration(payload.tenantId);
   let refreshTokenEnc = null;
   if (tokenResponse.refresh_token) {
     refreshTokenEnc = encrypt(String(tokenResponse.refresh_token));
@@ -264,7 +263,7 @@ async function getValidAccessToken({ tenantId, userId }) {
     return 'mock_access_token';
   }
 
-  const integration = await getIntegration(tenantId, userId);
+  const integration = await getIntegration(tenantId);
   if (!integration) {
     const err = new Error('GA4 integration not connected');
     err.status = 400;
@@ -365,7 +364,7 @@ async function getValidAccessToken({ tenantId, userId }) {
 }
 
 async function disconnect({ tenantId, userId, clearTokens = true }) {
-  const integration = await getIntegration(tenantId, userId);
+  const integration = await getIntegration(tenantId);
   if (!integration) return null;
 
   return prisma.integrationGoogleGa4.update({

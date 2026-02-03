@@ -49,7 +49,7 @@ module.exports = {
         include: { integration: true },
       });
 
-      if (!property || property.integration?.userId !== String(userId)) {
+      if (!property) {
         return res.status(404).json({ error: 'GA4 property not found' });
       }
 

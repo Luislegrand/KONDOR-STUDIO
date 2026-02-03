@@ -29,9 +29,9 @@ async function resolveGa4IntegrationContext({
     });
   }
 
-  if (!integration && userId) {
+  if (!integration) {
     integration = await prisma.integrationGoogleGa4.findFirst({
-      where: { tenantId: tenantKey, userId: String(userId), status: 'CONNECTED' },
+      where: { tenantId: tenantKey, status: 'CONNECTED' },
     });
   }
 

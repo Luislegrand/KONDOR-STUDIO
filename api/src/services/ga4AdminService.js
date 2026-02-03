@@ -110,7 +110,7 @@ async function getIntegrationOrThrow(tenantId, userId) {
     return ga4OAuthService.ensureMockIntegration(tenantId, userId);
   }
   const integration = await prisma.integrationGoogleGa4.findFirst({
-    where: { tenantId: String(tenantId), userId: String(userId) },
+    where: { tenantId: String(tenantId) },
   });
   if (!integration) {
     const err = new Error('GA4 integration not found');
@@ -217,7 +217,7 @@ async function syncProperties({ tenantId, userId }) {
 
 async function listProperties({ tenantId, userId }) {
   const integration = await prisma.integrationGoogleGa4.findFirst({
-    where: { tenantId: String(tenantId), userId: String(userId) },
+    where: { tenantId: String(tenantId) },
   });
   if (!integration) return [];
   const db = useTenant(tenantId);
@@ -243,20 +243,23 @@ async function selectProperty({ tenantId, userId, propertyId }) {
     throw err;
   }
 
-  await db.integrationGoogleGa4Property.updateMany({
-    where: { integrationId: integration.id },
-    data: { isSelected: false },
-  });
+  const [_, selected] = await db.$transaction([
+    db.integrationGoogleGa4Property.updateMany({
+      where: { integrationId: integration.id },
+      data: { isSelected: false },
+    }),
+    db.integrationGoogleGa4Property.update({
+      where: { id: property.id },
+      data: { isSelected: true },
+    }),
+  ]);
 
-  return db.integrationGoogleGa4Property.update({
-    where: { id: property.id },
-    data: { isSelected: true },
-  });
+  return selected;
 }
 
 async function getSelectedProperty({ tenantId, userId }) {
   const integration = await prisma.integrationGoogleGa4.findFirst({
-    where: { tenantId: String(tenantId), userId: String(userId) },
+    where: { tenantId: String(tenantId) },
   });
   if (!integration) return null;
   const db = useTenant(tenantId);

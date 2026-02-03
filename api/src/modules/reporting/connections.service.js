@@ -149,17 +149,10 @@ async function linkConnection(tenantId, brandId, payload, userId, scope) {
 
   const { source, integrationId, externalAccountId, displayName } = payload;
   if (source === 'GA4' && !integrationId) {
-    if (!userId) {
-      const err = new Error('userId é obrigatório para conectar GA4');
-      err.status = 400;
-      throw err;
-    }
-
     const property = await prisma.integrationGoogleGa4Property.findFirst({
       where: {
         tenantId,
         propertyId: String(externalAccountId),
-        integration: { userId: String(userId) },
       },
       include: { integration: true },
     });
@@ -177,7 +170,7 @@ async function linkConnection(tenantId, brandId, payload, userId, scope) {
     }
 
     const meta = {
-      ga4UserId: String(userId),
+      ga4UserId: property.integration?.userId ? String(property.integration.userId) : null,
       ga4IntegrationId: property.integrationId,
       propertyId: String(property.propertyId),
     };
