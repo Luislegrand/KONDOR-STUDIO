@@ -44,6 +44,7 @@ function buildApp() {
   mockModule('../src/services/ga4OAuthService', {
     isMockMode: () => false,
     buildState: () => 'state',
+    getIntegration: async () => null,
     ensureMockIntegration: async () => ({}),
     exchangeCode: async () => ({}),
     disconnect: async () => ({}),

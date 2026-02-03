@@ -19,6 +19,7 @@ function loadService({ tokenResponse, existingIntegration }) {
   mockModule('../src/prisma', {
     prisma: {
       integrationGoogleGa4: {
+        findUnique: async () => existingIntegration || null,
         findFirst: async () => existingIntegration || null,
         update: async () => existingIntegration || null,
       },
@@ -36,6 +37,13 @@ function loadService({ tokenResponse, existingIntegration }) {
     exchangeCodeForTokens: async () => tokenResponse,
     refreshAccessToken: async () => ({ access_token: 'token', expires_in: 3600 }),
     buildAuthUrl: () => 'http://example.com',
+    normalizeScopes: (scope) => {
+      if (!scope) return [];
+      if (Array.isArray(scope)) return scope;
+      return String(scope).split(/\s+/).filter(Boolean);
+    },
+    applyScopePolicy: (scopes) => scopes || [],
+    getOAuthScopes: () => ['https://www.googleapis.com/auth/analytics.readonly'],
   });
 
   resetModule('../src/services/ga4OAuthService');
