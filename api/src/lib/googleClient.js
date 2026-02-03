@@ -1,6 +1,13 @@
 const { google } = require('googleapis');
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const REQUIRED_SCOPES = [
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/analytics.readonly',
+];
+const FORBIDDEN_SCOPES = new Set(['https://www.googleapis.com/auth/analytics']);
 
 function normalizeScopes(value) {
   if (!value) return [];
@@ -14,18 +21,42 @@ function normalizeScopes(value) {
   return [];
 }
 
+function applyScopePolicy(scopes = []) {
+  const filtered = scopes.filter((scope) => !FORBIDDEN_SCOPES.has(scope));
+  const seen = new Set();
+  const merged = [];
+
+  REQUIRED_SCOPES.forEach((scope) => {
+    if (seen.has(scope)) return;
+    seen.add(scope);
+    merged.push(scope);
+  });
+
+  filtered.forEach((scope) => {
+    if (seen.has(scope)) return;
+    seen.add(scope);
+    merged.push(scope);
+  });
+
+  return merged;
+}
+
+function getOAuthScopes() {
+  const rawScopes = process.env.GOOGLE_OAUTH_SCOPES;
+  const normalized = normalizeScopes(rawScopes);
+  return applyScopePolicy(normalized);
+}
+
 function getOAuthConfig() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
-  const scopes = normalizeScopes(process.env.GOOGLE_OAUTH_SCOPES);
+  const scopes = getOAuthScopes();
 
   if (!clientId) throw new Error('GOOGLE_OAUTH_CLIENT_ID missing');
   if (!clientSecret) throw new Error('GOOGLE_OAUTH_CLIENT_SECRET missing');
   if (!redirectUri) throw new Error('GOOGLE_OAUTH_REDIRECT_URI missing');
-  if (!scopes.length) {
-    throw new Error('GOOGLE_OAUTH_SCOPES missing');
-  }
+  if (!scopes.length) throw new Error('GOOGLE_OAUTH_SCOPES missing');
 
   return { clientId, clientSecret, redirectUri, scopes };
 }
@@ -111,6 +142,8 @@ async function refreshAccessToken(refreshToken) {
 
 module.exports = {
   normalizeScopes,
+  applyScopePolicy,
+  getOAuthScopes,
   getOAuthConfig,
   buildAuthUrl,
   exchangeCodeForTokens,
