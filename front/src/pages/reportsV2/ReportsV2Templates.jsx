@@ -61,7 +61,7 @@ export default function ReportsV2Templates() {
     <div className="min-h-screen bg-white" style={themeStyle}>
       <PageShell>
         <PageHeader
-          kicker="Templates V2"
+          kicker="Templates"
           title="Galeria de templates"
           subtitle="Escolha um template e crie um dashboard em 1 clique."
           actions={

@@ -87,7 +87,7 @@ export default function ReportsV2Home() {
       <div className="border-b border-[var(--border)] bg-[linear-gradient(135deg,rgba(245,158,11,0.08),rgba(34,197,94,0.04))]">
         <PageShell>
           <PageHeader
-            kicker="Relatorios V2"
+            kicker="Relatorios"
             title="Relatorios inteligentes"
             subtitle="Construa dashboards vivos com metricas normalizadas e filtros globais."
             actions={
