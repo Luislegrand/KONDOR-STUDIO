@@ -680,12 +680,30 @@ const ReportsV2 = {
     });
   },
 
+  async listDashboardVersions(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/versions`, { method: "GET" });
+  },
+
   async publishDashboard(id, payload = {}) {
     if (!id) throw new Error("dashboardId obrigatorio");
     return jsonFetch(`/reports/dashboards/${id}/publish`, {
       method: "POST",
       body: JSON.stringify(payload || {}),
     });
+  },
+
+  async rollbackDashboard(id, payload = {}) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/rollback`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async cloneDashboard(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/clone`, { method: "POST" });
   },
 
   async queryMetrics(payload = {}) {

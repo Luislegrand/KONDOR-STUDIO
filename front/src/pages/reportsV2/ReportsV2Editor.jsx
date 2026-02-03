@@ -12,16 +12,25 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
+  History,
 } from "lucide-react";
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
-import { useDebouncedValue } from "@/components/reportsV2/utils.js";
+import { useDebouncedValue, stableStringify } from "@/components/reportsV2/utils.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog.jsx";
 import { cn } from "@/utils/classnames.js";
 import { deriveThemeColors } from "@/utils/theme.js";
 import { base44 } from "@/apiClient/base44Client";
@@ -392,10 +401,21 @@ function buildWidgetSummary(widget) {
   return `${metricLabel} • ${dimensionLabel}`;
 }
 
+function formatVersionDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function EditorWidgetCard({
   widget,
   selected,
   hasErrors,
+  errorCount,
   onSelect,
   onDuplicate,
   onRemove,
@@ -425,6 +445,11 @@ function EditorWidgetCard({
             {String(widget.type || "").toUpperCase()}
           </p>
         </div>
+        {hasErrors ? (
+          <span className="rounded-full bg-rose-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-600">
+            {errorCount || 1} erro{errorCount === 1 ? "" : "s"}
+          </span>
+        ) : null}
         <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
           <button
             type="button"
@@ -475,6 +500,11 @@ export default function ReportsV2Editor() {
   const debouncedPreviewFilters = useDebouncedValue(previewFilters, 400);
   const [actionMessage, setActionMessage] = React.useState(null);
   const [showValidation, setShowValidation] = React.useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = React.useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = React.useState("idle");
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [lastSavedKey, setLastSavedKey] = React.useState("");
+  const [hasHydrated, setHasHydrated] = React.useState(false);
   const addMenuRef = React.useRef(null);
 
   const { data, isLoading, error } = useQuery({
@@ -482,20 +512,30 @@ export default function ReportsV2Editor() {
     queryFn: () => base44.reportsV2.getDashboard(id),
   });
 
+  const versionsQuery = useQuery({
+    queryKey: ["reportsV2-versions", id],
+    queryFn: () => base44.reportsV2.listDashboardVersions(id),
+    enabled: showHistory && Boolean(id),
+  });
+
   const dashboard = data || null;
   const layoutFromApi =
     dashboard?.latestVersion?.layoutJson ||
     dashboard?.publishedVersion?.layoutJson ||
     null;
+  const debouncedLayoutJson = useDebouncedValue(layoutJson, 1500);
 
   React.useEffect(() => {
     if (!layoutFromApi) return;
     const merged = mergeLayoutDefaults(layoutFromApi);
+    const initialPayload = sanitizeLayoutForSave(merged);
     setLayoutJson(merged);
     setPreviewFilters(buildInitialFilters(merged));
     if (merged.widgets.length) {
       setSelectedWidgetId(merged.widgets[0].id);
     }
+    setLastSavedKey(stableStringify(initialPayload));
+    setHasHydrated(true);
   }, [layoutFromApi]);
 
   React.useEffect(() => {
@@ -515,13 +555,17 @@ export default function ReportsV2Editor() {
   );
   const hasValidationErrors = validation.issues.length > 0;
 
+  const autoSaveMutation = useMutation({
+    mutationFn: async (payload) =>
+      base44.reportsV2.createDashboardVersion(id, { layoutJson: payload }),
+  });
+
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      const payload = sanitizeLayoutForSave(layoutJson);
-      return base44.reportsV2.createDashboardVersion(id, { layoutJson: payload });
-    },
+    mutationFn: async (payload) =>
+      base44.reportsV2.createDashboardVersion(id, { layoutJson: payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-versions", id] });
       setActionMessage({
         type: "success",
         text: "Rascunho salvo com sucesso.",
@@ -536,8 +580,7 @@ export default function ReportsV2Editor() {
   });
 
   const publishMutation = useMutation({
-    mutationFn: async () => {
-      const payload = sanitizeLayoutForSave(layoutJson);
+    mutationFn: async (payload) => {
       const version = await base44.reportsV2.createDashboardVersion(id, {
         layoutJson: payload,
       });
@@ -545,6 +588,7 @@ export default function ReportsV2Editor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-versions", id] });
       setActionMessage({
         type: "success",
         text: "Dashboard publicado com sucesso.",
@@ -558,9 +602,58 @@ export default function ReportsV2Editor() {
     },
   });
 
+  const rollbackMutation = useMutation({
+    mutationFn: async (versionId) =>
+      base44.reportsV2.rollbackDashboard(id, { versionId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-versions", id] });
+      setActionMessage({
+        type: "success",
+        text: "Rollback publicado com sucesso.",
+      });
+    },
+    onError: () => {
+      setActionMessage({
+        type: "error",
+        text: "Nao foi possivel fazer rollback.",
+      });
+    },
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: async () => base44.reportsV2.cloneDashboard(id),
+    onSuccess: (cloned) => {
+      if (cloned?.id) {
+        navigate(`/relatorios/v2/${cloned.id}/edit`);
+      }
+    },
+    onError: () => {
+      setActionMessage({
+        type: "error",
+        text: "Nao foi possivel duplicar o dashboard.",
+      });
+    },
+  });
+
   const selectedWidget = layoutJson.widgets.find(
     (widget) => widget.id === selectedWidgetId
   );
+  const versions = Array.isArray(versionsQuery.data?.items)
+    ? versionsQuery.data.items
+    : [];
+
+  const validationSummary = React.useMemo(() => {
+    if (!validation.issues.length) return [];
+    return validation.issues.map((issue, index) => {
+      const widget = layoutJson.widgets.find((item) => item.id === issue.widgetId);
+      return {
+        key: `${issue.widgetId}-${index}`,
+        widgetTitle: widget?.title || "Widget",
+        message: issue.message,
+      };
+    });
+  }, [layoutJson.widgets, validation.issues]);
 
   const rglLayout = React.useMemo(() => {
     return layoutJson.widgets.map((widget) => {
@@ -609,6 +702,39 @@ export default function ReportsV2Editor() {
       return { ...prev, widgets: nextWidgets };
     });
   }, []);
+
+  React.useEffect(() => {
+    if (!autoSaveEnabled || !hasHydrated || !id) return;
+    if (autoSaveMutation.isPending || saveMutation.isPending || publishMutation.isPending) {
+      return;
+    }
+    const payload = sanitizeLayoutForSave(debouncedLayoutJson);
+    const payloadKey = stableStringify(payload);
+    if (!payloadKey || payloadKey === lastSavedKey) return;
+    setAutoSaveStatus("saving");
+    autoSaveMutation.mutate(payload, {
+      onSuccess: () => {
+        setLastSavedKey(payloadKey);
+        setAutoSaveStatus("saved");
+        queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+        queryClient.invalidateQueries({ queryKey: ["reportsV2-versions", id] });
+      },
+      onError: () => {
+        setAutoSaveStatus("error");
+      },
+    });
+  }, [
+    autoSaveEnabled,
+    autoSaveMutation,
+    autoSaveMutation.isPending,
+    debouncedLayoutJson,
+    hasHydrated,
+    id,
+    lastSavedKey,
+    publishMutation.isPending,
+    queryClient,
+    saveMutation.isPending,
+  ]);
 
   const handleAddWidget = (type) => {
     const preset = WIDGET_PRESETS[type] || WIDGET_PRESETS.kpi;
@@ -832,14 +958,64 @@ export default function ReportsV2Editor() {
     setShowValidation(true);
     if (hasValidationErrors) return;
     setActionMessage(null);
-    await saveMutation.mutateAsync();
+    const payload = sanitizeLayoutForSave(layoutJson);
+    const payloadKey = stableStringify(payload);
+    try {
+      await saveMutation.mutateAsync(payload);
+      setLastSavedKey(payloadKey);
+      setAutoSaveStatus("saved");
+    } catch (err) {
+      // handled by mutation
+    }
   };
 
   const handlePublish = async () => {
     setShowValidation(true);
     if (hasValidationErrors) return;
     setActionMessage(null);
-    await publishMutation.mutateAsync();
+    const payload = sanitizeLayoutForSave(layoutJson);
+    const payloadKey = stableStringify(payload);
+    try {
+      await publishMutation.mutateAsync(payload);
+      setLastSavedKey(payloadKey);
+      setAutoSaveStatus("saved");
+    } catch (err) {
+      // handled by mutation
+    }
+  };
+
+  const handleCloneDashboard = async () => {
+    setActionMessage(null);
+    try {
+      await cloneMutation.mutateAsync();
+    } catch (err) {
+      // handled by mutation
+    }
+  };
+
+  const handleRestoreVersion = (version) => {
+    if (!version?.layoutJson) return;
+    const merged = mergeLayoutDefaults(version.layoutJson);
+    setLayoutJson(merged);
+    setPreviewFilters(buildInitialFilters(merged));
+    setSelectedWidgetId(merged.widgets[0]?.id || null);
+    setPreviewMode(false);
+    setShowHistory(false);
+    setActionMessage({
+      type: "success",
+      text: `Versao ${version.versionNumber} restaurada como rascunho.`,
+    });
+  };
+
+  const handleRollbackPublished = async (versionId) => {
+    if (!versionId) return;
+    setActionMessage(null);
+    try {
+      await rollbackMutation.mutateAsync(versionId);
+      setShowHistory(false);
+    } catch (err) {
+      // handled by mutation
+    }
   };
 
   if (isLoading) {
@@ -879,6 +1055,15 @@ export default function ReportsV2Editor() {
   }
 
   const themeStyle = buildThemeStyle(layoutJson);
+  const autoSaveLabel = autoSaveEnabled
+    ? autoSaveStatus === "saving"
+      ? "Salvando..."
+      : autoSaveStatus === "error"
+      ? "Erro"
+      : autoSaveStatus === "saved"
+      ? "Salvo"
+      : "Ativo"
+    : "Desligado";
 
   return (
     <div className="min-h-screen bg-white" style={themeStyle}>
@@ -904,6 +1089,33 @@ export default function ReportsV2Editor() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-xs">
+              <Checkbox
+                checked={autoSaveEnabled}
+                onCheckedChange={(checked) => {
+                  const enabled = Boolean(checked);
+                  setAutoSaveEnabled(enabled);
+                  if (!enabled) setAutoSaveStatus("idle");
+                }}
+              />
+              <span className="font-semibold text-[var(--text)]">Auto-salvar</span>
+              <span className="text-[var(--text-muted)]">{autoSaveLabel}</span>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => setShowHistory(true)}
+              leftIcon={History}
+            >
+              Historico
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleCloneDashboard}
+              disabled={cloneMutation.isPending}
+              leftIcon={Copy}
+            >
+              {cloneMutation.isPending ? "Duplicando..." : "Duplicar dashboard"}
+            </Button>
             <Button
               variant="secondary"
               onClick={() => setPreviewMode((prev) => !prev)}
@@ -1026,6 +1238,7 @@ export default function ReportsV2Editor() {
                     widget={widget}
                     selected={selectedWidgetId === widget.id}
                     hasErrors={Boolean(validation.widgetIssues[widget.id])}
+                    errorCount={validation.widgetIssues[widget.id]?.length || 0}
                     onSelect={setSelectedWidgetId}
                     onDuplicate={handleDuplicateWidget}
                     onRemove={handleRemoveWidget}
@@ -1061,6 +1274,22 @@ export default function ReportsV2Editor() {
                 <AlertTriangle className="h-5 w-5" />
               </div>
             </div>
+
+            {validationSummary.length ? (
+              <div className="mb-4 rounded-[12px] border border-rose-200 bg-rose-50 px-3 py-3 text-xs text-rose-700">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]">
+                  Erros do layout
+                </p>
+                <ul className="space-y-1">
+                  {validationSummary.map((issue) => (
+                    <li key={issue.key}>
+                      <span className="font-semibold">{issue.widgetTitle}</span>:{" "}
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {selectedWidget ? (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1306,6 +1535,88 @@ export default function ReportsV2Editor() {
           </div>
         </aside>
       </div>
+
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-[760px]">
+          <DialogHeader>
+            <DialogTitle>Historico de versoes</DialogTitle>
+            <DialogDescription>
+              Escolha uma versao para restaurar como rascunho ou publicar um rollback.
+            </DialogDescription>
+          </DialogHeader>
+
+          {versionsQuery.isLoading ? (
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-6 text-sm text-[var(--text-muted)]">
+              Carregando versoes...
+            </div>
+          ) : versionsQuery.error ? (
+            <div className="rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Nao foi possivel carregar o historico.
+            </div>
+          ) : versions.length ? (
+            <div className="space-y-3">
+              {versions.map((version) => {
+                const isPublished = version.id === dashboard?.publishedVersionId;
+                const isLatest = version.id === dashboard?.latestVersion?.id;
+                const statusLabel = isPublished
+                  ? "Publicado"
+                  : isLatest
+                  ? "Rascunho atual"
+                  : "Rascunho";
+                return (
+                  <div
+                    key={version.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-white p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text)]">
+                        Versao {version.versionNumber}
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {formatVersionDate(version.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                          isPublished
+                            ? "bg-emerald-100 text-emerald-600"
+                            : "bg-slate-100 text-slate-600"
+                        )}
+                      >
+                        {statusLabel}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleRestoreVersion(version)}
+                      >
+                        Restaurar rascunho
+                      </Button>
+                      <Button
+                        onClick={() => handleRollbackPublished(version.id)}
+                        disabled={rollbackMutation.isPending}
+                      >
+                        {rollbackMutation.isPending ? "Publicando..." : "Rollback publicado"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-6 text-sm text-[var(--text-muted)]">
+              Nenhuma versao encontrada.
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowHistory(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

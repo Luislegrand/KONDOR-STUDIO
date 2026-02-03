@@ -220,6 +220,24 @@ async function rollback(req, res) {
   }
 }
 
+async function clone(req, res) {
+  try {
+    const dashboard = await dashboardsService.cloneDashboard(
+      req.tenantId,
+      req.user?.id,
+      req.params.id,
+    );
+    if (!dashboard) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.status(201).json(dashboard);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
 module.exports = {
   create,
   list,
@@ -229,4 +247,5 @@ module.exports = {
   listVersions,
   publish,
   rollback,
+  clone,
 };

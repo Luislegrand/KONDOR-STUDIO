@@ -316,6 +316,55 @@ async function rollbackDashboard(tenantId, dashboardId, versionId) {
   });
 }
 
+async function cloneDashboard(tenantId, userId, dashboardId) {
+  const dashboard = await prisma.reportDashboard.findFirst({
+    where: { id: dashboardId, tenantId },
+  });
+  if (!dashboard) return null;
+
+  const latestVersion = await prisma.reportDashboardVersion.findFirst({
+    where: { dashboardId: dashboard.id },
+    orderBy: { versionNumber: 'desc' },
+  });
+
+  const publishedVersion = dashboard.publishedVersionId
+    ? await prisma.reportDashboardVersion.findFirst({
+        where: { id: dashboard.publishedVersionId, dashboardId: dashboard.id },
+      })
+    : null;
+
+  const baseLayout = latestVersion?.layoutJson || publishedVersion?.layoutJson || DEFAULT_LAYOUT;
+  const layout = ensureLayoutValid(baseLayout);
+
+  return prisma.$transaction(async (tx) => {
+    const cloned = await tx.reportDashboard.create({
+      data: {
+        tenantId,
+        brandId: dashboard.brandId,
+        groupId: dashboard.groupId,
+        name: `${dashboard.name} (cópia)`,
+        status: 'DRAFT',
+        createdByUserId: userId,
+      },
+    });
+
+    const version = await tx.reportDashboardVersion.create({
+      data: {
+        dashboardId: cloned.id,
+        versionNumber: 1,
+        layoutJson: layout,
+        createdByUserId: userId,
+      },
+    });
+
+    return {
+      ...cloned,
+      latestVersion: version,
+      publishedVersion: null,
+    };
+  });
+}
+
 module.exports = {
   createDashboard,
   listDashboards,
@@ -325,5 +374,6 @@ module.exports = {
   listVersions,
   publishDashboard,
   rollbackDashboard,
+  cloneDashboard,
   ensureLayoutValid,
 };

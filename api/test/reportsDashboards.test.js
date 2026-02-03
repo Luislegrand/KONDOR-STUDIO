@@ -234,6 +234,36 @@ test('create version increments version_number', async () => {
   assert.equal(versionRes.body.versionNumber, 2);
 });
 
+test('clone dashboard creates draft with latest layout', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard Base', brandId });
+
+  const latestLayout = buildLayout();
+  latestLayout.theme.brandColor = '#111111';
+
+  await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/versions`)
+    .set('x-role', 'MEMBER')
+    .send({ layoutJson: latestLayout });
+
+  const cloneRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/clone`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(cloneRes.statusCode, 201);
+  assert.notEqual(cloneRes.body.id, createRes.body.id);
+  assert.equal(cloneRes.body.name, 'Dashboard Base (cópia)');
+  assert.equal(cloneRes.body.status, 'DRAFT');
+  assert.equal(cloneRes.body.latestVersion.versionNumber, 1);
+  assert.equal(cloneRes.body.latestVersion.layoutJson.theme.brandColor, '#111111');
+});
+
 test('publish rejects invalid layout', async () => {
   const { app, state } = buildApp();
   const brandId = randomUUID();
@@ -343,6 +373,27 @@ test('tenant isolation prevents cross-tenant access', async () => {
 
   const res = await request(app)
     .get(`/api/reports/dashboards/${otherDashboard.id}`)
+    .set('x-role', 'ADMIN')
+    .set('x-tenant-id', 'tenant-1');
+
+  assert.equal(res.statusCode, 404);
+});
+
+test('clone prevents cross-tenant access', async () => {
+  const { app, prisma } = buildApp();
+  const dashboard = await prisma.reportDashboard.create({
+    data: {
+      tenantId: 'tenant-2',
+      brandId: randomUUID(),
+      groupId: null,
+      name: 'Outro tenant',
+      status: 'DRAFT',
+      createdByUserId: 'user-2',
+    },
+  });
+
+  const res = await request(app)
+    .post(`/api/reports/dashboards/${dashboard.id}/clone`)
     .set('x-role', 'ADMIN')
     .set('x-tenant-id', 'tenant-1');
 

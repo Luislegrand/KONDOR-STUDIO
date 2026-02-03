@@ -91,6 +91,20 @@ function ChartTooltip({ active, payload, label, meta, formatOverride }) {
   );
 }
 
+function resolveLegendProps(position) {
+  const normalized = String(position || "bottom").toLowerCase();
+  if (normalized === "top") {
+    return { verticalAlign: "top", align: "center" };
+  }
+  if (normalized === "left") {
+    return { verticalAlign: "middle", align: "left", layout: "vertical" };
+  }
+  if (normalized === "right") {
+    return { verticalAlign: "middle", align: "right", layout: "vertical" };
+  }
+  return { verticalAlign: "bottom", align: "center" };
+}
+
 function buildChartData(rows, metrics, dimension) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
@@ -123,7 +137,10 @@ export default function WidgetRenderer({
   const widgetType = widget?.type || "kpi";
   const formatOverride = widget?.viz?.format || "auto";
   const showLegend = widget?.viz?.showLegend !== false;
+  const vizOptions = widget?.viz?.options || {};
   const isTable = widgetType === "table";
+  const showGrid = vizOptions.showGrid !== false;
+  const legendProps = resolveLegendProps(vizOptions.legendPosition);
 
   const [pageSize, setPageSize] = React.useState(25);
   const [pageIndex, setPageIndex] = React.useState(0);
@@ -249,18 +266,19 @@ export default function WidgetRenderer({
 
   if (widgetType === "timeseries") {
     const chartData = buildChartData(rows, metrics, "date");
+    const lineType = vizOptions.lineType || "monotone";
     return (
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData}>
-          <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
+          {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-          {showLegend ? <Legend /> : null}
+          {showLegend ? <Legend {...legendProps} /> : null}
           {metrics.map((metric, index) => (
             <Line
               key={metric}
-              type="monotone"
+              type={lineType}
               dataKey={metric}
               stroke={CHART_COLORS[index % CHART_COLORS.length]}
               strokeWidth={2}
@@ -276,21 +294,24 @@ export default function WidgetRenderer({
   if (widgetType === "bar") {
     const dimension = dimensions[0] || "label";
     const chartData = buildChartData(rows, metrics, dimension);
+    const barRadius = Array.isArray(vizOptions.barRadius)
+      ? vizOptions.barRadius
+      : [6, 6, 0, 0];
     return (
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData}>
-          <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
+          {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-          {showLegend ? <Legend /> : null}
+          {showLegend ? <Legend {...legendProps} /> : null}
           {metrics.map((metric, index) => (
             <Bar
               key={metric}
               dataKey={metric}
               fill={CHART_COLORS[index % CHART_COLORS.length]}
               name={metric}
-              radius={[6, 6, 0, 0]}
+              radius={barRadius}
             />
           ))}
         </BarChart>
@@ -302,6 +323,7 @@ export default function WidgetRenderer({
     const columns = [...dimensions, ...metrics];
     const pageOptions = [25, 50, 100, 200];
     const currentPage = Math.floor((pageInfo.offset || 0) / pageSize) + 1;
+    const showTotals = vizOptions.showTotals !== false;
     return (
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-auto">
@@ -341,21 +363,23 @@ export default function WidgetRenderer({
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-              Totais
+          {showTotals ? (
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Totais
+              </div>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {metrics.map((metric) => (
+                  <div key={`total-${metric}`} className="text-[var(--text)]">
+                    <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--text-muted)]">
+                      {metric}
+                    </span>
+                    {formatMetricValue(metric, totals?.[metric], meta, formatOverride)}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="mt-1 flex flex-wrap gap-3">
-              {metrics.map((metric) => (
-                <div key={`total-${metric}`} className="text-[var(--text)]">
-                  <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--text-muted)]">
-                    {metric}
-                  </span>
-                  {formatMetricValue(metric, totals?.[metric], meta, formatOverride)}
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
             <label
@@ -412,6 +436,12 @@ export default function WidgetRenderer({
       name: row[dimension],
       value: row[metrics[0]],
     }));
+    const innerRadius = Number.isFinite(vizOptions.innerRadius)
+      ? vizOptions.innerRadius
+      : 45;
+    const outerRadius = Number.isFinite(vizOptions.outerRadius)
+      ? vizOptions.outerRadius
+      : 80;
     return (
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -419,8 +449,8 @@ export default function WidgetRenderer({
             data={chartData}
             dataKey="value"
             nameKey="name"
-            innerRadius={45}
-            outerRadius={80}
+            innerRadius={innerRadius}
+            outerRadius={outerRadius}
           >
             {chartData.map((entry, index) => (
               <Cell
@@ -430,7 +460,7 @@ export default function WidgetRenderer({
             ))}
           </Pie>
           <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-          {showLegend ? <Legend /> : null}
+          {showLegend ? <Legend {...legendProps} /> : null}
         </PieChart>
       </ResponsiveContainer>
     );
