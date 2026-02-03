@@ -166,7 +166,24 @@ function buildWhereClause({ tenantId, brandId, dateFrom, dateTo, filters }) {
   return { whereSql: conditions.join(' AND '), params };
 }
 
-function buildSelectClause(dimensions, baseMetrics) {
+function buildDerivedSelectClause(metricKey) {
+  switch (metricKey) {
+    case 'ctr':
+      return 'CASE WHEN SUM("impressions") = 0 THEN 0 ELSE SUM("clicks")::numeric / SUM("impressions") END AS "ctr"';
+    case 'cpc':
+      return 'CASE WHEN SUM("clicks") = 0 THEN 0 ELSE SUM("spend")::numeric / SUM("clicks") END AS "cpc"';
+    case 'cpm':
+      return 'CASE WHEN SUM("impressions") = 0 THEN 0 ELSE (SUM("spend")::numeric / SUM("impressions")) * 1000 END AS "cpm"';
+    case 'cpa':
+      return 'CASE WHEN SUM("conversions") = 0 THEN 0 ELSE SUM("spend")::numeric / SUM("conversions") END AS "cpa"';
+    case 'roas':
+      return 'CASE WHEN SUM("spend") = 0 THEN 0 ELSE SUM("revenue")::numeric / SUM("spend") END AS "roas"';
+    default:
+      return null;
+  }
+}
+
+function buildSelectClause({ dimensions, baseMetrics, derivedMetrics }) {
   const dimensionSelects = dimensions.map((dim) => {
     const column = DIMENSION_COLUMN_MAP[dim];
     return `"${column}" AS "${dim}"`;
@@ -177,7 +194,11 @@ function buildSelectClause(dimensions, baseMetrics) {
     return `COALESCE(SUM("${column}")::numeric, 0) AS "${metric}"`;
   });
 
-  return [...dimensionSelects, ...metricSelects].join(', ');
+  const derivedSelects = (derivedMetrics || [])
+    .map((metric) => buildDerivedSelectClause(metric.key))
+    .filter(Boolean);
+
+  return [...dimensionSelects, ...metricSelects, ...derivedSelects].join(', ');
 }
 
 function buildGroupByClause(dimensions) {
@@ -186,10 +207,21 @@ function buildGroupByClause(dimensions) {
   return `GROUP BY ${columns.join(', ')}`;
 }
 
-function buildOrderByClause(dimensions) {
+function buildOrderByClause({ dimensions, sort }) {
+  if (sort?.field) {
+    const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+    return `ORDER BY "${sort.field}" ${direction}`;
+  }
   if (!dimensions.length) return '';
-  const columns = dimensions.map((dim) => `"${DIMENSION_COLUMN_MAP[dim]}"`);
+  const columns = dimensions.map((dim) => `"${dim}"`);
   return `ORDER BY ${columns.join(', ')}`;
+}
+
+function normalizePagination(pagination) {
+  if (!pagination) return null;
+  const limit = Math.min(Math.max(Number(pagination.limit ?? 25), 1), 500);
+  const offset = Math.max(Number(pagination.offset ?? 0), 0);
+  return { limit, offset };
 }
 
 function computeDerivedValues(row, derivedMetrics) {
@@ -286,6 +318,9 @@ async function runAggregates({
   dimensions,
   baseMetrics,
   filters,
+  derivedMetrics,
+  sort,
+  pagination,
 }) {
   const { whereSql, params } = buildWhereClause({
     tenantId,
@@ -295,20 +330,47 @@ async function runAggregates({
     filters,
   });
 
-  const selectClause = buildSelectClause(dimensions, baseMetrics);
+  const selectClause = buildSelectClause({
+    dimensions,
+    baseMetrics,
+    derivedMetrics,
+  });
   const groupByClause = buildGroupByClause(dimensions);
-  const orderByClause = buildOrderByClause(dimensions);
+  const orderByClause = buildOrderByClause({ dimensions, sort });
+  const page = normalizePagination(pagination);
 
-  const baseQuery = `SELECT ${selectClause} FROM "fact_kondor_metrics_daily" WHERE ${whereSql} ${groupByClause} ${orderByClause}`;
+  let paginationClause = '';
+  const nextParams = [...params];
+  if (page) {
+    const limitPlus = page.limit + 1;
+    paginationClause = `LIMIT $${nextParams.length + 1} OFFSET $${nextParams.length + 2}`;
+    nextParams.push(limitPlus, page.offset);
+  }
 
-  const totalsSelect = buildSelectClause([], baseMetrics);
+  const baseQuery = `SELECT ${selectClause} FROM "fact_kondor_metrics_daily" WHERE ${whereSql} ${groupByClause} ${orderByClause} ${paginationClause}`;
+
+  const totalsSelect = buildSelectClause({
+    dimensions: [],
+    baseMetrics,
+    derivedMetrics: [],
+  });
   const totalsQuery = `SELECT ${totalsSelect} FROM "fact_kondor_metrics_daily" WHERE ${whereSql}`;
 
-  const rows = await prisma.$queryRawUnsafe(baseQuery, ...params);
+  const rows = await prisma.$queryRawUnsafe(baseQuery, ...nextParams);
   const totalsResult = await prisma.$queryRawUnsafe(totalsQuery, ...params);
   const totalsRow = Array.isArray(totalsResult) ? totalsResult[0] : totalsResult;
 
-  return { rows: rows || [], totals: totalsRow || {} };
+  let pageInfo = null;
+  let safeRows = rows || [];
+  if (page) {
+    const hasMore = safeRows.length > page.limit;
+    if (hasMore) {
+      safeRows = safeRows.slice(0, page.limit);
+    }
+    pageInfo = { limit: page.limit, offset: page.offset, hasMore };
+  }
+
+  return { rows: safeRows, totals: totalsRow || {}, pageInfo };
 }
 
 async function queryMetrics(tenantId, payload = {}) {
@@ -340,6 +402,32 @@ async function queryMetrics(tenantId, payload = {}) {
   const normalizedCatalog = normalizeMetricCatalog(catalogEntries);
   const plan = buildMetricsPlan(metrics, normalizedCatalog);
 
+  const allowedSortFields = new Set([...dimensions, ...metrics]);
+  let resolvedSort = null;
+  if (payload.sort?.field) {
+    if (!allowedSortFields.has(payload.sort.field)) {
+      const err = new Error('sort.field inválido');
+      err.code = 'INVALID_SORT_FIELD';
+      err.status = 400;
+      err.details = { field: payload.sort.field };
+      throw err;
+    }
+    resolvedSort = {
+      field: payload.sort.field,
+      direction: payload.sort.direction || 'asc',
+    };
+  }
+
+  let derivedForSelect = [];
+  if (resolvedSort?.field) {
+    const derivedMatch = plan.derivedMetrics.find(
+      (metric) => metric.key === resolvedSort.field
+    );
+    if (derivedMatch) {
+      derivedForSelect = [derivedMatch];
+    }
+  }
+
   const baseResult = await runAggregates({
     tenantId,
     brandId,
@@ -347,7 +435,10 @@ async function queryMetrics(tenantId, payload = {}) {
     dateTo: dateRange.end,
     dimensions,
     baseMetrics: plan.baseMetrics,
+    derivedMetrics: derivedForSelect,
     filters,
+    sort: resolvedSort,
+    pagination: payload.pagination,
   });
 
   const rows = buildRows(
@@ -380,7 +471,10 @@ async function queryMetrics(tenantId, payload = {}) {
         dateTo: range.end,
         dimensions,
         baseMetrics: plan.baseMetrics,
+        derivedMetrics: derivedForSelect,
         filters,
+        sort: resolvedSort,
+        pagination: payload.pagination,
       });
 
       compare = {
@@ -401,6 +495,7 @@ async function queryMetrics(tenantId, payload = {}) {
           },
           compareResult.totals,
         ),
+        pageInfo: compareResult.pageInfo,
       };
     }
   }
@@ -413,6 +508,7 @@ async function queryMetrics(tenantId, payload = {}) {
     },
     rows,
     totals,
+    pageInfo: baseResult.pageInfo,
     compare,
   };
 }

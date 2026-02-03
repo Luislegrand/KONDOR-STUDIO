@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export function toDateKey(date) {
   if (!(date instanceof Date)) return "";
   return date.toISOString().slice(0, 10);
@@ -37,10 +39,16 @@ export function stableStringify(value) {
     .join(",")}}`;
 }
 
-export function buildWidgetQueryKey({ dashboardId, widget, globalFilters }) {
+export function buildWidgetQueryKey({
+  dashboardId,
+  widget,
+  globalFilters,
+  pagination,
+}) {
   const filtersKey = stableStringify({
     globalFilters,
     query: widget?.query || {},
+    pagination: pagination || null,
   });
   return ["reportsV2-widget", dashboardId, widget?.id || "unknown", filtersKey];
 }
@@ -56,4 +64,15 @@ export function mergeWidgetFilters(widgetFilters = [], globalFilters = {}) {
   }
 
   return merged;
+}
+
+export function useDebouncedValue(value, delay = 350) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return debounced;
 }

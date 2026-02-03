@@ -56,6 +56,20 @@ const compareToSchema = z
   })
   .strict();
 
+const paginationSchema = z
+  .object({
+    limit: z.number().int().min(1).max(500).default(25),
+    offset: z.number().int().min(0).default(0),
+  })
+  .strict();
+
+const sortSchema = z
+  .object({
+    field: z.string().min(1),
+    direction: z.enum(['asc', 'desc']).default('asc'),
+  })
+  .strict();
+
 const metricsQuerySchema = z
   .object({
     tenantId: z.string().uuid().optional(),
@@ -65,6 +79,8 @@ const metricsQuerySchema = z
     metrics: z.array(z.string().min(1)).min(1),
     filters: z.array(filterSchema).default([]),
     compareTo: compareToSchema.optional().nullable(),
+    pagination: paginationSchema.optional(),
+    sort: sortSchema.optional(),
   })
   .strict();
 

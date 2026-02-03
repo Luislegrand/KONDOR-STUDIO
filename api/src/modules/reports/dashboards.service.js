@@ -146,11 +146,20 @@ async function listDashboards(tenantId, filters, role) {
 }
 
 async function getDashboard(tenantId, id, role) {
+  const include = {
+    publishedVersion: true,
+  };
+
+  if (role !== 'viewer') {
+    include.versions = {
+      orderBy: { versionNumber: 'desc' },
+      take: 1,
+    };
+  }
+
   const dashboard = await prisma.reportDashboard.findFirst({
     where: { id, tenantId },
-    include: {
-      publishedVersion: true,
-    },
+    include,
   });
 
   if (!dashboard) return null;
@@ -165,14 +174,14 @@ async function getDashboard(tenantId, id, role) {
     };
   }
 
-  const latestVersion = await prisma.reportDashboardVersion.findFirst({
-    where: { dashboardId: dashboard.id },
-    orderBy: { versionNumber: 'desc' },
-  });
+  const latestVersion = Array.isArray(dashboard.versions)
+    ? dashboard.versions[0] || null
+    : null;
 
+  const { versions, ...rest } = dashboard;
   return {
-    ...dashboard,
-    latestVersion: latestVersion || null,
+    ...rest,
+    latestVersion,
   };
 }
 

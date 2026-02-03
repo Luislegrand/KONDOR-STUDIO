@@ -1,12 +1,13 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3 } from "lucide-react";
 import PageShell from "@/components/ui/page-shell.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import { base44 } from "@/apiClient/base44Client";
+import { useDebouncedValue } from "@/components/reportsV2/utils.js";
 
 const themeStyle = {
   "--background": "#FFFFFF",
@@ -47,6 +48,7 @@ function buildInitialFilters(layout) {
 export default function ReportsV2Viewer() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["reportsV2-dashboard", id],
@@ -60,10 +62,20 @@ export default function ReportsV2Viewer() {
     null;
 
   const [filters, setFilters] = React.useState(() => buildInitialFilters(layout));
+  const debouncedFilters = useDebouncedValue(filters, 400);
 
   React.useEffect(() => {
     setFilters(buildInitialFilters(layout));
   }, [layout]);
+
+  React.useEffect(() => {
+    const refreshSec = Number(filters?.autoRefreshSec || 0);
+    if (!refreshSec || !id) return undefined;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-widget", id] });
+    }, refreshSec * 1000);
+    return () => clearInterval(interval);
+  }, [filters?.autoRefreshSec, id, queryClient]);
 
   if (isLoading) {
     return (
@@ -128,7 +140,7 @@ export default function ReportsV2Viewer() {
               layout={layout}
               dashboardId={dashboard.id}
               brandId={dashboard.brandId}
-              globalFilters={filters}
+              globalFilters={debouncedFilters}
             />
           ) : (
             <div className="rounded-[16px] border border-[var(--border)] bg-white px-6 py-5 text-sm text-[var(--text-muted)]">

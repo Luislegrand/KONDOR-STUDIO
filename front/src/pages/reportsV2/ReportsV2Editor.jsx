@@ -16,6 +16,7 @@ import {
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
+import { useDebouncedValue } from "@/components/reportsV2/utils.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
@@ -471,6 +472,7 @@ export default function ReportsV2Editor() {
   const [previewFilters, setPreviewFilters] = React.useState(
     buildInitialFilters(DEFAULT_LAYOUT)
   );
+  const debouncedPreviewFilters = useDebouncedValue(previewFilters, 400);
   const [actionMessage, setActionMessage] = React.useState(null);
   const [showValidation, setShowValidation] = React.useState(false);
   const addMenuRef = React.useRef(null);
@@ -1006,7 +1008,7 @@ export default function ReportsV2Editor() {
                   layout={layoutJson}
                   dashboardId={dashboard.id}
                   brandId={dashboard.brandId}
-                  globalFilters={previewFilters}
+                  globalFilters={debouncedPreviewFilters}
                 />
               </div>
             ) : layoutJson.widgets.length ? (

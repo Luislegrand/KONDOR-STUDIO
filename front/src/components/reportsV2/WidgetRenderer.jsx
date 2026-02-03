@@ -20,7 +20,12 @@ import { formatNumber } from "@/utils/formatNumber.js";
 import WidgetSkeleton from "@/components/reports/widgets/WidgetSkeleton.jsx";
 import WidgetEmptyState from "@/components/reports/widgets/WidgetEmptyState.jsx";
 import WidgetErrorState from "@/components/reports/widgets/WidgetErrorState.jsx";
-import { buildWidgetQueryKey, mergeWidgetFilters, resolveDateRange } from "./utils.js";
+import {
+  buildWidgetQueryKey,
+  mergeWidgetFilters,
+  resolveDateRange,
+  stableStringify,
+} from "./utils.js";
 
 const CHART_COLORS = ["#1f6feb", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
 const PERCENT_METRICS = new Set(["ctr"]);
@@ -118,12 +123,34 @@ export default function WidgetRenderer({
   const widgetType = widget?.type || "kpi";
   const formatOverride = widget?.viz?.format || "auto";
   const showLegend = widget?.viz?.showLegend !== false;
+  const isTable = widgetType === "table";
+
+  const [pageSize, setPageSize] = React.useState(25);
+  const [pageIndex, setPageIndex] = React.useState(0);
 
   const dateRange = resolveDateRange(globalFilters?.dateRange || {});
   const mergedFilters = mergeWidgetFilters(widget?.query?.filters || [], globalFilters);
   const compareTo = globalFilters?.compareTo
     ? { mode: globalFilters.compareTo }
     : null;
+
+  const tableResetKey = stableStringify({
+    widgetId: widget?.id,
+    globalFilters,
+    query: widget?.query || {},
+  });
+
+  React.useEffect(() => {
+    if (!isTable) return;
+    setPageIndex(0);
+  }, [isTable, pageSize, tableResetKey]);
+
+  const pagination = isTable
+    ? {
+        limit: pageSize,
+        offset: pageIndex * pageSize,
+      }
+    : undefined;
 
   const payload = {
     brandId,
@@ -132,21 +159,20 @@ export default function WidgetRenderer({
     metrics,
     filters: mergedFilters,
     compareTo,
+    pagination,
   };
 
   const queryKey = buildWidgetQueryKey({
     dashboardId,
     widget,
     globalFilters: { ...globalFilters, dateRange },
+    pagination,
   });
-
-  const refreshMs = Number(globalFilters?.autoRefreshSec || 0) * 1000;
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey,
     queryFn: () => base44.reportsV2.queryMetrics(payload),
     enabled: Boolean(brandId && dateRange.start && dateRange.end && metrics.length),
-    refetchInterval: refreshMs > 0 ? refreshMs : false,
     keepPreviousData: true,
   });
 
@@ -184,6 +210,11 @@ export default function WidgetRenderer({
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const totals = data?.totals || {};
   const meta = data?.meta || {};
+  const pageInfo = data?.pageInfo || {
+    limit: pagination?.limit || 0,
+    offset: pagination?.offset || 0,
+    hasMore: false,
+  };
 
   if (!rows.length && widgetType !== "kpi") {
     return (
@@ -269,32 +300,108 @@ export default function WidgetRenderer({
 
   if (widgetType === "table") {
     const columns = [...dimensions, ...metrics];
+    const pageOptions = [25, 50, 100, 200];
+    const currentPage = Math.floor((pageInfo.offset || 0) / pageSize) + 1;
     return (
-      <div className="h-full overflow-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr className="border-b border-[var(--border)]">
-              {columns.map((col) => (
-                <th key={col} className="px-3 py-2 text-xs font-semibold uppercase text-[var(--text-muted)]">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row.id || index}`} className="border-b border-[var(--border)] last:border-none">
+      <div className="flex h-full flex-col">
+        <div className="flex-1 overflow-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-[var(--border)]">
                 {columns.map((col) => (
-                  <td key={`${col}-${index}`} className="px-3 py-2 text-sm text-[var(--text)]">
-                    {metrics.includes(col)
-                      ? formatMetricValue(col, row[col], meta, formatOverride)
-                      : row[col] ?? "-"}
-                  </td>
+                  <th
+                    key={col}
+                    className="px-3 py-2 text-xs font-semibold uppercase text-[var(--text-muted)]"
+                  >
+                    {col}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr
+                  key={`${row.id || index}`}
+                  className="border-b border-[var(--border)] last:border-none"
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={`${col}-${index}`}
+                      className="px-3 py-2 text-sm text-[var(--text)]"
+                    >
+                      {metrics.includes(col)
+                        ? formatMetricValue(col, row[col], meta, formatOverride)
+                        : row[col] ?? "-"}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              Totais
+            </div>
+            <div className="mt-1 flex flex-wrap gap-3">
+              {metrics.map((metric) => (
+                <div key={`total-${metric}`} className="text-[var(--text)]">
+                  <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--text-muted)]">
+                    {metric}
+                  </span>
+                  {formatMetricValue(metric, totals?.[metric], meta, formatOverride)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+            <label
+              className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+              htmlFor={`page-size-${widget?.id || "table"}`}
+            >
+              Itens
+            </label>
+            <select
+              id={`page-size-${widget?.id || "table"}`}
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPageIndex(0);
+              }}
+              className="rounded-[10px] border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text)]"
+            >
+              {pageOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+
+            <div className="text-xs text-[var(--text-muted)]">
+              Pagina {currentPage}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPageIndex((prev) => Math.max(prev - 1, 0))}
+              disabled={pageIndex === 0}
+              className="rounded-[10px] border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageIndex((prev) => prev + 1)}
+              disabled={!pageInfo?.hasMore}
+              className="rounded-[10px] border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Proximo
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
