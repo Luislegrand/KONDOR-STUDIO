@@ -646,215 +646,6 @@ const Metrics = {
 };
 
 // --------------------
-// Reporting
-// --------------------
-
-const Reporting = {
-  async listMetricCatalog(params = {}) {
-    const qs = buildQuery(params);
-    return jsonFetch(`/reporting/metric-catalog${qs}`, { method: "GET" });
-  },
-
-  async listDimensions(params = {}) {
-    const qs = buildQuery(params);
-    return jsonFetch(`/reporting/dimensions${qs}`, { method: "GET" });
-  },
-
-  async createMetricCatalog(payload = {}) {
-    return jsonFetch("/reporting/metric-catalog", {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async listTemplates(params = {}) {
-    const qs = buildQuery(params);
-    return jsonFetch(`/reporting/templates${qs}`, { method: "GET" });
-  },
-
-  async getTemplate(id) {
-    if (!id) throw new Error("templateId obrigatorio");
-    return jsonFetch(`/reporting/templates/${id}`, { method: "GET" });
-  },
-
-  async createTemplate(payload = {}) {
-    return jsonFetch("/reporting/templates", {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async updateTemplate(id, payload = {}) {
-    if (!id) throw new Error("templateId obrigatorio");
-    return jsonFetch(`/reporting/templates/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async duplicateTemplate(id, payload = {}) {
-    if (!id) throw new Error("templateId obrigatorio");
-    return jsonFetch(`/reporting/templates/${id}/duplicate`, {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async listBrandGroups() {
-    return jsonFetch("/reporting/brand-groups", { method: "GET" });
-  },
-
-  async listBrandGroupMembers(groupId) {
-    if (!groupId) throw new Error("groupId obrigatorio");
-    return jsonFetch(`/reporting/brand-groups/${groupId}/members`, {
-      method: "GET",
-    });
-  },
-
-  async listConnectionsByBrand(brandId) {
-    if (!brandId) throw new Error("brandId obrigatorio");
-    return jsonFetch(`/reporting/brands/${brandId}/connections`, {
-      method: "GET",
-    });
-  },
-
-  async getGa4MetadataByConnection(connectionId) {
-    if (!connectionId) throw new Error("connectionId obrigatorio");
-    return jsonFetch(`/reporting/connections/${connectionId}/ga4/metadata`, {
-      method: "GET",
-    });
-  },
-
-  async checkGa4Compatibility(connectionId, payload = {}) {
-    if (!connectionId) throw new Error("connectionId obrigatorio");
-    return jsonFetch(`/reporting/connections/${connectionId}/ga4/compatibility`, {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async listReports(params = {}) {
-    const qs = buildQuery(params);
-    return jsonFetch(`/reporting/reports${qs}`, { method: "GET" });
-  },
-
-  async getReport(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}`, { method: "GET" });
-  },
-
-  async createReport(payload = {}) {
-    return jsonFetch("/reporting/reports", {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async updateReport(id, payload = {}) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async deleteReport(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}`, {
-      method: "DELETE",
-    });
-  },
-
-  async updateReportLayout(id, payload = {}) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/layout`, {
-      method: "PUT",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async refreshReport(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/refresh`, {
-      method: "POST",
-    });
-  },
-
-  async getReportSnapshots(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/snapshots`, { method: "GET" });
-  },
-
-  async listReportExports(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/exports`, { method: "GET" });
-  },
-
-  async createReportExport(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/exports`, { method: "POST" });
-  },
-
-  async getReportExport(exportId) {
-    if (!exportId) throw new Error("exportId obrigatorio");
-    return jsonFetch(`/reporting/report-exports/${exportId}`, { method: "GET" });
-  },
-
-  async listReportDeliveries(id) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/deliveries`, { method: "GET" });
-  },
-
-  async createReportDelivery(id, payload = {}) {
-    if (!id) throw new Error("reportId obrigatorio");
-    return jsonFetch(`/reporting/reports/${id}/deliveries`, {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async listDashboards(params = {}) {
-    const qs = buildQuery(params);
-    return jsonFetch(`/reporting/dashboards${qs}`, { method: "GET" });
-  },
-
-  async getDashboard(id) {
-    if (!id) throw new Error("dashboardId obrigatorio");
-    return jsonFetch(`/reporting/dashboards/${id}`, { method: "GET" });
-  },
-
-  async createDashboard(payload = {}) {
-    return jsonFetch("/reporting/dashboards", {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async updateDashboard(id, payload = {}) {
-    if (!id) throw new Error("dashboardId obrigatorio");
-    return jsonFetch(`/reporting/dashboards/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async queryDashboardData(id, payload = {}) {
-    if (!id) throw new Error("dashboardId obrigatorio");
-    return jsonFetch(`/reporting/dashboards/${id}/query`, {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  async queryMetrics(payload = {}) {
-    return jsonFetch("/reporting/metrics/query", {
-      method: "POST",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-};
-
-// --------------------
 // Reports V2 (new endpoints)
 // --------------------
 
@@ -906,6 +697,12 @@ const ReportsV2 = {
 
   async listConnections(params = {}) {
     const qs = buildQuery(params);
+    return jsonFetch(`/reports/connections${qs}`, { method: "GET" });
+  },
+
+  async getConnectionsStatus(brandId) {
+    if (!brandId) throw new Error("brandId obrigatorio");
+    const qs = buildQuery({ brandId });
     return jsonFetch(`/reports/connections${qs}`, { method: "GET" });
   },
 
@@ -1429,7 +1226,6 @@ export const base44 = {
     Integration,
     Competitor,
   },
-  reporting: Reporting,
   reportsV2: ReportsV2,
   ga4: GA4,
   analytics: Analytics,

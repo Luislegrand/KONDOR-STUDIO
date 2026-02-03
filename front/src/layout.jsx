@@ -45,6 +45,8 @@ import { useActiveClient } from "@/hooks/useActiveClient.js";
 import { useTenantTheme } from "@/hooks/useTenantTheme.js";
 import { resolveTenantBranding } from "@/utils/theme.js";
 
+const REQUIRED_REPORTS_PLATFORMS = ["META_ADS", "GOOGLE_ADS", "GA4"];
+
 const navGroups = [
   {
     label: "Principal",
@@ -132,9 +134,9 @@ function LayoutContent() {
     queryFn: () => base44.entities.Client.list(),
   });
 
-  const { data: connectionsStatus } = useQuery({
-    queryKey: ["reporting-connections-status", activeClientId],
-    queryFn: () => base44.reporting.listConnectionsByBrand(activeClientId),
+  const { data: connectionsStatus, isLoading: connectionsLoading } = useQuery({
+    queryKey: ["reportsV2-connections-status", activeClientId],
+    queryFn: () => base44.reportsV2.getConnectionsStatus(activeClientId),
     enabled: Boolean(activeClientId),
   });
 
@@ -205,7 +207,26 @@ function LayoutContent() {
     }
     return location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
   });
-  const totalConnections = connectionsStatus?.items?.length || 0;
+  const connections = connectionsStatus?.items || [];
+  const activePlatforms = useMemo(() => {
+    const platforms = new Set();
+    connections.forEach((connection) => {
+      if (String(connection?.status || "").toUpperCase() !== "ACTIVE") return;
+      if (connection?.platform) platforms.add(connection.platform);
+    });
+    return platforms;
+  }, [connections]);
+
+  const missingPlatforms = useMemo(
+    () => REQUIRED_REPORTS_PLATFORMS.filter((platform) => !activePlatforms.has(platform)),
+    [activePlatforms]
+  );
+
+  const hasRequiredConnections =
+    Boolean(activeClientId) && !connectionsLoading && missingPlatforms.length === 0;
+  const needsConnections =
+    Boolean(activeClientId) && !connectionsLoading && missingPlatforms.length > 0;
+  const isCheckingConnections = Boolean(activeClientId) && connectionsLoading;
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--text)]">
@@ -323,19 +344,34 @@ function LayoutContent() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {activeClientId ? (
-              <div
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
-                  totalConnections
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
-                }`}
-              >
-                {totalConnections ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                )}
-                {totalConnections ? "Conexoes OK" : "Sem conexoes"}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+                    hasRequiredConnections
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-amber-200 bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {hasRequiredConnections ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  )}
+                  {isCheckingConnections
+                    ? "Verificando conexoes"
+                    : hasRequiredConnections
+                      ? "Conexoes OK"
+                      : "Conexoes pendentes"}
+                </div>
+                {needsConnections ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate("/relatorios/v2/conexoes")}
+                  >
+                    Gerenciar conexoes
+                  </Button>
+                ) : null}
               </div>
             ) : null}
             <div className="flex items-center gap-3 rounded-[12px] border border-[var(--border)] bg-white/80 px-3 py-2 shadow-[var(--shadow-sm)] backdrop-blur">
