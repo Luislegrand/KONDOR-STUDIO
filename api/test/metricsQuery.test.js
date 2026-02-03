@@ -76,6 +76,7 @@ function buildMetricsApp({
   totals,
   compareRows,
   compareTotals,
+  connections = [{ platform: 'META_ADS' }],
 } = {}) {
   let lastGroupQuery = '';
   let groupByCalls = 0;
@@ -95,6 +96,12 @@ function buildMetricsApp({
   const fakePrisma = {
     client: {
       findFirst: async ({ where }) => (where?.id ? { id: where.id } : null),
+    },
+    brandSourceConnection: {
+      findMany: async ({ where }) => {
+        const platforms = where?.platform?.in || [];
+        return connections.filter((item) => platforms.includes(item.platform));
+      },
     },
     metricsCatalog: {
       findMany: async ({ where }) => buildCatalog(where.key.in),
@@ -166,6 +173,9 @@ test('metrics query computes derived totals from base sums', async () => {
     client: {
       findFirst: async () => ({ id: 'brand-1' }),
     },
+    brandSourceConnection: {
+      findMany: async () => [{ platform: 'META_ADS' }],
+    },
     metricsCatalog: {
       findMany: async ({ where }) => buildCatalog(where.key.in),
     },
@@ -234,6 +244,9 @@ test('metrics query paginates rows and keeps totals for full dataset', async () 
     client: {
       findFirst: async () => ({ id: 'brand-1' }),
     },
+    brandSourceConnection: {
+      findMany: async () => [{ platform: 'META_ADS' }],
+    },
     metricsCatalog: {
       findMany: async ({ where }) => buildCatalog(where.key.in),
     },
@@ -272,6 +285,9 @@ test('metrics query applies sort whitelist (asc/desc)', async () => {
   const fakePrisma = {
     client: {
       findFirst: async () => ({ id: 'brand-1' }),
+    },
+    brandSourceConnection: {
+      findMany: async () => [{ platform: 'META_ADS' }],
     },
     metricsCatalog: {
       findMany: async ({ where }) => buildCatalog(where.key.in),
@@ -328,6 +344,9 @@ test('compareTo previous_period paginates compare rows', async () => {
   const fakePrisma = {
     client: {
       findFirst: async () => ({ id: 'brand-1' }),
+    },
+    brandSourceConnection: {
+      findMany: async () => [{ platform: 'META_ADS' }],
     },
     metricsCatalog: {
       findMany: async ({ where }) => buildCatalog(where.key.in),
@@ -397,6 +416,44 @@ test('metrics query rejects tenantId mismatch', async () => {
 
   assert.equal(res.status, 403);
   assert.equal(res.body?.error?.code, 'TENANT_MISMATCH');
+});
+
+test('metrics query rejects when required connections are missing', async () => {
+  const { app } = buildMetricsApp({ connections: [] });
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .set('x-tenant-id', 'tenant-1')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-02' },
+      dimensions: [],
+      metrics: ['spend'],
+      filters: [],
+    });
+
+  assert.equal(res.status, 409);
+  assert.equal(res.body?.error?.code, 'MISSING_CONNECTIONS');
+  assert.ok(res.body?.error?.details?.missing?.includes('META_ADS'));
+});
+
+test('metrics query allows when GA4 connection exists', async () => {
+  const { app } = buildMetricsApp({ connections: [{ platform: 'GA4' }] });
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .set('x-tenant-id', 'tenant-1')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-02' },
+      dimensions: [],
+      metrics: ['sessions'],
+      filters: [],
+    });
+
+  assert.equal(res.status, 200);
 });
 
 test('metrics query rejects invalid sort field', async () => {

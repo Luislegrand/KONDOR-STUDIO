@@ -247,6 +247,9 @@ function sanitizeLayoutForSave(layout) {
       const dimensions = Array.isArray(widget?.query?.dimensions)
         ? widget.query.dimensions.filter(Boolean)
         : [];
+      const requiredPlatforms = Array.isArray(widget?.query?.requiredPlatforms)
+        ? widget.query.requiredPlatforms.filter(Boolean)
+        : [];
       const filters = Array.isArray(widget?.query?.filters)
         ? widget.query.filters.map((filter) => {
             const op = filter?.op || "eq";
@@ -295,6 +298,7 @@ function sanitizeLayoutForSave(layout) {
           metrics,
           dimensions,
           filters,
+          ...(requiredPlatforms.length ? { requiredPlatforms } : {}),
         },
         viz: {
           variant: widget?.viz?.variant || "default",

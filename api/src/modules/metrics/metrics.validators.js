@@ -27,6 +27,15 @@ const dateRangeSchema = z
   .strict();
 
 const dimensionEnum = z.enum(['date', 'platform', 'account_id', 'campaign_id']);
+const platformEnum = z.enum([
+  'META_ADS',
+  'GOOGLE_ADS',
+  'TIKTOK_ADS',
+  'LINKEDIN_ADS',
+  'GA4',
+  'GMB',
+  'FB_IG',
+]);
 
 const filterSchema = z
   .object({
@@ -78,6 +87,7 @@ const metricsQuerySchema = z
     dimensions: z.array(dimensionEnum).default([]),
     metrics: z.array(z.string().min(1)).min(1),
     filters: z.array(filterSchema).default([]),
+    requiredPlatforms: z.array(platformEnum).optional(),
     compareTo: compareToSchema.optional().nullable(),
     pagination: paginationSchema.optional(),
     sort: sortSchema.optional(),

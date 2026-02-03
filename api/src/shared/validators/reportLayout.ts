@@ -86,6 +86,7 @@ const querySchema = z
     dimensions: z.array(dimensionEnum).default([]),
     metrics: z.array(z.string().min(1)).min(1),
     filters: z.array(filterSchema).default([]),
+    requiredPlatforms: z.array(platformEnum).optional(),
   })
   .strict();
 

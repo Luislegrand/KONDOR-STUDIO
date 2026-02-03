@@ -1,5 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,6 +32,22 @@ const CHART_COLORS = ["#1f6feb", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
 const PERCENT_METRICS = new Set(["ctr"]);
 const RATIO_METRICS = new Set(["roas"]);
 const CURRENCY_METRICS = new Set(["spend", "revenue", "cpc", "cpm", "cpa"]);
+const PLATFORM_LABELS = {
+  META_ADS: "Meta Ads",
+  GOOGLE_ADS: "Google Ads",
+  TIKTOK_ADS: "TikTok Ads",
+  LINKEDIN_ADS: "LinkedIn Ads",
+  GA4: "GA4",
+  GMB: "Google Meu Negocio",
+  FB_IG: "Facebook/Instagram",
+};
+
+function formatPlatformList(list) {
+  if (!Array.isArray(list) || !list.length) return "conexoes necessarias";
+  return list
+    .map((platform) => PLATFORM_LABELS[platform] || platform)
+    .join(", ");
+}
 
 function formatMetricValue(metricKey, value, meta, formatOverride = "auto") {
   if (value === null || value === undefined || value === "") return "-";
@@ -130,6 +147,7 @@ export default function WidgetRenderer({
   brandId,
   globalFilters,
 }) {
+  const navigate = useNavigate();
   const metrics = Array.isArray(widget?.query?.metrics) ? widget.query.metrics : [];
   const dimensions = Array.isArray(widget?.query?.dimensions)
     ? widget.query.dimensions
@@ -175,6 +193,7 @@ export default function WidgetRenderer({
     dimensions,
     metrics,
     filters: mergedFilters,
+    requiredPlatforms: widget?.query?.requiredPlatforms,
     compareTo,
     pagination,
   };
@@ -208,6 +227,25 @@ export default function WidgetRenderer({
     return (
       <WidgetSkeleton
         widgetType={widgetType}
+        className="border-0 bg-transparent p-0"
+      />
+    );
+  }
+
+  if (
+    error?.status === 409 &&
+    error?.data?.error?.code === "MISSING_CONNECTIONS"
+  ) {
+    const missing = error?.data?.error?.details?.missing || [];
+    return (
+      <WidgetEmptyState
+        title="Conexoes pendentes"
+        description={`Conecte ${formatPlatformList(missing)} para ver este widget.`}
+        variant="connection"
+        actionLabel="Ir para conexoes"
+        onAction={() =>
+          navigate(`/relatorios/v2/conexoes${brandId ? `?brandId=${brandId}` : ""}`)
+        }
         className="border-0 bg-transparent p-0"
       />
     );
