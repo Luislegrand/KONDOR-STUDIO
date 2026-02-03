@@ -8,9 +8,31 @@ const { encrypt, decrypt } = require('../lib/crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme_local_secret';
 const STATE_PURPOSE = 'ga4_oauth_state';
 const TOKEN_SKEW_MS = Number(process.env.GA4_TOKEN_SKEW_MS || 300000);
+const REFRESH_LOCK_TTL_MS = Number(process.env.GA4_REFRESH_LOCK_TTL_MS || 10000);
+const refreshLocks = new Map();
 
 function isMockMode() {
   return process.env.GA4_MOCK_MODE === 'true';
+}
+
+function withRefreshLock(tenantId, executor) {
+  const key = String(tenantId || 'unknown');
+  const now = Date.now();
+  const existing = refreshLocks.get(key);
+  if (existing && now - existing.startedAt < REFRESH_LOCK_TTL_MS) {
+    return existing.promise;
+  }
+
+  const promise = (async () => executor())()
+    .finally(() => {
+      const current = refreshLocks.get(key);
+      if (current && current.promise === promise) {
+        refreshLocks.delete(key);
+      }
+    });
+
+  refreshLocks.set(key, { startedAt: now, promise });
+  return promise;
 }
 
 function buildState({ tenantId, userId }) {
@@ -320,47 +342,49 @@ async function getValidAccessToken({ tenantId, userId }) {
     throw buildReauthError();
   }
 
-  let tokenResponse;
-  try {
-    tokenResponse = await googleClient.refreshAccessToken(refreshToken);
-  } catch (error) {
-    if (isReauthFailure(error)) {
-      await markIntegrationNeedsReconnect(
-        tenantId,
-        userId,
-        'REAUTH_REQUIRED',
-        { clearTokens: true, clearRefreshToken: true }
-      );
-      throw buildReauthError();
+  return withRefreshLock(tenantId, async () => {
+    let tokenResponse;
+    try {
+      tokenResponse = await googleClient.refreshAccessToken(refreshToken);
+    } catch (error) {
+      if (isReauthFailure(error)) {
+        await markIntegrationNeedsReconnect(
+          tenantId,
+          userId,
+          'REAUTH_REQUIRED',
+          { clearTokens: true, clearRefreshToken: true }
+        );
+        throw buildReauthError();
+      }
+      await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
+      const err = new Error('OAuth refresh failed. Reconnect GA4.');
+      err.status = error?.status || 400;
+      err.code = 'GA4_REAUTH_REQUIRED';
+      throw err;
     }
-    await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
-    const err = new Error('OAuth refresh failed. Reconnect GA4.');
-    err.status = error?.status || 400;
-    err.code = 'GA4_REAUTH_REQUIRED';
-    throw err;
-  }
-  if (!tokenResponse.access_token) {
-    await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
-    const err = new Error('OAuth refresh failed. Reconnect GA4.');
-    err.status = 400;
-    err.code = 'GA4_REAUTH_REQUIRED';
-    throw err;
-  }
+    if (!tokenResponse.access_token) {
+      await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
+      const err = new Error('OAuth refresh failed. Reconnect GA4.');
+      err.status = 400;
+      err.code = 'GA4_REAUTH_REQUIRED';
+      throw err;
+    }
 
-  const accessTokenEnc = encrypt(String(tokenResponse.access_token));
-  const tokenExpiry = resolveExpiry(tokenResponse);
+    const accessTokenEnc = encrypt(String(tokenResponse.access_token));
+    const tokenExpiry = resolveExpiry(tokenResponse);
 
-  await prisma.integrationGoogleGa4.update({
-    where: { id: integration.id },
-    data: {
-      accessToken: accessTokenEnc,
-      tokenExpiry,
-      status: 'CONNECTED',
-      lastError: null,
-    },
+    await prisma.integrationGoogleGa4.update({
+      where: { id: integration.id },
+      data: {
+        accessToken: accessTokenEnc,
+        tokenExpiry,
+        status: 'CONNECTED',
+        lastError: null,
+      },
+    });
+
+    return tokenResponse.access_token;
   });
-
-  return tokenResponse.access_token;
 }
 
 async function disconnect({ tenantId, userId, clearTokens = true }) {

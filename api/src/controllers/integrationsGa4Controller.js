@@ -112,8 +112,17 @@ module.exports = {
       }
 
       const state = ga4OAuthService.buildState({ tenantId, userId });
-      const force = req.query?.force === '1' || req.query?.force === 'true';
-      const url = require('../lib/googleClient').buildAuthUrl({ state, force });
+      const forceConsent =
+        req.query?.forceConsent === '1' ||
+        req.query?.forceConsent === 'true' ||
+        req.query?.force === '1' ||
+        req.query?.force === 'true';
+      const integration = await ga4OAuthService.getIntegration(tenantId);
+      const needsReconnect = integration?.status === 'NEEDS_RECONNECT';
+      const url = require('../lib/googleClient').buildAuthUrl({
+        state,
+        forceConsent: forceConsent || needsReconnect,
+      });
       return res.json({ url });
     } catch (error) {
       const message = error?.message || 'Failed to start GA4 OAuth';

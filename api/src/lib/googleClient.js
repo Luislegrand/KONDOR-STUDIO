@@ -66,10 +66,9 @@ function createOAuthClient() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-function assertAuthUrlParams(url) {
+function assertAuthUrlParams(url, { requireConsent = false } = {}) {
   const parsed = new URL(url);
   const required = {
-    prompt: 'consent',
     access_type: 'offline',
     include_granted_scopes: 'true',
   };
@@ -78,6 +77,11 @@ function assertAuthUrlParams(url) {
     .map(([key]) => key);
   if (missing.length) {
     const err = new Error(`GA4 OAuth URL missing params: ${missing.join(', ')}`);
+    err.status = 500;
+    throw err;
+  }
+  if (requireConsent && parsed.searchParams.get('prompt') !== 'consent') {
+    const err = new Error('GA4 OAuth URL missing prompt=consent');
     err.status = 500;
     throw err;
   }
@@ -91,17 +95,18 @@ function assertAuthUrlParams(url) {
   return url;
 }
 
-function buildAuthUrl({ state, force } = {}) {
+function buildAuthUrl({ state, forceConsent, force } = {}) {
   const { scopes } = getOAuthConfig();
   const oauth2Client = createOAuthClient();
+  const shouldConsent = Boolean(forceConsent || force);
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: force ? 'consent' : 'consent',
+    prompt: shouldConsent ? 'consent' : undefined,
     include_granted_scopes: true,
     scope: scopes,
     state,
   });
-  return assertAuthUrlParams(url);
+  return assertAuthUrlParams(url, { requireConsent: shouldConsent });
 }
 
 async function exchangeCodeForTokens(code) {
