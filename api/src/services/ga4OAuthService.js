@@ -50,6 +50,27 @@ function normalizeScope(scope) {
   return String(scope);
 }
 
+function buildReauthError() {
+  const err = new Error('REAUTH_REQUIRED');
+  err.status = 409;
+  err.code = 'REAUTH_REQUIRED';
+  return err;
+}
+
+function isReauthFailure(error) {
+  if (!error) return false;
+  const message = String(error.message || '').toLowerCase();
+  const dataError = String(error?.data?.error || '').toLowerCase();
+  const dataDesc = String(error?.data?.error_description || '').toLowerCase();
+  return (
+    message.includes('invalid_grant') ||
+    message.includes('revoked') ||
+    dataError === 'invalid_grant' ||
+    dataDesc.includes('invalid_grant') ||
+    dataDesc.includes('revoked')
+  );
+}
+
 function resolveExpiry(tokenResponse) {
   if (tokenResponse?.expiry_date) {
     return new Date(Number(tokenResponse.expiry_date));
@@ -103,7 +124,12 @@ async function getIntegration(tenantId, userId) {
 async function markIntegrationError(tenantId, userId, message) {
   const existing = await getIntegration(tenantId, userId);
   if (!existing) return null;
-  const nextStatus = existing.status === 'CONNECTED' ? 'CONNECTED' : 'ERROR';
+  const nextStatus =
+    existing.status === 'CONNECTED'
+      ? 'CONNECTED'
+      : existing.status === 'NEEDS_RECONNECT'
+      ? 'NEEDS_RECONNECT'
+      : 'ERROR';
   return prisma.integrationGoogleGa4.update({
     where: { id: existing.id },
     data: { status: nextStatus, lastError: message || 'GA4 error' },
@@ -125,6 +151,26 @@ async function resetIntegration(
       lastError: message || 'GA4 error',
       accessToken: clearTokens ? null : existing.accessToken,
       refreshTokenEnc: clearTokens ? null : existing.refreshTokenEnc,
+      tokenExpiry: clearTokens ? null : existing.tokenExpiry,
+    },
+  });
+}
+
+async function markIntegrationNeedsReconnect(
+  tenantId,
+  userId,
+  message,
+  { clearTokens = true, clearRefreshToken = false } = {}
+) {
+  const existing = await getIntegration(tenantId, userId);
+  if (!existing) return null;
+  return prisma.integrationGoogleGa4.update({
+    where: { id: existing.id },
+    data: {
+      status: 'NEEDS_RECONNECT',
+      lastError: message || 'REAUTH_REQUIRED',
+      accessToken: clearTokens ? null : existing.accessToken,
+      refreshTokenEnc: clearRefreshToken ? null : existing.refreshTokenEnc,
       tokenExpiry: clearTokens ? null : existing.tokenExpiry,
     },
   });
@@ -190,7 +236,12 @@ async function exchangeCode({ code, state }) {
   }
 
   if (!refreshTokenEnc) {
-    await resetIntegration(payload.tenantId, payload.userId, 'Missing refresh token');
+    await markIntegrationNeedsReconnect(
+      payload.tenantId,
+      payload.userId,
+      'Missing refresh token',
+      { clearTokens: true, clearRefreshToken: false }
+    );
     const err = new Error('Refresh token missing. Reconnect with prompt=consent.');
     err.status = 400;
     err.code = 'GA4_REFRESH_TOKEN_MISSING';
@@ -214,7 +265,16 @@ async function getValidAccessToken({ tenantId, userId }) {
   }
 
   const integration = await getIntegration(tenantId, userId);
-  if (!integration || integration.status !== 'CONNECTED') {
+  if (!integration) {
+    const err = new Error('GA4 integration not connected');
+    err.status = 400;
+    err.code = 'GA4_NOT_CONNECTED';
+    throw err;
+  }
+  if (integration.status === 'NEEDS_RECONNECT') {
+    throw buildReauthError();
+  }
+  if (integration.status !== 'CONNECTED') {
     const err = new Error('GA4 integration not connected');
     err.status = 400;
     err.code = 'GA4_NOT_CONNECTED';
@@ -227,43 +287,59 @@ async function getValidAccessToken({ tenantId, userId }) {
       try {
         return decrypt(integration.accessToken);
       } catch (error) {
-        await markIntegrationError(
+        await markIntegrationNeedsReconnect(
           tenantId,
           userId,
-          'Access token decrypt failed. Reconnect GA4.'
+          'Access token decrypt failed. Reconnect GA4.',
+          { clearTokens: true, clearRefreshToken: false }
         );
-        const err = new Error('Access token invalido. Reconecte o GA4.');
-        err.status = 400;
-        err.code = 'GA4_REAUTH_REQUIRED';
-        throw err;
+        throw buildReauthError();
       }
     }
   }
 
   if (!integration.refreshTokenEnc) {
-    await markIntegrationError(tenantId, userId, 'Missing refresh token');
-    const err = new Error('Refresh token missing. Reconnect GA4.');
-    err.status = 400;
-    err.code = 'GA4_REAUTH_REQUIRED';
-    throw err;
+    await markIntegrationNeedsReconnect(
+      tenantId,
+      userId,
+      'Missing refresh token',
+      { clearTokens: true, clearRefreshToken: false }
+    );
+    throw buildReauthError();
   }
 
   let refreshToken;
   try {
     refreshToken = decrypt(integration.refreshTokenEnc);
   } catch (error) {
-    await markIntegrationError(
+    await markIntegrationNeedsReconnect(
       tenantId,
       userId,
-      'Refresh token decrypt failed. Reconnect GA4.'
+      'Refresh token decrypt failed. Reconnect GA4.',
+      { clearTokens: true, clearRefreshToken: true }
     );
-    const err = new Error('Refresh token invalido. Reconecte o GA4.');
-    err.status = 400;
+    throw buildReauthError();
+  }
+
+  let tokenResponse;
+  try {
+    tokenResponse = await googleClient.refreshAccessToken(refreshToken);
+  } catch (error) {
+    if (isReauthFailure(error)) {
+      await markIntegrationNeedsReconnect(
+        tenantId,
+        userId,
+        'REAUTH_REQUIRED',
+        { clearTokens: true, clearRefreshToken: true }
+      );
+      throw buildReauthError();
+    }
+    await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
+    const err = new Error('OAuth refresh failed. Reconnect GA4.');
+    err.status = error?.status || 400;
     err.code = 'GA4_REAUTH_REQUIRED';
     throw err;
   }
-
-  const tokenResponse = await googleClient.refreshAccessToken(refreshToken);
   if (!tokenResponse.access_token) {
     await markIntegrationError(tenantId, userId, 'OAuth refresh failed. Reconnect GA4.');
     const err = new Error('OAuth refresh failed. Reconnect GA4.');

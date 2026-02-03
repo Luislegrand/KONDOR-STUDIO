@@ -22,6 +22,10 @@ function normalizeGa4Error(error) {
   const message = error?.message || 'GA4 error';
   const lower = String(message).toLowerCase();
 
+  if (error?.code === 'REAUTH_REQUIRED') {
+    return 'REAUTH_REQUIRED';
+  }
+
   if (error?.code === 'GA4_REAUTH_REQUIRED') {
     return 'Tokens invalidos ou expirados. Reconecte o GA4.';
   }
