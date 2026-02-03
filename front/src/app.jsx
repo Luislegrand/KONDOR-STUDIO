@@ -26,6 +26,9 @@ const ReportsV2Templates = lazy(() =>
 );
 const ReportsV2Viewer = lazy(() => import("./pages/reportsV2/ReportsV2Viewer.jsx"));
 const ReportsV2Editor = lazy(() => import("./pages/reportsV2/ReportsV2Editor.jsx"));
+const ReportsV2Connections = lazy(() =>
+  import("./pages/reportsV2/ReportsV2Connections.jsx")
+);
 const AnalyticsDashboards = lazy(() => import("./pages/analytics/dashboards.jsx"));
 const AnalyticsDashboardBuilder = lazy(() =>
   import("./pages/analytics/dashboardBuilder.jsx")
@@ -131,6 +134,7 @@ export default function App() {
             />
             <Route path="/relatorios/v2" element={<ReportsV2Home />} />
             <Route path="/relatorios/v2/templates" element={<ReportsV2Templates />} />
+            <Route path="/relatorios/v2/conexoes" element={<ReportsV2Connections />} />
             <Route path="/relatorios/v2/:id" element={<ReportsV2Viewer />} />
             <Route path="/relatorios/v2/:id/edit" element={<ReportsV2Editor />} />
             <Route path="/competitors" element={<Competitors />} />

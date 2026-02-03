@@ -903,6 +903,23 @@ const ReportsV2 = {
       body: JSON.stringify(payload || {}),
     });
   },
+
+  async listConnections(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/reports/connections${qs}`, { method: "GET" });
+  },
+
+  async listAvailableConnections(params = {}) {
+    const qs = buildQuery(params);
+    return jsonFetch(`/reports/connections/available${qs}`, { method: "GET" });
+  },
+
+  async linkConnection(payload = {}) {
+    return jsonFetch("/reports/connections", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
 };
 
 // --------------------

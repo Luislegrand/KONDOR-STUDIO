@@ -91,10 +91,21 @@ export default function ReportsV2Home() {
             title="Relatorios inteligentes"
             subtitle="Construa dashboards vivos com metricas normalizadas e filtros globais."
             actions={
-              <Button onClick={() => navigate("/relatorios/v2/templates")} className="gap-2">
-                Criar com template
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate("/relatorios/v2/conexoes")}
+                >
+                  Conexoes por marca
+                </Button>
+                <Button
+                  onClick={() => navigate("/relatorios/v2/templates")}
+                  className="gap-2"
+                >
+                  Criar com template
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
             }
           />
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
