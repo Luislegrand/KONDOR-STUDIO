@@ -20,14 +20,6 @@ const Competitors = lazy(() => import("./pages/competitors.jsx"));
 const Integrations = lazy(() => import("./pages/integrations.jsx"));
 const Ga4Integration = lazy(() => import("./pages/integrations/ga4.jsx"));
 const Settings = lazy(() => import("./pages/settings.jsx"));
-const ReportsHome = lazy(() => import("./pages/reports/ReportsHome.jsx"));
-const ReportsTemplates = lazy(() => import("./pages/reports/ReportsTemplates.jsx"));
-const ReportsTemplateBuilder = lazy(() => import("./pages/reports/ReportsTemplateBuilder.jsx"));
-const ReportsWizard = lazy(() => import("./pages/reports/ReportsWizard.jsx"));
-const ReportViewer = lazy(() => import("./pages/reports/ReportViewer.jsx"));
-const DashboardsHome = lazy(() => import("./pages/reports/DashboardsHome.jsx"));
-const DashboardViewer = lazy(() => import("./pages/reports/DashboardViewer.jsx"));
-const DashboardBuilder = lazy(() => import("./pages/reports/DashboardBuilder.jsx"));
 const ReportsV2Home = lazy(() => import("./pages/reportsV2/ReportsV2Home.jsx"));
 const ReportsV2Templates = lazy(() =>
   import("./pages/reportsV2/ReportsV2Templates.jsx")
@@ -129,21 +121,9 @@ export default function App() {
             <Route path="/team" element={<Team />} />
             <Route path="/biblioteca" element={<Biblioteca />} />
             <Route path="/metrics" element={<Metrics />} />
-            <Route path="/reports" element={<ReportsHome />} />
-            <Route path="/reports/templates" element={<ReportsTemplates />} />
-            <Route path="/reports/templates/new" element={<ReportsTemplateBuilder />} />
-            <Route path="/reports/templates/:templateId/edit" element={<ReportsTemplateBuilder />} />
-            <Route path="/reports/new" element={<ReportsWizard />} />
-            <Route path="/reports/:reportId" element={<ReportViewer />} />
-            <Route path="/reports/dashboards" element={<DashboardsHome />} />
-            <Route path="/reports/dashboards/new" element={<DashboardBuilder />} />
             <Route
-              path="/reports/dashboards/:dashboardId"
-              element={<DashboardViewer />}
-            />
-            <Route
-              path="/reports/dashboards/:dashboardId/edit"
-              element={<DashboardBuilder />}
+              path="/relatorios"
+              element={<Navigate to="/relatorios/v2" replace />}
             />
             <Route path="/relatorios/v2" element={<ReportsV2Home />} />
             <Route path="/relatorios/v2/templates" element={<ReportsV2Templates />} />
