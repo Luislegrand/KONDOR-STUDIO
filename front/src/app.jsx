@@ -125,6 +125,10 @@ export default function App() {
               path="/relatorios"
               element={<Navigate to="/relatorios/v2" replace />}
             />
+            <Route
+              path="/reports/*"
+              element={<Navigate to="/relatorios/v2" replace />}
+            />
             <Route path="/relatorios/v2" element={<ReportsV2Home />} />
             <Route path="/relatorios/v2/templates" element={<ReportsV2Templates />} />
             <Route path="/relatorios/v2/:id" element={<ReportsV2Viewer />} />
