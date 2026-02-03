@@ -2,6 +2,9 @@ process.env.NODE_ENV = 'test';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const express = require('express');
+const request = require('supertest');
+const { randomUUID } = require('crypto');
 
 function mockModule(path, exports) {
   const resolved = require.resolve(path);
@@ -40,6 +43,96 @@ function buildCatalog(keys) {
       requiredFields: null,
     };
   });
+}
+
+function buildRows(count, startDate = '2026-01-01') {
+  const rows = [];
+  const base = new Date(startDate);
+  for (let i = 0; i < count; i += 1) {
+    const date = new Date(base);
+    date.setDate(base.getDate() + i);
+    rows.push({
+      date: date.toISOString().slice(0, 10),
+      spend: String(10 + i),
+      impressions: '100',
+      clicks: '10',
+    });
+  }
+  return rows;
+}
+
+function paginateRows(rows, params) {
+  if (!params.length) return rows;
+  const limitPlus = params[params.length - 2];
+  const offset = params[params.length - 1];
+  if (typeof limitPlus !== 'number' || typeof offset !== 'number') {
+    return rows;
+  }
+  return rows.slice(offset, offset + limitPlus);
+}
+
+function buildMetricsApp({
+  rows = buildRows(60),
+  totals,
+  compareRows,
+  compareTotals,
+} = {}) {
+  let lastGroupQuery = '';
+  let groupByCalls = 0;
+  let totalsCalls = 0;
+  const totalsRow =
+    totals ||
+    rows.reduce(
+      (acc, row) => {
+        acc.spend += Number(row.spend || 0);
+        acc.impressions += Number(row.impressions || 0);
+        acc.clicks += Number(row.clicks || 0);
+        return acc;
+      },
+      { spend: 0, impressions: 0, clicks: 0 },
+    );
+
+  const fakePrisma = {
+    client: {
+      findFirst: async ({ where }) => (where?.id ? { id: where.id } : null),
+    },
+    metricsCatalog: {
+      findMany: async ({ where }) => buildCatalog(where.key.in),
+    },
+    $queryRawUnsafe: async (sql, ...params) => {
+      if (sql.includes('GROUP BY')) {
+        groupByCalls += 1;
+        lastGroupQuery = sql;
+        const source = groupByCalls === 1 ? rows : compareRows || rows;
+        return paginateRows(source, params);
+      }
+      totalsCalls += 1;
+      const source =
+        totalsCalls === 1 ? totalsRow : compareTotals || totalsRow;
+      return [source];
+    },
+  };
+
+  mockModule('../src/prisma', { prisma: fakePrisma });
+  resetModule('../src/modules/metrics/metrics.service');
+  resetModule('../src/modules/metrics/metrics.controller');
+  resetModule('../src/modules/metrics/metrics.routes');
+
+  const router = require('../src/modules/metrics/metrics.routes');
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    const tenantId = req.headers['x-tenant-id'] || 'tenant-1';
+    req.user = { id: 'user-1', tenantId, role: 'ADMIN' };
+    req.tenantId = tenantId;
+    next();
+  });
+  app.use('/metrics', router);
+
+  return {
+    app,
+    getLastGroupQuery: () => lastGroupQuery,
+  };
 }
 
 test('metrics query computes derived totals from base sums', async () => {
@@ -282,4 +375,115 @@ test('compare range previous_year shifts by one year', () => {
   const range = service.buildCompareRange('2026-02-01', '2026-02-28', 'previous_year');
   assert.equal(range.start, '2025-02-01');
   assert.equal(range.end, '2025-02-28');
+});
+
+test('metrics query rejects tenantId mismatch', async () => {
+  const { app } = buildMetricsApp();
+  const brandId = randomUUID();
+  const tenantId = randomUUID();
+  const otherTenantId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .set('x-tenant-id', tenantId)
+    .send({
+      tenantId: otherTenantId,
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-02' },
+      dimensions: [],
+      metrics: ['spend'],
+      filters: [],
+    });
+
+  assert.equal(res.status, 403);
+  assert.equal(res.body?.error?.code, 'TENANT_MISMATCH');
+});
+
+test('metrics query rejects invalid sort field', async () => {
+  const { app } = buildMetricsApp();
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-02' },
+      dimensions: ['date'],
+      metrics: ['spend'],
+      filters: [],
+      sort: { field: 'invalid_field', direction: 'asc' },
+    });
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body?.error?.code, 'INVALID_SORT_FIELD');
+});
+
+test('metrics query accepts valid sort field', async () => {
+  const { app, getLastGroupQuery } = buildMetricsApp();
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-02' },
+      dimensions: ['date'],
+      metrics: ['spend'],
+      filters: [],
+      sort: { field: 'spend', direction: 'desc' },
+    });
+
+  assert.equal(res.status, 200);
+  assert.ok(getLastGroupQuery().includes('ORDER BY "spend" DESC'));
+});
+
+test('metrics totals stay stable across pagination offsets', async () => {
+  const { app } = buildMetricsApp();
+  const brandId = randomUUID();
+
+  const body = {
+    brandId,
+    dateRange: { start: '2026-01-01', end: '2026-03-01' },
+    dimensions: ['date'],
+    metrics: ['spend'],
+    filters: [],
+  };
+
+  const first = await request(app)
+    .post('/metrics/query')
+    .send({ ...body, pagination: { limit: 25, offset: 0 } });
+
+  const second = await request(app)
+    .post('/metrics/query')
+    .send({ ...body, pagination: { limit: 25, offset: 25 } });
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(first.body.totals.spend, second.body.totals.spend);
+  assert.notEqual(first.body.rows[0]?.date, second.body.rows[0]?.date);
+});
+
+test('metrics compare respects pagination and keeps totals', async () => {
+  const { app } = buildMetricsApp({
+    rows: buildRows(10, '2026-01-01'),
+    compareRows: buildRows(10, '2025-12-20'),
+  });
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-01-10' },
+      dimensions: ['date'],
+      metrics: ['spend'],
+      filters: [],
+      compareTo: { mode: 'previous_period' },
+      pagination: { limit: 2, offset: 0 },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.compare.rows.length, 2);
+  assert.equal(typeof res.body.compare.totals.spend, 'number');
+  assert.equal(res.body.compare.pageInfo.hasMore, true);
 });

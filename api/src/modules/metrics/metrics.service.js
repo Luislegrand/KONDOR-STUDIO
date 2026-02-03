@@ -18,6 +18,24 @@ const BASE_METRIC_COLUMN_MAP = {
 };
 
 const SUPPORTED_DERIVED_METRICS = new Set(['ctr', 'cpc', 'cpm', 'cpa', 'roas']);
+const SORTABLE_FIELD_ALIAS = {
+  date: '"date"',
+  platform: '"platform"',
+  account_id: '"account_id"',
+  campaign_id: '"campaign_id"',
+  spend: '"spend"',
+  impressions: '"impressions"',
+  clicks: '"clicks"',
+  conversions: '"conversions"',
+  revenue: '"revenue"',
+  sessions: '"sessions"',
+  leads: '"leads"',
+  ctr: '"ctr"',
+  cpc: '"cpc"',
+  cpm: '"cpm"',
+  cpa: '"cpa"',
+  roas: '"roas"',
+};
 
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
@@ -208,12 +226,13 @@ function buildGroupByClause(dimensions) {
 }
 
 function buildOrderByClause({ dimensions, sort }) {
-  if (sort?.field) {
+  if (sort?.alias) {
     const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
-    return `ORDER BY "${sort.field}" ${direction}`;
+    return `ORDER BY ${sort.alias} ${direction}`;
   }
   if (!dimensions.length) return '';
-  const columns = dimensions.map((dim) => `"${dim}"`);
+  const columns = dimensions.map((dim) => SORTABLE_FIELD_ALIAS[dim]).filter(Boolean);
+  if (!columns.length) return '';
   return `ORDER BY ${columns.join(', ')}`;
 }
 
@@ -402,18 +421,21 @@ async function queryMetrics(tenantId, payload = {}) {
   const normalizedCatalog = normalizeMetricCatalog(catalogEntries);
   const plan = buildMetricsPlan(metrics, normalizedCatalog);
 
-  const allowedSortFields = new Set([...dimensions, ...metrics]);
   let resolvedSort = null;
   if (payload.sort?.field) {
-    if (!allowedSortFields.has(payload.sort.field)) {
+    const sortField = payload.sort.field;
+    const allowedSortFields = new Set([...dimensions, ...metrics]);
+    const alias = SORTABLE_FIELD_ALIAS[sortField];
+    if (!allowedSortFields.has(sortField) || !alias) {
       const err = new Error('sort.field inválido');
       err.code = 'INVALID_SORT_FIELD';
       err.status = 400;
-      err.details = { field: payload.sort.field };
+      err.details = { field: sortField };
       throw err;
     }
     resolvedSort = {
-      field: payload.sort.field,
+      field: sortField,
+      alias,
       direction: payload.sort.direction || 'asc',
     };
   }
