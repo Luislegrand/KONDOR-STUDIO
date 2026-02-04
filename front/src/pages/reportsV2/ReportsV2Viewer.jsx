@@ -177,11 +177,29 @@ export default function ReportsV2Viewer() {
   });
 
   const exportMutation = useMutation({
-    mutationFn: () => base44.reportsV2.createExport(id, { format: "pdf" }),
-    onSuccess: (payload) => {
-      if (payload?.downloadUrl) {
-        window.open(payload.downloadUrl, "_blank", "noopener");
+    mutationFn: () =>
+      base44.reportsV2.exportPdf(id, {
+        filters,
+        page: "current",
+        activePageId,
+        orientation: "landscape",
+      }),
+    onSuccess: (result) => {
+      if (!result?.blob) {
+        showToast("Nao foi possivel gerar o PDF.", "error");
+        return;
       }
+      const fallbackDate = new Date().toISOString().slice(0, 10);
+      const fallbackName = `Relatorio - ${dashboard?.name || "Dashboard"} - ${fallbackDate}.pdf`;
+      const filename = result.filename || fallbackName;
+      const objectUrl = window.URL.createObjectURL(result.blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(objectUrl);
       showToast("PDF gerado com sucesso.", "success");
     },
     onError: (err) => {

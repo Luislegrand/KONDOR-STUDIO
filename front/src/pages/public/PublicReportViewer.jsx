@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useIsFetching } from "@tanstack/react-query";
 import PageShell from "@/components/ui/page-shell.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
@@ -32,10 +32,58 @@ function buildInitialFilters(layout) {
   };
 }
 
+function parseExportFilters(rawValue) {
+  if (!rawValue) return null;
+  try {
+    const decoded = decodeURIComponent(rawValue);
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+function mergeFilters(base, incoming) {
+  if (!incoming || typeof incoming !== "object") return base;
+  return {
+    ...base,
+    ...incoming,
+    dateRange: {
+      ...base.dateRange,
+      ...(incoming.dateRange || {}),
+    },
+    controls: {
+      ...DEFAULT_FILTER_CONTROLS,
+      ...(base.controls || {}),
+      ...(incoming.controls || {}),
+    },
+  };
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function PublicReportViewer() {
   const { token } = useParams();
   const [searchParams] = useSearchParams();
   const isPdf = searchParams.get("pdf") === "1";
+  const isExport = searchParams.get("export") === "1";
+  const exportPageMode = searchParams.get("page") === "all" ? "all" : "current";
+  const exportOrientation =
+    searchParams.get("orientation") === "landscape" ? "landscape" : "portrait";
+  const exportActivePageId = searchParams.get("activePageId") || null;
+  const exportFilters = React.useMemo(
+    () => parseExportFilters(searchParams.get("filters")),
+    [searchParams]
+  );
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -48,33 +96,86 @@ export default function PublicReportViewer() {
   const normalizedLayout = normalizeLayoutFront(layout);
   const pages = normalizedLayout?.pages || [];
   const globalFilterControls = normalizedLayout?.globalFilters?.controls;
-  const [activePageId, setActivePageId] = React.useState(pages[0]?.id || null);
+  const [activePageId, setActivePageId] = React.useState(
+    exportActivePageId || pages[0]?.id || null
+  );
   const [filters, setFilters] = React.useState(() =>
-    buildInitialFilters(normalizedLayout)
+    mergeFilters(buildInitialFilters(normalizedLayout), exportFilters)
   );
   const debouncedFilters = useDebouncedValue(filters, 400);
+  const widgetFetchingCount = useIsFetching({
+    queryKey: ["reportsV2-widget", data?.dashboard?.id],
+  });
+  const shouldRenderAllPages = isExport && exportPageMode === "all";
+  const pagesToRender = React.useMemo(() => {
+    if (shouldRenderAllPages) return pages;
+    const current = pages.filter((page) => page.id === activePageId);
+    return current.length ? current : pages.slice(0, 1);
+  }, [activePageId, pages, shouldRenderAllPages]);
+  const exportReady =
+    (isExport || isPdf) &&
+    !isLoading &&
+    !error &&
+    Boolean(normalizedLayout) &&
+    widgetFetchingCount === 0;
 
   React.useEffect(() => {
-    setFilters(buildInitialFilters(normalizedLayout));
-  }, [normalizedLayout]);
+    const initial = buildInitialFilters(normalizedLayout);
+    setFilters(mergeFilters(initial, exportFilters));
+  }, [normalizedLayout, exportFilters]);
 
   React.useEffect(() => {
     if (!pages.length) return;
+    if (isExport) {
+      if (
+        exportPageMode === "current" &&
+        exportActivePageId &&
+        pages.some((page) => page.id === exportActivePageId)
+      ) {
+        setActivePageId(exportActivePageId);
+        return;
+      }
+      setActivePageId(pages[0].id);
+      return;
+    }
     setActivePageId((current) => {
       if (current && pages.some((page) => page.id === current)) return current;
       return pages[0].id;
     });
-  }, [pages]);
+  }, [exportActivePageId, exportPageMode, isExport, pages]);
 
   React.useEffect(() => {
-    if (isPdf) return undefined;
+    if (isPdf || isExport) return undefined;
     const refreshSec = Number(filters?.autoRefreshSec || 0);
     if (!refreshSec || !token) return undefined;
     const interval = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: ["reportsV2-widget", data?.dashboard?.id] });
     }, refreshSec * 1000);
     return () => clearInterval(interval);
-  }, [filters?.autoRefreshSec, token, queryClient, data?.dashboard?.id, isPdf]);
+  }, [filters?.autoRefreshSec, token, queryClient, data?.dashboard?.id, isPdf, isExport]);
+
+  React.useEffect(() => {
+    if (!isExport && !isPdf) {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-export-ready");
+        document.body.removeAttribute("data-export-orientation");
+      }
+      return undefined;
+    }
+    if (typeof document !== "undefined") {
+      document.body.setAttribute("data-export-ready", exportReady ? "true" : "false");
+      document.body.setAttribute(
+        "data-export-orientation",
+        isExport ? exportOrientation : "portrait"
+      );
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-export-ready");
+        document.body.removeAttribute("data-export-orientation");
+      }
+    };
+  }, [exportOrientation, exportReady, isExport, isPdf]);
 
   if (isLoading) {
     return (
@@ -102,8 +203,8 @@ export default function PublicReportViewer() {
 
   return (
     <ThemeProvider theme={normalizedLayout?.theme} className="min-h-screen bg-[var(--bg)]">
-      <PageShell className={isPdf ? "print:p-0" : ""}>
-        {!isPdf ? (
+      <PageShell className={isPdf || isExport ? "print:p-0" : ""}>
+        {!isPdf && !isExport ? (
           <div className="mb-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
               Relatorio publico
@@ -117,7 +218,21 @@ export default function PublicReportViewer() {
           </div>
         ) : null}
 
-        {!isPdf ? (
+        {isExport ? (
+          <div className="mb-6 rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-5 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+              KONDOR STUDIO • RELATORIO
+            </p>
+            <h1 className="mt-1 text-xl font-semibold text-[var(--text)]">
+              {data.dashboard?.name || "Relatorio"}
+            </h1>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Gerado em {formatDateTime(data?.meta?.generatedAt)}
+            </p>
+          </div>
+        ) : null}
+
+        {!isPdf && !isExport ? (
           <div className="mb-6">
             <GlobalFiltersBar
               filters={filters}
@@ -129,7 +244,7 @@ export default function PublicReportViewer() {
 
         {normalizedLayout ? (
           <>
-            {!isPdf && pages.length > 1 ? (
+            {!isPdf && !isExport && pages.length > 1 ? (
               <div
                 role="tablist"
                 aria-label="Paginas do dashboard"
@@ -153,13 +268,24 @@ export default function PublicReportViewer() {
                 ))}
               </div>
             ) : null}
-            <DashboardRenderer
-              layout={normalizedLayout}
-              dashboardId={data.dashboard?.id}
-              publicToken={token}
-              globalFilters={debouncedFilters}
-              activePageId={activePageId}
-            />
+            <div className="space-y-8">
+              {pagesToRender.map((page) => (
+                <section key={page.id} className="space-y-3">
+                  {isExport && pagesToRender.length > 1 ? (
+                    <header className="rounded-[12px] border border-[var(--border)] bg-[var(--card)] px-4 py-2">
+                      <p className="text-sm font-semibold text-[var(--text)]">{page.name}</p>
+                    </header>
+                  ) : null}
+                  <DashboardRenderer
+                    layout={normalizedLayout}
+                    dashboardId={data.dashboard?.id}
+                    publicToken={token}
+                    globalFilters={debouncedFilters}
+                    activePageId={page.id}
+                  />
+                </section>
+              ))}
+            </div>
           </>
         ) : (
           <div className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-6 py-5 text-sm text-[var(--muted)]">

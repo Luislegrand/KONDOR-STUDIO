@@ -1,4 +1,4 @@
-const { exportSchema } = require('./exports.validators');
+const { exportSchema, exportPdfSchema } = require('./exports.validators');
 const exportsService = require('./exports.service');
 
 function formatValidationError(error) {
@@ -76,7 +76,39 @@ async function download(req, res) {
   }
 }
 
+async function exportPdf(req, res) {
+  const parsed = exportPdfSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Dados inválidos',
+        details: formatValidationError(parsed.error),
+      },
+    });
+  }
+
+  try {
+    const result = await exportsService.exportDashboardPdf(
+      req.tenantId,
+      req.user?.id,
+      req.params.id,
+      parsed.data,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(result.buffer);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
 module.exports = {
   create,
   download,
+  exportPdf,
 };

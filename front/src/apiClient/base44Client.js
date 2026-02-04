@@ -288,6 +288,46 @@ async function _jsonFetchInternal(path, options = {}) {
   return data;
 }
 
+function extractFilenameFromDisposition(disposition) {
+  if (!disposition) return null;
+  const utf8Match = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch (err) {
+      return utf8Match[1];
+    }
+  }
+  const basicMatch = disposition.match(/filename\s*=\s*\"?([^\";]+)\"?/i);
+  return basicMatch?.[1] || null;
+}
+
+async function blobFetch(path, options = {}) {
+  return autoRefreshWrapper(_blobFetchInternal, path, options);
+}
+
+async function _blobFetchInternal(path, options = {}) {
+  const res = await authedFetch(path, options);
+
+  if (!res.ok) {
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (err) {}
+    const error = new Error(data?.error || "Request failed");
+    error.status = res.status;
+    error.data = data;
+    error.code = data?.code || null;
+    throw error;
+  }
+
+  const blob = await res.blob();
+  const filename = extractFilenameFromDisposition(
+    res.headers.get("content-disposition")
+  );
+  return { blob, filename };
+}
+
 // --------------------
 // Uploads
 // --------------------
@@ -696,6 +736,14 @@ const ReportsV2 = {
   async createExport(id, payload = {}) {
     if (!id) throw new Error("dashboardId obrigatorio");
     return jsonFetch(`/reports/dashboards/${id}/exports`, {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async exportPdf(id, payload = {}) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return blobFetch(`/reports/dashboards/${id}/export-pdf`, {
       method: "POST",
       body: JSON.stringify(payload || {}),
     });
