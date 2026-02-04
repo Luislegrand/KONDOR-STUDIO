@@ -622,13 +622,6 @@ export default function ReportsV2Editor() {
     queryFn: () => base44.reportsV2.getDashboard(id),
   });
 
-  const connectionsQuery = useQuery({
-    queryKey: ["reportsV2-editor-connections", dashboard?.brandId],
-    queryFn: () => base44.reportsV2.listConnections({ brandId: dashboard?.brandId }),
-    enabled: Boolean(dashboard?.brandId),
-  });
-  const connections = connectionsQuery.data?.items || [];
-
   const versionsQuery = useQuery({
     queryKey: ["reportsV2-versions", id],
     queryFn: () => base44.reportsV2.listDashboardVersions(id),
@@ -640,6 +633,13 @@ export default function ReportsV2Editor() {
     dashboard?.latestVersion?.layoutJson ||
     dashboard?.publishedVersion?.layoutJson ||
     null;
+
+  const connectionsQuery = useQuery({
+    queryKey: ["reportsV2-editor-connections", dashboard?.brandId],
+    queryFn: () => base44.reportsV2.listConnections({ brandId: dashboard?.brandId }),
+    enabled: Boolean(dashboard?.brandId),
+  });
+  const connections = connectionsQuery.data?.items || [];
   const debouncedLayoutJson = useDebouncedValue(layoutJson, 1500);
 
   React.useEffect(() => {
