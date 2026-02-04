@@ -565,3 +565,112 @@ test('metrics compare respects pagination and keeps totals', async () => {
   assert.equal(typeof res.body.compare.totals.spend, 'number');
   assert.equal(res.body.compare.pageInfo.hasMore, true);
 });
+
+test('metrics query reuses cache for identical payload within ttl', { concurrency: false }, async () => {
+  let rawCalls = 0;
+  const fakePrisma = {
+    client: {
+      findFirst: async () => ({ id: 'brand-1' }),
+    },
+    brandSourceConnection: {
+      findMany: async () => [{ platform: 'META_ADS' }],
+    },
+    metricsCatalog: {
+      findMany: async ({ where }) => buildCatalog(where.key.in),
+    },
+    $queryRawUnsafe: async (sql) => {
+      rawCalls += 1;
+      if (sql.includes('GROUP BY')) {
+        return [{ date: '2026-01-01', spend: '10' }];
+      }
+      return [{ spend: '10' }];
+    },
+  };
+
+  mockModule('../src/prisma', { prisma: fakePrisma });
+  resetModule('../src/modules/metrics/metrics.service');
+  const service = require('../src/modules/metrics/metrics.service');
+  service.__internal._resetForTests();
+
+  const payload = {
+    brandId: 'brand-1',
+    dateRange: { start: '2026-01-01', end: '2026-01-01' },
+    dimensions: ['date'],
+    metrics: ['spend'],
+    filters: [],
+    compareTo: null,
+    pagination: { limit: 25, offset: 0 },
+  };
+
+  const first = await service.queryMetrics('tenant-1', payload);
+  const second = await service.queryMetrics('tenant-1', payload);
+
+  assert.equal(first.rows.length, 1);
+  assert.equal(second.rows.length, 1);
+  assert.equal(rawCalls, 2);
+});
+
+test('metrics query enforces per-dashboard concurrency limit', { concurrency: false }, async () => {
+  const previousLimit = process.env.METRICS_QUERY_CONCURRENCY_LIMIT;
+  process.env.METRICS_QUERY_CONCURRENCY_LIMIT = '2';
+
+  try {
+    let activeGroupQueries = 0;
+    let maxActiveGroupQueries = 0;
+
+    const fakePrisma = {
+      client: {
+        findFirst: async () => ({ id: 'brand-1' }),
+      },
+      brandSourceConnection: {
+        findMany: async () => [{ platform: 'META_ADS' }],
+      },
+      metricsCatalog: {
+        findMany: async ({ where }) => buildCatalog(where.key.in),
+      },
+      $queryRawUnsafe: async (sql) => {
+        if (sql.includes('GROUP BY')) {
+          activeGroupQueries += 1;
+          maxActiveGroupQueries = Math.max(
+            maxActiveGroupQueries,
+            activeGroupQueries,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          activeGroupQueries -= 1;
+          return [{ date: '2026-01-01', spend: '10' }];
+        }
+        return [{ spend: '10' }];
+      },
+    };
+
+    mockModule('../src/prisma', { prisma: fakePrisma });
+    resetModule('../src/modules/metrics/metrics.service');
+    const service = require('../src/modules/metrics/metrics.service');
+    service.__internal._resetForTests();
+
+    const makePayload = (offset) => ({
+      brandId: 'brand-1',
+      dateRange: { start: '2026-01-01', end: '2026-01-01' },
+      dimensions: ['date'],
+      metrics: ['spend'],
+      filters: [],
+      compareTo: null,
+      pagination: { limit: 1, offset },
+    });
+
+    await Promise.all(
+      Array.from({ length: 6 }, (_, index) =>
+        service.queryMetrics('tenant-1', makePayload(index)),
+      ),
+    );
+
+    assert.ok(maxActiveGroupQueries <= 2);
+  } finally {
+    if (previousLimit === undefined) {
+      delete process.env.METRICS_QUERY_CONCURRENCY_LIMIT;
+    } else {
+      process.env.METRICS_QUERY_CONCURRENCY_LIMIT = previousLimit;
+    }
+    resetModule('../src/modules/metrics/metrics.service');
+  }
+});

@@ -10,6 +10,7 @@ import {
   useDebouncedValue,
   normalizeLayoutFront,
   DEFAULT_FILTER_CONTROLS,
+  stableStringify,
 } from "@/components/reportsV2/utils.js";
 
 function buildInitialFilters(layout) {
@@ -100,10 +101,18 @@ export default function PublicReportViewer() {
   const [activePageId, setActivePageId] = React.useState(
     exportActivePageId || pages[0]?.id || null
   );
+  const [widgetStatusesByPage, setWidgetStatusesByPage] = React.useState({});
+  const [isAutoRefreshing, setIsAutoRefreshing] = React.useState(false);
+  const [isFilterRefreshing, setIsFilterRefreshing] = React.useState(false);
+  const previousFiltersKeyRef = React.useRef("");
   const [filters, setFilters] = React.useState(() =>
     mergeFilters(buildInitialFilters(normalizedLayout), exportFilters)
   );
   const debouncedFilters = useDebouncedValue(filters, 400);
+  const debouncedFiltersKey = React.useMemo(
+    () => stableStringify(debouncedFilters),
+    [debouncedFilters]
+  );
   const widgetFetchingCount = useIsFetching({
     queryKey: ["reportsV2-widget", data?.dashboard?.id],
   });
@@ -122,12 +131,10 @@ export default function PublicReportViewer() {
     });
     return map;
   }, [health?.widgets]);
-  const exportReady =
-    (isExport || isPdf) &&
-    !isLoading &&
-    !error &&
-    Boolean(normalizedLayout) &&
-    widgetFetchingCount === 0;
+
+  React.useEffect(() => {
+    setWidgetStatusesByPage({});
+  }, [token]);
 
   React.useEffect(() => {
     const initial = buildInitialFilters(normalizedLayout);
@@ -159,10 +166,80 @@ export default function PublicReportViewer() {
     const refreshSec = Number(filters?.autoRefreshSec || 0);
     if (!refreshSec || !token) return undefined;
     const interval = setInterval(() => {
+      setIsAutoRefreshing(true);
       queryClient.invalidateQueries({ queryKey: ["reportsV2-widget", data?.dashboard?.id] });
     }, refreshSec * 1000);
     return () => clearInterval(interval);
   }, [filters?.autoRefreshSec, token, queryClient, data?.dashboard?.id, isPdf, isExport]);
+
+  React.useEffect(() => {
+    if (isPdf || isExport) return;
+    const previousKey = previousFiltersKeyRef.current;
+    if (!previousKey) {
+      previousFiltersKeyRef.current = debouncedFiltersKey;
+      return;
+    }
+    if (previousKey !== debouncedFiltersKey) {
+      previousFiltersKeyRef.current = debouncedFiltersKey;
+      setIsFilterRefreshing(true);
+    }
+  }, [debouncedFiltersKey, isExport, isPdf]);
+
+  React.useEffect(() => {
+    if (widgetFetchingCount > 0) return;
+    setIsAutoRefreshing(false);
+    setIsFilterRefreshing(false);
+  }, [widgetFetchingCount]);
+
+  const fetchReason = React.useMemo(() => {
+    if (isAutoRefreshing) return "auto";
+    if (isFilterRefreshing) return "filters";
+    return "manual";
+  }, [isAutoRefreshing, isFilterRefreshing]);
+
+  const refreshNotice = React.useMemo(() => {
+    if (widgetFetchingCount <= 0) return null;
+    if (isAutoRefreshing) return "Atualizando automaticamente...";
+    if (isFilterRefreshing) return "Aplicando filtros...";
+    return "Atualizando...";
+  }, [isAutoRefreshing, isFilterRefreshing, widgetFetchingCount]);
+
+  const handleWidgetStatusesChange = React.useCallback(({ pageId, statuses }) => {
+    if (!pageId || !statuses || typeof statuses !== "object") return;
+    setWidgetStatusesByPage((prev) => {
+      const current = prev?.[pageId] || {};
+      if (stableStringify(current) === stableStringify(statuses)) return prev;
+      return {
+        ...(prev || {}),
+        [pageId]: statuses,
+      };
+    });
+  }, []);
+
+  const exportReady = React.useMemo(() => {
+    if (!(isExport || isPdf)) return false;
+    if (isLoading || error || !normalizedLayout) return false;
+    if (widgetFetchingCount > 0) return false;
+
+    const widgetsToCheck = pagesToRender.flatMap((page) =>
+      Array.isArray(page?.widgets) ? page.widgets.map((widget) => ({ pageId: page.id, widget })) : []
+    );
+    if (!widgetsToCheck.length) return true;
+
+    return widgetsToCheck.every(({ pageId, widget }) => {
+      const status = widgetStatusesByPage?.[pageId]?.[widget?.id]?.status || "loading";
+      return status !== "loading";
+    });
+  }, [
+    error,
+    isExport,
+    isLoading,
+    isPdf,
+    normalizedLayout,
+    pagesToRender,
+    widgetFetchingCount,
+    widgetStatusesByPage,
+  ]);
 
   React.useEffect(() => {
     if (!isExport && !isPdf) {
@@ -225,6 +302,9 @@ export default function PublicReportViewer() {
             <p className="text-sm text-[var(--muted)]">
               Compartilhado para visualizacao externa.
             </p>
+            {refreshNotice ? (
+              <p className="mt-2 text-xs text-[var(--muted)]">{refreshNotice}</p>
+            ) : null}
           </div>
         ) : null}
 
@@ -293,6 +373,8 @@ export default function PublicReportViewer() {
                     globalFilters={debouncedFilters}
                     activePageId={page.id}
                     healthIssuesByWidgetId={healthIssuesByWidgetId}
+                    fetchReason={fetchReason}
+                    onWidgetStatusesChange={handleWidgetStatusesChange}
                   />
                 </section>
               ))}

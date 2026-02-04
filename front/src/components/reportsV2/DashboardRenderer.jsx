@@ -25,10 +25,86 @@ export default function DashboardRenderer({
   activePageId,
   globalFilters,
   healthIssuesByWidgetId,
+  fetchReason,
+  onWidgetStatusesChange,
 }) {
   const normalized = normalizeLayoutFront(layout);
   const activePage = getActivePage(normalized, activePageId);
   const widgets = Array.isArray(activePage?.widgets) ? activePage.widgets : [];
+  const [widgetStatuses, setWidgetStatuses] = React.useState({});
+  const widgetIdsKey = React.useMemo(
+    () => widgets.map((widget) => widget?.id).filter(Boolean).join("|"),
+    [widgets]
+  );
+  const widgetIds = React.useMemo(
+    () => (widgetIdsKey ? widgetIdsKey.split("|").filter(Boolean) : []),
+    [widgetIdsKey]
+  );
+
+  React.useEffect(() => {
+    setWidgetStatuses((prev) => {
+      const next = {};
+      widgetIds.forEach((widgetId) => {
+        next[widgetId] = prev?.[widgetId] || { status: "loading", reason: null };
+      });
+      const prevKeys = Object.keys(prev || {});
+      if (
+        prevKeys.length === widgetIds.length &&
+        widgetIds.every((widgetId) => {
+          const previous = prev?.[widgetId] || { status: "loading", reason: null };
+          const current = next[widgetId];
+          return (
+            previous.status === current.status && previous.reason === current.reason
+          );
+        })
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [widgetIds, widgetIdsKey]);
+
+  const resolvedStatuses = React.useMemo(() => {
+    const next = {};
+    widgets.forEach((widget) => {
+      if (!widget?.id) return;
+      next[widget.id] = widgetStatuses?.[widget.id] || {
+        status: "loading",
+        reason: null,
+      };
+    });
+    return next;
+  }, [widgetStatuses, widgets]);
+
+  React.useEffect(() => {
+    if (!onWidgetStatusesChange) return;
+    onWidgetStatusesChange({
+      pageId: activePage?.id || null,
+      statuses: resolvedStatuses,
+    });
+  }, [activePage?.id, onWidgetStatusesChange, resolvedStatuses]);
+
+  const handleWidgetStatusChange = React.useCallback((widgetId, payload) => {
+    if (!widgetId) return;
+    setWidgetStatuses((prev) => {
+      const current = prev?.[widgetId];
+      const nextPayload = {
+        status: payload?.status || "loading",
+        reason: payload?.reason || null,
+      };
+      if (
+        current &&
+        current.status === nextPayload.status &&
+        current.reason === nextPayload.reason
+      ) {
+        return prev;
+      }
+      return {
+        ...(prev || {}),
+        [widgetId]: nextPayload,
+      };
+    });
+  }, []);
 
   if (!widgets.length) {
     return (
@@ -85,6 +161,8 @@ export default function DashboardRenderer({
                 pageId={activePage?.id}
                 globalFilters={globalFilters}
                 healthIssue={healthIssuesByWidgetId?.[widget.id] || null}
+                fetchReason={fetchReason}
+                onStatusChange={handleWidgetStatusChange}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation, useIsFetching } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Share2, Download, Copy, RefreshCw, Link2Off } from "lucide-react";
 import PageShell from "@/components/ui/page-shell.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -21,6 +21,7 @@ import { base44 } from "@/apiClient/base44Client";
 import {
   useDebouncedValue,
   normalizeLayoutFront,
+  stableStringify,
   DEFAULT_FILTER_CONTROLS,
 } from "@/components/reportsV2/utils.js";
 import useToast from "@/hooks/useToast.js";
@@ -96,6 +97,10 @@ export default function ReportsV2Viewer() {
   const [shareOpen, setShareOpen] = React.useState(false);
   const [shareUrl, setShareUrl] = React.useState("");
   const [blockedAction, setBlockedAction] = React.useState(null);
+  const [widgetStatusesByPage, setWidgetStatusesByPage] = React.useState({});
+  const [isAutoRefreshing, setIsAutoRefreshing] = React.useState(false);
+  const [isFilterRefreshing, setIsFilterRefreshing] = React.useState(false);
+  const previousFiltersKeyRef = React.useRef("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["reportsV2-dashboard", id],
@@ -140,9 +145,20 @@ export default function ReportsV2Viewer() {
     buildInitialFilters(normalizedLayout)
   );
   const debouncedFilters = useDebouncedValue(filters, 400);
+  const debouncedFiltersKey = React.useMemo(
+    () => stableStringify(debouncedFilters),
+    [debouncedFilters]
+  );
+  const widgetFetchingCount = useIsFetching({
+    queryKey: ["reportsV2-widget", id],
+  });
 
   React.useEffect(() => {
     setShareUrl("");
+  }, [id]);
+
+  React.useEffect(() => {
+    setWidgetStatusesByPage({});
   }, [id]);
 
   React.useEffect(() => {
@@ -188,10 +204,88 @@ export default function ReportsV2Viewer() {
     const refreshSec = Number(filters?.autoRefreshSec || 0);
     if (!refreshSec || !id) return undefined;
     const interval = setInterval(() => {
+      setIsAutoRefreshing(true);
       queryClient.invalidateQueries({ queryKey: ["reportsV2-widget", id] });
     }, refreshSec * 1000);
     return () => clearInterval(interval);
   }, [filters?.autoRefreshSec, id, queryClient]);
+
+  React.useEffect(() => {
+    const previousKey = previousFiltersKeyRef.current;
+    if (!previousKey) {
+      previousFiltersKeyRef.current = debouncedFiltersKey;
+      return;
+    }
+    if (previousKey !== debouncedFiltersKey) {
+      previousFiltersKeyRef.current = debouncedFiltersKey;
+      setIsFilterRefreshing(true);
+    }
+  }, [debouncedFiltersKey]);
+
+  React.useEffect(() => {
+    if (widgetFetchingCount > 0) return;
+    setIsAutoRefreshing(false);
+    setIsFilterRefreshing(false);
+  }, [widgetFetchingCount]);
+
+  const activeWidgets = React.useMemo(() => {
+    const activePage = pages.find((page) => page.id === activePageId);
+    return Array.isArray(activePage?.widgets) ? activePage.widgets : [];
+  }, [activePageId, pages]);
+
+  const visibleWidgetStatuses = React.useMemo(() => {
+    const currentStatuses = widgetStatusesByPage?.[activePageId] || {};
+    const statusMap = {};
+    activeWidgets.forEach((widget) => {
+      if (!widget?.id) return;
+      statusMap[widget.id] = currentStatuses[widget.id] || {
+        status: "loading",
+        reason: null,
+      };
+    });
+    return statusMap;
+  }, [activePageId, activeWidgets, widgetStatusesByPage]);
+
+  const isExportReady = React.useMemo(() => {
+    const statuses = Object.values(visibleWidgetStatuses || {});
+    return statuses.every((entry) => entry?.status !== "loading") && widgetFetchingCount === 0;
+  }, [visibleWidgetStatuses, widgetFetchingCount]);
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.body.setAttribute("data-export-ready", isExportReady ? "true" : "false");
+    return () => {
+      document.body.removeAttribute("data-export-ready");
+    };
+  }, [isExportReady]);
+
+  const refreshNotice = React.useMemo(() => {
+    if (widgetFetchingCount <= 0) return null;
+    if (isAutoRefreshing) return "Atualizando automaticamente...";
+    if (isFilterRefreshing) return "Aplicando filtros...";
+    return "Atualizando...";
+  }, [isAutoRefreshing, isFilterRefreshing, widgetFetchingCount]);
+
+  const fetchReason = React.useMemo(() => {
+    if (isAutoRefreshing) return "auto";
+    if (isFilterRefreshing) return "filters";
+    return "manual";
+  }, [isAutoRefreshing, isFilterRefreshing]);
+
+  const handleWidgetStatusesChange = React.useCallback(({ pageId, statuses }) => {
+    if (!pageId || !statuses || typeof statuses !== "object") return;
+    setWidgetStatusesByPage((prev) => {
+      const current = prev?.[pageId] || {};
+      const next = statuses || {};
+      if (stableStringify(current) === stableStringify(next)) {
+        return prev;
+      }
+      return {
+        ...(prev || {}),
+        [pageId]: next,
+      };
+    });
+  }, []);
 
   const createShareMutation = useMutation({
     mutationFn: () => base44.reportsV2.createPublicShare(id),
@@ -344,6 +438,10 @@ export default function ReportsV2Viewer() {
       setBlockedAction("export");
       return;
     }
+    if (!isExportReady) {
+      showToast("Aguarde o carregamento completo dos dados para exportar.", "info");
+      return;
+    }
     exportMutation.mutate();
   };
 
@@ -400,6 +498,9 @@ export default function ReportsV2Viewer() {
             <p className="text-sm text-[var(--muted)]">
               {dashboard.status === "PUBLISHED" ? "Publicado" : "Rascunho"}
             </p>
+            {refreshNotice ? (
+              <p className="mt-2 text-xs text-[var(--muted)]">{refreshNotice}</p>
+            ) : null}
             {isHealthWarn ? (
               <span className="mt-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                 Dados parcialmente indisponiveis
@@ -550,6 +651,8 @@ export default function ReportsV2Viewer() {
               globalFilters={debouncedFilters}
               activePageId={activePageId}
               healthIssuesByWidgetId={healthIssuesByWidgetId}
+              fetchReason={fetchReason}
+              onWidgetStatusesChange={handleWidgetStatusesChange}
             />
             </>
           ) : (

@@ -92,6 +92,61 @@ function formatMetricValue(metricKey, value, meta, formatOverride = "auto") {
   return formatNumber(number, { compact: true });
 }
 
+function resolveRefreshLabel(fetchReason) {
+  if (fetchReason === "auto") return "Atualizando automaticamente...";
+  if (fetchReason === "filters") return "Aplicando filtros...";
+  return "Atualizando...";
+}
+
+function resolveFriendlyError(error) {
+  const status = Number(error?.status || 0);
+  const code = String(error?.data?.error?.code || error?.code || "").toUpperCase();
+
+  if (
+    status === 0 ||
+    code.includes("NETWORK") ||
+    code.includes("FAILED_TO_FETCH") ||
+    code.includes("ERR_NETWORK")
+  ) {
+    return {
+      title: "Sem conexao",
+      description: "Verifique sua conexao com a internet e tente novamente.",
+    };
+  }
+
+  if (
+    code.includes("TIMEOUT") ||
+    code.includes("ETIMEDOUT") ||
+    code.includes("ECONNABORTED") ||
+    status === 408 ||
+    status === 504
+  ) {
+    return {
+      title: "Tempo de resposta excedido",
+      description: "A consulta demorou mais que o esperado. Tente novamente em instantes.",
+    };
+  }
+
+  if (code.includes("INVALID_QUERY")) {
+    return {
+      title: "Configuracao invalida",
+      description: "Este widget possui uma configuracao invalida. Ajuste no editor.",
+    };
+  }
+
+  if (status >= 500 || status === 502 || status === 503) {
+    return {
+      title: "Servico temporariamente indisponivel",
+      description: "Nao foi possivel carregar agora. Tente novamente em alguns instantes.",
+    };
+  }
+
+  return {
+    title: "Nao foi possivel carregar",
+    description: "Ocorreu um erro ao consultar os dados deste widget.",
+  };
+}
+
 function ChartTooltip({ active, payload, label, meta, formatOverride }) {
   if (!active || !payload?.length) return null;
   return (
@@ -170,6 +225,7 @@ export default function WidgetRenderer({
   globalFilters,
   onStatusChange,
   healthIssue,
+  fetchReason,
 }) {
   const navigate = useNavigate();
   const isPublic = Boolean(publicToken);
@@ -276,13 +332,15 @@ export default function WidgetRenderer({
     ),
     keepPreviousData: true,
   });
+  const isRefreshing = isFetching && !isLoading;
+  const refreshLabel = resolveRefreshLabel(fetchReason);
 
   if (widgetType === "text") {
     return (
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
@@ -332,7 +390,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="invalid"
+          status="error"
           reason="INVALID_QUERY"
           onStatusChange={onStatusChange}
         />
@@ -357,7 +415,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="invalid"
+          status="error"
           reason="MISSING_METRICS"
           onStatusChange={onStatusChange}
         />
@@ -371,7 +429,7 @@ export default function WidgetRenderer({
     );
   }
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <>
         <WidgetStatusReporter
@@ -382,6 +440,7 @@ export default function WidgetRenderer({
         />
         <WidgetSkeleton
           widgetType={widgetType}
+          variant="embedded"
           className="border-0 bg-transparent p-0"
         />
       </>
@@ -397,7 +456,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="invalid"
+          status="warn"
           reason="MISSING_CONNECTIONS"
           onStatusChange={onStatusChange}
         />
@@ -421,6 +480,7 @@ export default function WidgetRenderer({
   }
 
   if (error) {
+    const friendlyError = resolveFriendlyError(error);
     return (
       <>
         <WidgetStatusReporter
@@ -430,8 +490,8 @@ export default function WidgetRenderer({
           onStatusChange={onStatusChange}
         />
         <WidgetErrorState
-          title="Nao foi possivel carregar"
-          description="Verifique sua conexao e tente novamente."
+          title={friendlyError.title}
+          description={friendlyError.description}
           onRetry={() => refetch()}
           className="border-0 bg-transparent p-0"
         />
@@ -453,7 +513,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason="EMPTY_DATA"
           onStatusChange={onStatusChange}
         />
@@ -474,7 +534,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
@@ -485,8 +545,8 @@ export default function WidgetRenderer({
           <div className="text-3xl font-semibold text-[var(--text)]">
             {formatMetricValue(metric, value, meta, formatOverride)}
           </div>
-          {isFetching ? (
-            <div className="text-xs text-[var(--muted)]">Atualizando...</div>
+          {isRefreshing ? (
+            <div className="text-xs text-[var(--muted)]">{refreshLabel}</div>
           ) : (
             <div className="text-xs text-[var(--muted)]">Atualizado agora</div>
           )}
@@ -502,30 +562,37 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-            {showLegend ? <Legend {...legendProps} /> : null}
-            {metrics.map((metric, index) => (
-              <Line
-                key={metric}
-                type={lineType}
-                dataKey={metric}
-                stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                strokeWidth={2}
-                dot={false}
-                name={metric}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="flex h-full flex-col">
+          <div className="flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
+                {showLegend ? <Legend {...legendProps} /> : null}
+                {metrics.map((metric, index) => (
+                  <Line
+                    key={metric}
+                    type={lineType}
+                    dataKey={metric}
+                    stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    name={metric}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {isRefreshing ? (
+            <div className="mt-2 text-xs text-[var(--muted)]">{refreshLabel}</div>
+          ) : null}
+        </div>
       </>
     );
   }
@@ -540,28 +607,35 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData}>
-            {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-            {showLegend ? <Legend {...legendProps} /> : null}
-            {metrics.map((metric, index) => (
-              <Bar
-                key={metric}
-                dataKey={metric}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
-                name={metric}
-                radius={barRadius}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="flex h-full flex-col">
+          <div className="flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                {showGrid ? <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /> : null}
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
+                {showLegend ? <Legend {...legendProps} /> : null}
+                {metrics.map((metric, index) => (
+                  <Bar
+                    key={metric}
+                    dataKey={metric}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                    name={metric}
+                    radius={barRadius}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {isRefreshing ? (
+            <div className="mt-2 text-xs text-[var(--muted)]">{refreshLabel}</div>
+          ) : null}
+        </div>
       </>
     );
   }
@@ -587,7 +661,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
@@ -698,6 +772,9 @@ export default function WidgetRenderer({
             </div>
           </div>
         </div>
+        {isRefreshing ? (
+          <div className="mt-2 text-xs text-[var(--muted)]">{refreshLabel}</div>
+        ) : null}
       </>
     );
   }
@@ -715,7 +792,7 @@ export default function WidgetRenderer({
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="ok"
+          status="ready"
           reason={null}
           onStatusChange={onStatusChange}
         />
@@ -729,6 +806,9 @@ export default function WidgetRenderer({
           variant={variant}
           options={widget?.viz?.options}
         />
+        {isRefreshing ? (
+          <div className="mt-2 text-xs text-[var(--muted)]">{refreshLabel}</div>
+        ) : null}
       </>
     );
   }
@@ -737,7 +817,7 @@ export default function WidgetRenderer({
     <>
       <WidgetStatusReporter
         widgetId={widget?.id}
-        status="invalid"
+        status="error"
         reason="UNSUPPORTED_WIDGET"
         onStatusChange={onStatusChange}
       />

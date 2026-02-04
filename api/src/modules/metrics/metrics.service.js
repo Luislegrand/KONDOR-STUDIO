@@ -37,6 +37,130 @@ const SORTABLE_FIELD_ALIAS = {
   roas: '"roas"',
 };
 
+const METRICS_QUERY_CACHE_TTL_MS = Math.max(
+  0,
+  Number(process.env.METRICS_QUERY_CACHE_TTL_MS || 30_000),
+);
+const METRICS_QUERY_CACHE_MAX_ENTRIES = Math.max(
+  20,
+  Number(process.env.METRICS_QUERY_CACHE_MAX_ENTRIES || 300),
+);
+const METRICS_QUERY_CONCURRENCY_LIMIT = Math.max(
+  1,
+  Number(process.env.METRICS_QUERY_CONCURRENCY_LIMIT || 4),
+);
+
+const metricsQueryCache = new Map();
+const metricsQueryInFlight = new Map();
+const dashboardQueues = new Map();
+
+function stableStringify(value) {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+    .join(',')}}`;
+}
+
+function cloneResult(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function pruneMetricsCache() {
+  const now = Date.now();
+  for (const [key, entry] of metricsQueryCache.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      metricsQueryCache.delete(key);
+    }
+  }
+  while (metricsQueryCache.size > METRICS_QUERY_CACHE_MAX_ENTRIES) {
+    const firstKey = metricsQueryCache.keys().next().value;
+    if (!firstKey) break;
+    metricsQueryCache.delete(firstKey);
+  }
+}
+
+function getCachedMetricsResult(key) {
+  const entry = metricsQueryCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    metricsQueryCache.delete(key);
+    return null;
+  }
+  return cloneResult(entry.value);
+}
+
+function setCachedMetricsResult(key, value) {
+  if (!key || METRICS_QUERY_CACHE_TTL_MS <= 0) return;
+  metricsQueryCache.set(key, {
+    value: cloneResult(value),
+    expiresAt: Date.now() + METRICS_QUERY_CACHE_TTL_MS,
+  });
+  pruneMetricsCache();
+}
+
+function buildMetricsCacheKey(tenantId, payload = {}) {
+  if (!tenantId || !payload?.brandId || !payload?.dateRange?.start || !payload?.dateRange?.end) {
+    return null;
+  }
+  const keyPayload = {
+    tenantId,
+    brandId: payload.brandId,
+    dateRange: payload.dateRange,
+    dimensions: payload.dimensions || [],
+    metrics: payload.metrics || [],
+    filters: payload.filters || [],
+    compareTo: payload.compareTo || null,
+    sort: payload.sort || null,
+    limit: payload.limit || null,
+    pagination: payload.pagination || null,
+  };
+  return `metrics:${stableStringify(keyPayload)}`;
+}
+
+function withDashboardConcurrency(dashboardKey, task) {
+  if (!dashboardKey || typeof task !== 'function') {
+    return task();
+  }
+
+  return new Promise((resolve, reject) => {
+    const bucket = dashboardQueues.get(dashboardKey) || { active: 0, queue: [] };
+    dashboardQueues.set(dashboardKey, bucket);
+
+    const runTask = async () => {
+      bucket.active += 1;
+      try {
+        const result = await task();
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      } finally {
+        bucket.active -= 1;
+        const next = bucket.queue.shift();
+        if (next) {
+          next();
+        } else if (bucket.active === 0) {
+          dashboardQueues.delete(dashboardKey);
+        }
+      }
+    };
+
+    if (bucket.active < METRICS_QUERY_CONCURRENCY_LIMIT) {
+      runTask();
+      return;
+    }
+    bucket.queue.push(runTask);
+  });
+}
+
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
   if (typeof value === 'number') return value;
@@ -412,7 +536,7 @@ async function runAggregates({
   return { rows: safeRows, totals: totalsRow || {}, pageInfo };
 }
 
-async function queryMetrics(tenantId, payload = {}) {
+async function executeQueryMetrics(tenantId, payload = {}) {
   if (!tenantId) {
     const err = new Error('tenantId obrigatório');
     err.code = 'TENANT_REQUIRED';
@@ -558,9 +682,58 @@ async function queryMetrics(tenantId, payload = {}) {
   };
 }
 
+async function queryMetrics(tenantId, payload = {}) {
+  const cacheKey = buildMetricsCacheKey(tenantId, payload);
+  if (cacheKey) {
+    const cached = getCachedMetricsResult(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const inFlight = metricsQueryInFlight.get(cacheKey);
+    if (inFlight) {
+      return cloneResult(await inFlight);
+    }
+  }
+
+  const dashboardKey = tenantId && payload?.brandId
+    ? `${tenantId}:${payload.brandId}`
+    : null;
+
+  const execution = withDashboardConcurrency(
+    dashboardKey,
+    () => executeQueryMetrics(tenantId, payload),
+  );
+
+  if (!cacheKey) {
+    return execution;
+  }
+
+  metricsQueryInFlight.set(cacheKey, execution);
+  try {
+    const result = await execution;
+    setCachedMetricsResult(cacheKey, result);
+    return cloneResult(result);
+  } finally {
+    metricsQueryInFlight.delete(cacheKey);
+  }
+}
+
 module.exports = {
   queryMetrics,
   buildCompareRange,
   buildMetricsPlan,
   buildWhereClause,
+  __internal: {
+    stableStringify,
+    buildMetricsCacheKey,
+    getCachedMetricsResult,
+    setCachedMetricsResult,
+    pruneMetricsCache,
+    withDashboardConcurrency,
+    _resetForTests() {
+      metricsQueryCache.clear();
+      metricsQueryInFlight.clear();
+      dashboardQueues.clear();
+    },
+  },
 };

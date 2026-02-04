@@ -91,7 +91,11 @@ function ImageSkeleton() {
   );
 }
 
-export default function WidgetSkeleton({ widgetType = "KPI", variant = "default" }) {
+export default function WidgetSkeleton({
+  widgetType = "KPI",
+  variant = "default",
+  className = "",
+}) {
   const normalized = String(widgetType || "KPI").toUpperCase();
   const content =
     normalized === "KPI"
@@ -110,7 +114,9 @@ export default function WidgetSkeleton({ widgetType = "KPI", variant = "default"
     <div
       className={cn(
         "rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4",
-        variant === "mini" ? "p-3" : ""
+        variant === "mini" ? "p-3" : "",
+        variant === "embedded" ? "h-full border-0 bg-transparent p-0" : "",
+        className
       )}
     >
       {content}

@@ -3,6 +3,11 @@ const { prisma } = require('../../prisma');
 const uploadsService = require('../../services/uploadsService');
 const { computeDashboardHealth } = require('./dashboardHealth.service');
 
+const EXPORT_RENDER_TIMEOUT_MS = Math.max(
+  5_000,
+  Number(process.env.REPORTS_EXPORT_RENDER_TIMEOUT_MS || 45_000),
+);
+
 function slugify(value) {
   return String(value || '')
     .toLowerCase()
@@ -93,10 +98,13 @@ async function generatePdfFromUrlWithOptions(url, options = {}) {
         height: 900,
       },
     });
-    await page.goto(url, { waitUntil: 'networkidle' });
+    await page.goto(url, {
+      waitUntil: 'networkidle',
+      timeout: EXPORT_RENDER_TIMEOUT_MS,
+    });
     await page.waitForFunction(
       () => document?.body?.dataset?.exportReady === 'true',
-      { timeout: 45000 },
+      { timeout: EXPORT_RENDER_TIMEOUT_MS },
     );
     await page.waitForTimeout(400);
     const buffer = await page.pdf({
@@ -108,6 +116,19 @@ async function generatePdfFromUrlWithOptions(url, options = {}) {
     });
     await page.close();
     return buffer;
+  } catch (err) {
+    const message = err?.message || '';
+    const isTimeout =
+      err?.name === 'TimeoutError' || /timeout/i.test(message);
+    if (isTimeout) {
+      const timeoutError = new Error(
+        'Tempo limite ao preparar o dashboard para exportacao. Tente novamente em instantes.',
+      );
+      timeoutError.code = 'EXPORT_RENDER_TIMEOUT';
+      timeoutError.status = 504;
+      throw timeoutError;
+    }
+    throw err;
   } finally {
     await browser.close();
   }
@@ -187,6 +208,7 @@ async function exportDashboardPdf(tenantId, userId, dashboardId, options = {}) {
     },
   });
 
+  const startedAt = Date.now();
   try {
     const frontBase = resolveFrontBaseUrl().replace(/\/+$/, '');
     const queryString = buildExportQueryString(options);
@@ -214,6 +236,14 @@ async function exportDashboardPdf(tenantId, userId, dashboardId, options = {}) {
       filename: buildPdfFileName(dashboard.name),
     };
   } catch (err) {
+    const durationMs = Date.now() - startedAt;
+    console.error('[reports-v2:pdf-export-failed]', {
+      dashboardId: dashboard.id,
+      tenantId,
+      durationMs,
+      errorCode: err?.code || 'EXPORT_PDF_FAILED',
+      message: err?.message || 'Falha ao exportar PDF',
+    });
     await prisma.reportDashboardExport.update({
       where: { id: exportRecord.id },
       data: {
