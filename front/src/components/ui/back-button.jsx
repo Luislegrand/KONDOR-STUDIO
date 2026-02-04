@@ -11,11 +11,12 @@ export default function BackButton({
   labelClassName = "hidden sm:inline",
   size = "sm",
   variant = "outline",
+  forceFallback = false,
 }) {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
+    if (!forceFallback && typeof window !== "undefined" && window.history.length > 1) {
       navigate(-1);
       return;
     }

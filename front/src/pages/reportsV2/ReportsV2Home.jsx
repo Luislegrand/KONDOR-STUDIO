@@ -193,9 +193,10 @@ export default function ReportsV2Home() {
                   key={card.title}
                   type="button"
                   onClick={() => featureActions[card.title]?.()}
-                  className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[16px]"
+                  className="group text-left rounded-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] cursor-pointer"
+                  aria-label={card.title}
                 >
-                  <Card className="bg-white/70 transition hover:shadow-[var(--shadow-sm)]">
+                  <Card className="bg-white/70 transition group-hover:shadow-[var(--shadow-sm)]">
                     <CardContent className="flex h-full flex-col gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[var(--primary-light)] text-[var(--primary)]">
                         <Icon className="h-5 w-5" />

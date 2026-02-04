@@ -1,19 +1,27 @@
 import React from "react";
+import { useContainerWidth } from "react-grid-layout";
 import WidgetRenderer from "./WidgetRenderer.jsx";
 import WidgetEmptyState from "@/components/reports/widgets/WidgetEmptyState.jsx";
+import DashboardCanvas from "@/components/reportsV2/editor/DashboardCanvas.jsx";
 import { normalizeLayoutFront, getActivePage } from "./utils.js";
 
-function buildGridStyle(layout) {
-  const x = Number(layout?.x || 0);
-  const y = Number(layout?.y || 0);
-  const w = Number(layout?.w || 12);
-  const h = Number(layout?.h || 4);
+const CANVAS_ROW_HEIGHT = 28;
+const CANVAS_MARGIN = [16, 16];
+
+function normalizeLayoutItem(widget) {
+  const layout = widget?.layout || {};
+  const w = Math.max(1, Number(layout?.w || 3));
+  const h = Math.max(1, Number(layout?.h || 3));
+  const x = Math.max(0, Number(layout?.x || 0));
+  const y = Math.max(0, Number(layout?.y || 0));
   return {
-    gridColumnStart: x + 1,
-    gridColumnEnd: x + w + 1,
-    gridRowStart: y + 1,
-    gridRowEnd: y + h + 1,
-    minHeight: "100%",
+    i: widget?.id || `${x}-${y}`,
+    x,
+    y,
+    w,
+    h,
+    minW: Math.max(1, Number(layout?.minW || 2)),
+    minH: Math.max(1, Number(layout?.minH || 2)),
   };
 }
 
@@ -28,9 +36,17 @@ export default function DashboardRenderer({
   fetchReason,
   onWidgetStatusesChange,
 }) {
+  const { width, containerRef } = useContainerWidth({
+    measureBeforeMount: true,
+    initialWidth: 960,
+  });
   const normalized = normalizeLayoutFront(layout);
   const activePage = getActivePage(normalized, activePageId);
   const widgets = Array.isArray(activePage?.widgets) ? activePage.widgets : [];
+  const rglLayout = React.useMemo(
+    () => widgets.map((widget) => normalizeLayoutItem(widget)),
+    [widgets]
+  );
   const [widgetStatuses, setWidgetStatuses] = React.useState({});
   const widgetIdsKey = React.useMemo(
     () => widgets.map((widget) => widget?.id).filter(Boolean).join("|"),
@@ -117,23 +133,19 @@ export default function DashboardRenderer({
   }
 
   return (
-    <div
-      className="grid gap-4"
-      style={{
-        gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
-        gridAutoRows: "28px",
-      }}
-    >
-      {widgets.map((widget) => {
+    <DashboardCanvas
+      layout={rglLayout}
+      items={widgets}
+      width={width}
+      containerRef={containerRef}
+      rowHeight={CANVAS_ROW_HEIGHT}
+      margin={CANVAS_MARGIN}
+      renderItem={(widget) => {
         const hasTitle = Boolean(String(widget?.title || "").trim());
         const showTitle = widget?.viz?.options?.showTitle !== false;
         const showHeader = showTitle && (widget?.type !== "text" || hasTitle);
         return (
-          <div
-            key={widget.id}
-            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)] overflow-hidden"
-            style={buildGridStyle(widget.layout)}
-          >
+          <div className="h-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)] overflow-hidden">
             {showHeader ? (
               <div className="mb-3 flex items-center justify-between">
                 <div>
@@ -167,7 +179,7 @@ export default function DashboardRenderer({
             </div>
           </div>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

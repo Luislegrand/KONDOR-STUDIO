@@ -85,11 +85,12 @@ export default function DataPanel({
                   type="button"
                   onClick={() => onToggleMetric(metric.value)}
                   className={cn(
-                    "rounded-[10px] border px-2 py-1 text-[11px] font-semibold transition",
+                    "flex h-9 items-center justify-center rounded-[10px] border px-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition",
                     active
-                      ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+                      ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)] shadow-[var(--shadow-sm)]"
                       : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-slate-300"
                   )}
+                  title={metric.label}
                 >
                   {metric.label}
                 </button>
