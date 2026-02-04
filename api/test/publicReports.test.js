@@ -20,30 +20,34 @@ function createFakePrisma() {
   const state = {
     dashboards: [],
     versions: [],
+    publicShares: [],
   };
 
   const prisma = {
-    reportDashboard: {
+    reportPublicShare: {
       findFirst: async ({ where, include }) => {
-        const found = state.dashboards.find((item) => {
-          if (where.id && item.id !== where.id) return false;
-          if (where.tenantId && item.tenantId !== where.tenantId) return false;
-          if (where.sharedEnabled !== undefined && item.sharedEnabled !== where.sharedEnabled) {
-            return false;
-          }
-          if (where.sharedTokenHash && item.sharedTokenHash !== where.sharedTokenHash) {
-            return false;
-          }
+        const found = state.publicShares.find((item) => {
+          if (where.tokenHash && item.tokenHash !== where.tokenHash) return false;
+          if (where.status && item.status !== where.status) return false;
           return true;
         });
         if (!found) return null;
-        const result = { ...found };
-        if (include?.publishedVersion) {
-          result.publishedVersion =
-            state.versions.find((version) => version.id === found.publishedVersionId) ||
-            null;
+        const share = { ...found };
+        if (include?.dashboard) {
+          const dashboard = state.dashboards.find((item) => item.id === found.dashboardId);
+          if (!dashboard) {
+            share.dashboard = null;
+            return share;
+          }
+          const dashboardResult = { ...dashboard };
+          if (include.dashboard.include?.publishedVersion) {
+            dashboardResult.publishedVersion =
+              state.versions.find((version) => version.id === dashboard.publishedVersionId) ||
+              null;
+          }
+          share.dashboard = dashboardResult;
         }
-        return result;
+        return share;
       },
     },
     reportDashboardExport: {
@@ -94,14 +98,24 @@ test('public report resolves by token', async () => {
     tenantId: 'tenant-1',
     brandId: 'brand-1',
     name: 'Public Dashboard',
-    sharedEnabled: true,
-    sharedTokenHash: tokenHash,
+    status: 'PUBLISHED',
     publishedVersionId: versionId,
+  });
+  state.publicShares.push({
+    id: randomUUID(),
+    tenantId: 'tenant-1',
+    dashboardId: state.dashboards[0].id,
+    tokenHash,
+    status: 'ACTIVE',
+    createdByUserId: 'user-1',
+    createdAt: new Date(),
+    revokedAt: null,
   });
 
   const res = await request(app).get(`/api/public/reports/${token}`);
   assert.equal(res.status, 200);
   assert.equal(res.body?.dashboard?.name, 'Public Dashboard');
+  assert.equal(res.body?.dashboard?.brandId, 'brand-1');
   assert.deepEqual(res.body?.layoutJson?.widgets, []);
 });
 
@@ -121,9 +135,18 @@ test('public metrics query resolves tenant and brand from token', async () => {
     tenantId: 'tenant-2',
     brandId: 'brand-2',
     name: 'Shared Dashboard',
-    sharedEnabled: true,
-    sharedTokenHash: tokenHash,
+    status: 'PUBLISHED',
     publishedVersionId: versionId,
+  });
+  state.publicShares.push({
+    id: randomUUID(),
+    tenantId: 'tenant-2',
+    dashboardId: state.dashboards[0].id,
+    tokenHash,
+    status: 'ACTIVE',
+    createdByUserId: 'user-2',
+    createdAt: new Date(),
+    revokedAt: null,
   });
 
   const res = await request(app)
@@ -141,4 +164,94 @@ test('public metrics query resolves tenant and brand from token', async () => {
   assert.equal(metricsCalls[0].tenantId, 'tenant-2');
   assert.equal(metricsCalls[0].payload.brandId, 'brand-2');
   assert.equal(metricsCalls[0].payload.metrics[0], 'spend');
+});
+
+test('public report returns not found when share is revoked', async () => {
+  const { app, state } = buildApp();
+  const token = 'public-token-revoked';
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const versionId = randomUUID();
+  const dashboardId = randomUUID();
+
+  state.versions.push({
+    id: versionId,
+    layoutJson: { widgets: [], theme: {}, globalFilters: {} },
+  });
+
+  state.dashboards.push({
+    id: dashboardId,
+    tenantId: 'tenant-3',
+    brandId: 'brand-3',
+    name: 'Revogado',
+    status: 'PUBLISHED',
+    publishedVersionId: versionId,
+  });
+
+  state.publicShares.push({
+    id: randomUUID(),
+    tenantId: 'tenant-3',
+    dashboardId,
+    tokenHash,
+    status: 'REVOKED',
+    createdByUserId: 'user-3',
+    createdAt: new Date(),
+    revokedAt: new Date(),
+  });
+
+  const res = await request(app).get(`/api/public/reports/${token}`);
+  assert.equal(res.status, 404);
+  assert.equal(res.body?.error?.code, 'PUBLIC_REPORT_NOT_FOUND');
+});
+
+test('old token is invalid after rotation while new active token works', async () => {
+  const { app, state } = buildApp();
+  const oldToken = 'old-token-123';
+  const newToken = 'new-token-456';
+  const oldHash = createHash('sha256').update(oldToken).digest('hex');
+  const newHash = createHash('sha256').update(newToken).digest('hex');
+  const versionId = randomUUID();
+  const dashboardId = randomUUID();
+
+  state.versions.push({
+    id: versionId,
+    layoutJson: { widgets: [], theme: {}, globalFilters: {} },
+  });
+
+  state.dashboards.push({
+    id: dashboardId,
+    tenantId: 'tenant-4',
+    brandId: 'brand-4',
+    name: 'Rotacionado',
+    status: 'PUBLISHED',
+    publishedVersionId: versionId,
+  });
+
+  state.publicShares.push({
+    id: randomUUID(),
+    tenantId: 'tenant-4',
+    dashboardId,
+    tokenHash: oldHash,
+    status: 'REVOKED',
+    createdByUserId: 'user-4',
+    createdAt: new Date(Date.now() - 10000),
+    revokedAt: new Date(Date.now() - 5000),
+  });
+
+  state.publicShares.push({
+    id: randomUUID(),
+    tenantId: 'tenant-4',
+    dashboardId,
+    tokenHash: newHash,
+    status: 'ACTIVE',
+    createdByUserId: 'user-4',
+    createdAt: new Date(),
+    revokedAt: null,
+  });
+
+  const oldRes = await request(app).get(`/api/public/reports/${oldToken}`);
+  assert.equal(oldRes.status, 404);
+
+  const newRes = await request(app).get(`/api/public/reports/${newToken}`);
+  assert.equal(newRes.status, 200);
+  assert.equal(newRes.body?.dashboard?.name, 'Rotacionado');
 });

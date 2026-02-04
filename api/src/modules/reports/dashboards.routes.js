@@ -18,6 +18,10 @@ router.post('/:id/versions', allowEditor, dashboardsController.createVersion);
 router.get('/:id/versions', allowEditor, dashboardsController.listVersions);
 router.post('/:id/publish', allowEditor, dashboardsController.publish);
 router.post('/:id/rollback', allowEditor, dashboardsController.rollback);
+router.get('/:id/public-share', allowEditor, dashboardsController.getPublicShare);
+router.post('/:id/public-share', allowEditor, dashboardsController.createPublicShare);
+router.post('/:id/public-share/rotate', allowEditor, dashboardsController.rotatePublicShare);
+router.delete('/:id/public-share', allowEditor, dashboardsController.revokePublicShare);
 router.post('/:id/share', allowEditor, dashboardsController.share);
 router.delete('/:id/share', allowEditor, dashboardsController.unshare);
 

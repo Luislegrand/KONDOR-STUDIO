@@ -240,7 +240,11 @@ async function clone(req, res) {
 
 async function share(req, res) {
   try {
-    const result = await dashboardsService.shareDashboard(req.tenantId, req.params.id);
+    const result = await dashboardsService.shareDashboard(
+      req.tenantId,
+      req.user?.id,
+      req.params.id,
+    );
     if (!result) {
       return res.status(404).json({
         error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
@@ -266,6 +270,85 @@ async function unshare(req, res) {
   }
 }
 
+async function getPublicShare(req, res) {
+  try {
+    const share = await dashboardsService.getPublicShareStatus(req.tenantId, req.params.id);
+    if (!share) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.json(share);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+async function createPublicShare(req, res) {
+  try {
+    const share = await dashboardsService.createPublicShare(
+      req.tenantId,
+      req.user?.id,
+      req.params.id,
+    );
+    if (!share) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.status(share.revealed ? 201 : 200).json({
+      status: share.status,
+      createdAt: share.createdAt,
+      publicUrl: share.publicUrl,
+      alreadyActive: share.alreadyActive,
+    });
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+async function rotatePublicShare(req, res) {
+  try {
+    const share = await dashboardsService.rotatePublicShare(
+      req.tenantId,
+      req.user?.id,
+      req.params.id,
+    );
+    if (!share) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.status(201).json({
+      status: share.status,
+      createdAt: share.createdAt,
+      publicUrl: share.publicUrl,
+    });
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+async function revokePublicShare(req, res) {
+  try {
+    const share = await dashboardsService.revokePublicShare(
+      req.tenantId,
+      req.params.id,
+    );
+    if (!share) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.json({
+      status: share.status,
+      revokedAt: share.revokedAt,
+    });
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
 module.exports = {
   create,
   list,
@@ -276,6 +359,10 @@ module.exports = {
   publish,
   rollback,
   clone,
+  getPublicShare,
+  createPublicShare,
+  rotatePublicShare,
+  revokePublicShare,
   share,
   unshare,
 };

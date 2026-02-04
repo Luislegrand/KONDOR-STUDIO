@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 const { prisma } = require('../../prisma');
 const metricsService = require('../metrics/metrics.service');
+const {
+  reportLayoutSchema,
+  normalizeLayout,
+} = require('../../shared/validators/reportLayout');
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
@@ -10,16 +14,26 @@ async function resolveDashboardByToken(token) {
   if (!token) return null;
   const tokenHash = hashToken(token);
 
-  const sharedDashboard = await prisma.reportDashboard.findFirst({
+  const share = await prisma.reportPublicShare.findFirst({
     where: {
-      sharedEnabled: true,
-      sharedTokenHash: tokenHash,
+      tokenHash,
+      status: 'ACTIVE',
     },
-    include: { publishedVersion: true },
+    include: {
+      dashboard: {
+        include: {
+          publishedVersion: true,
+        },
+      },
+    },
   });
 
-  if (sharedDashboard) {
-    return { dashboard: sharedDashboard, source: 'share' };
+  if (share?.dashboard) {
+    return {
+      dashboard: share.dashboard,
+      source: 'share',
+      share,
+    };
   }
 
   const exportRecord = await prisma.reportDashboardExport.findFirst({
@@ -39,21 +53,43 @@ async function resolveDashboardByToken(token) {
 async function getPublicReport(token) {
   const resolved = await resolveDashboardByToken(token);
   const dashboard = resolved?.dashboard || null;
-  if (!dashboard || !dashboard.publishedVersion) return null;
+  if (
+    !dashboard ||
+    dashboard.status !== 'PUBLISHED' ||
+    !dashboard.publishedVersionId ||
+    !dashboard.publishedVersion
+  ) {
+    return null;
+  }
+
+  const parsedLayout = reportLayoutSchema.safeParse(dashboard.publishedVersion.layoutJson);
+  const layoutJson = parsedLayout.success
+    ? normalizeLayout(parsedLayout.data)
+    : dashboard.publishedVersion.layoutJson;
 
   return {
     dashboard: {
       id: dashboard.id,
       name: dashboard.name,
+      brandId: dashboard.brandId,
+      groupId: dashboard.groupId || null,
     },
-    layoutJson: dashboard.publishedVersion.layoutJson,
+    layoutJson,
+    meta: {
+      generatedAt: new Date().toISOString(),
+    },
   };
 }
 
 async function queryPublicMetrics(token, payload = {}) {
   const resolved = await resolveDashboardByToken(token);
   const dashboard = resolved?.dashboard || null;
-  if (!dashboard || !dashboard.publishedVersion) {
+  if (
+    !dashboard ||
+    dashboard.status !== 'PUBLISHED' ||
+    !dashboard.publishedVersionId ||
+    !dashboard.publishedVersion
+  ) {
     const err = new Error('Relatorio publico nao encontrado');
     err.code = 'PUBLIC_REPORT_NOT_FOUND';
     err.status = 404;

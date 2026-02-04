@@ -148,6 +148,11 @@ enum ReportExportStatus {
   ERROR
 }
 
+enum ReportPublicShareStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum ReportDeliveryChannel {
   WHATSAPP
   EMAIL
@@ -273,6 +278,7 @@ model Tenant {
   reportDashboardsV2 ReportDashboard[]
   reportTemplatesV2  ReportTemplateV2[]
   reportDashboardExports ReportDashboardExport[]
+  reportPublicShares ReportPublicShare[]
   brandSourceConnections BrandSourceConnection[]
   factMetricsDaily  FactKondorMetricsDaily[]
   reportExports    ReportExport[]
@@ -333,6 +339,7 @@ model User {
   preferences        UserPreference[]
   reportDashboardsCreated ReportDashboard[] @relation("ReportDashboardAuthor")
   reportDashboardVersionsCreated ReportDashboardVersion[] @relation("ReportDashboardVersionAuthor")
+  reportPublicSharesCreated ReportPublicShare[] @relation("ReportPublicShareCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,6 +1086,7 @@ model ReportDashboard {
   createdBy          User                   @relation("ReportDashboardAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
   versions           ReportDashboardVersion[] @relation("ReportDashboardVersions")
   exports            ReportDashboardExport[]
+  publicShares       ReportPublicShare[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1126,6 +1134,25 @@ model ReportDashboardExport {
   @@index([status])
   @@index([publicTokenHash])
   @@map("report_dashboard_export")
+}
+
+model ReportPublicShare {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dashboardId     String
+  dashboard       ReportDashboard         @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  tokenHash       String                  @unique
+  status          ReportPublicShareStatus @default(ACTIVE)
+  createdByUserId String
+  createdBy       User                    @relation("ReportPublicShareCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime                @default(now())
+  revokedAt       DateTime?
+
+  @@index([tenantId])
+  @@index([dashboardId])
+  @@index([status])
+  @@map("report_public_share")
 }
 
 model ReportTemplateV2 {

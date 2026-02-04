@@ -701,18 +701,32 @@ const ReportsV2 = {
     });
   },
 
-  async createShare(id) {
+  async getPublicShareStatus(id) {
     if (!id) throw new Error("dashboardId obrigatorio");
-    return jsonFetch(`/reports/dashboards/${id}/share`, {
-      method: "POST",
-    });
+    return jsonFetch(`/reports/dashboards/${id}/public-share`, { method: "GET" });
+  },
+
+  async createPublicShare(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/public-share`, { method: "POST" });
+  },
+
+  async rotatePublicShare(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/public-share/rotate`, { method: "POST" });
+  },
+
+  async revokePublicShare(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}/public-share`, { method: "DELETE" });
+  },
+
+  async createShare(id) {
+    return this.createPublicShare(id);
   },
 
   async disableShare(id) {
-    if (!id) throw new Error("dashboardId obrigatorio");
-    return jsonFetch(`/reports/dashboards/${id}/share`, {
-      method: "DELETE",
-    });
+    return this.revokePublicShare(id);
   },
 
   async rollbackDashboard(id, payload = {}) {

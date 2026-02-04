@@ -41,6 +41,32 @@ function hashShareToken(token) {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 }
 
+function resolvePublicAppUrl() {
+  return (
+    process.env.PUBLIC_APP_URL ||
+    process.env.APP_PUBLIC_URL ||
+    process.env.APP_URL_FRONT ||
+    process.env.APP_BASE_URL ||
+    process.env.PUBLIC_APP_BASE_URL ||
+    'http://localhost:5173'
+  ).replace(/\/+$/, '');
+}
+
+function buildPublicUrl(token) {
+  return `${resolvePublicAppUrl()}/public/reports/${token}`;
+}
+
+async function getActiveShare(tenantId, dashboardId) {
+  return prisma.reportPublicShare.findFirst({
+    where: {
+      tenantId,
+      dashboardId,
+      status: 'ACTIVE',
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 async function assertBrand(tenantId, brandId) {
   if (!brandId) return null;
   return prisma.client.findFirst({
@@ -411,48 +437,213 @@ async function cloneDashboard(tenantId, userId, dashboardId) {
   });
 }
 
-async function shareDashboard(tenantId, dashboardId) {
-  const dashboard = await prisma.reportDashboard.findFirst({
-    where: { id: dashboardId, tenantId },
-  });
-  if (!dashboard) return null;
-
-  if (!dashboard.publishedVersionId) {
+async function ensureDashboardPublished(dashboard) {
+  if (!dashboard || dashboard.status !== 'PUBLISHED' || !dashboard.publishedVersionId) {
     const err = new Error('Dashboard precisa estar publicado');
     err.code = 'DASHBOARD_NOT_PUBLISHED';
     err.status = 400;
     throw err;
   }
-
-  const token = generateShareToken();
-  const tokenHash = hashShareToken(token);
-
-  await prisma.reportDashboard.update({
-    where: { id: dashboard.id },
-    data: {
-      sharedEnabled: true,
-      sharedTokenHash: tokenHash,
-      sharedAt: new Date(),
-    },
-  });
-
-  return { token };
 }
 
-async function unshareDashboard(tenantId, dashboardId) {
+async function getPublicShareStatus(tenantId, dashboardId) {
   const dashboard = await prisma.reportDashboard.findFirst({
     where: { id: dashboardId, tenantId },
   });
   if (!dashboard) return null;
 
-  return prisma.reportDashboard.update({
-    where: { id: dashboard.id },
-    data: {
-      sharedEnabled: false,
-      sharedTokenHash: null,
-      sharedAt: null,
-    },
+  const activeShare = await getActiveShare(tenantId, dashboard.id);
+  if (!activeShare) {
+    return {
+      status: 'INACTIVE',
+      createdAt: null,
+      revokedAt: null,
+    };
+  }
+
+  return {
+    status: 'ACTIVE',
+    createdAt: activeShare.createdAt,
+    revokedAt: activeShare.revokedAt || null,
+  };
+}
+
+async function createPublicShare(tenantId, userId, dashboardId) {
+  const dashboard = await prisma.reportDashboard.findFirst({
+    where: { id: dashboardId, tenantId },
   });
+  if (!dashboard) return null;
+
+  await ensureDashboardPublished(dashboard);
+
+  const existing = await getActiveShare(tenantId, dashboard.id);
+  if (existing) {
+    return {
+      status: 'ACTIVE',
+      createdAt: existing.createdAt,
+      publicUrl: null,
+      revealed: false,
+      alreadyActive: true,
+    };
+  }
+
+  const token = generateShareToken();
+  const tokenHash = hashShareToken(token);
+  const createdAt = new Date();
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const share = await tx.reportPublicShare.create({
+        data: {
+          tenantId,
+          dashboardId: dashboard.id,
+          tokenHash,
+          status: 'ACTIVE',
+          createdByUserId: userId,
+          createdAt,
+        },
+      });
+
+      await tx.reportDashboard.update({
+        where: { id: dashboard.id },
+        data: {
+          sharedEnabled: true,
+          sharedTokenHash: tokenHash,
+          sharedAt: share.createdAt,
+        },
+      });
+
+      return share;
+    });
+
+    return {
+      status: 'ACTIVE',
+      createdAt: result.createdAt,
+      publicUrl: buildPublicUrl(token),
+      revealed: true,
+      alreadyActive: false,
+    };
+  } catch (err) {
+    if (err?.code === 'P2002') {
+      const active = await getActiveShare(tenantId, dashboard.id);
+      if (active) {
+        return {
+          status: 'ACTIVE',
+          createdAt: active.createdAt,
+          publicUrl: null,
+          revealed: false,
+          alreadyActive: true,
+        };
+      }
+    }
+    throw err;
+  }
+}
+
+async function rotatePublicShare(tenantId, userId, dashboardId) {
+  const dashboard = await prisma.reportDashboard.findFirst({
+    where: { id: dashboardId, tenantId },
+  });
+  if (!dashboard) return null;
+
+  await ensureDashboardPublished(dashboard);
+
+  const token = generateShareToken();
+  const tokenHash = hashShareToken(token);
+  const now = new Date();
+
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.reportPublicShare.updateMany({
+      where: {
+        tenantId,
+        dashboardId: dashboard.id,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt: now,
+      },
+    });
+
+    const share = await tx.reportPublicShare.create({
+      data: {
+        tenantId,
+        dashboardId: dashboard.id,
+        tokenHash,
+        status: 'ACTIVE',
+        createdByUserId: userId,
+        createdAt: now,
+      },
+    });
+
+    await tx.reportDashboard.update({
+      where: { id: dashboard.id },
+      data: {
+        sharedEnabled: true,
+        sharedTokenHash: tokenHash,
+        sharedAt: share.createdAt,
+      },
+    });
+
+    return share;
+  });
+
+  return {
+    status: 'ACTIVE',
+    createdAt: result.createdAt,
+    publicUrl: buildPublicUrl(token),
+    revealed: true,
+    alreadyActive: false,
+  };
+}
+
+async function revokePublicShare(tenantId, dashboardId) {
+  const dashboard = await prisma.reportDashboard.findFirst({
+    where: { id: dashboardId, tenantId },
+  });
+  if (!dashboard) return null;
+
+  const revokedAt = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.reportPublicShare.updateMany({
+      where: {
+        tenantId,
+        dashboardId: dashboard.id,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt,
+      },
+    });
+
+    await tx.reportDashboard.update({
+      where: { id: dashboard.id },
+      data: {
+        sharedEnabled: false,
+        sharedTokenHash: null,
+        sharedAt: null,
+      },
+    });
+  });
+
+  return {
+    status: 'REVOKED',
+    revokedAt,
+  };
+}
+
+async function shareDashboard(tenantId, userId, dashboardId) {
+  const result = await rotatePublicShare(tenantId, userId, dashboardId);
+  if (!result) return null;
+  const token = result.publicUrl ? result.publicUrl.split('/').pop() : null;
+  return { token };
+}
+
+async function unshareDashboard(tenantId, dashboardId) {
+  const result = await revokePublicShare(tenantId, dashboardId);
+  if (!result) return null;
+  return { ok: true };
 }
 
 module.exports = {
@@ -465,7 +656,12 @@ module.exports = {
   publishDashboard,
   rollbackDashboard,
   cloneDashboard,
+  getPublicShareStatus,
+  createPublicShare,
+  rotatePublicShare,
+  revokePublicShare,
   shareDashboard,
   unshareDashboard,
   ensureLayoutValid,
+  hashShareToken,
 };

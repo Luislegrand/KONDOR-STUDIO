@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Edit3, Share2, Download, Copy } from "lucide-react";
+import { ArrowLeft, Edit3, Share2, Download, Copy, RefreshCw, Link2Off } from "lucide-react";
 import PageShell from "@/components/ui/page-shell.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -45,6 +45,16 @@ function buildInitialFilters(layout) {
   };
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function ReportsV2Viewer() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -67,12 +77,24 @@ export default function ReportsV2Viewer() {
   const pages = normalizedLayout?.pages || [];
   const globalFilterControls = normalizedLayout?.globalFilters?.controls;
   const [activePageId, setActivePageId] = React.useState(pages[0]?.id || null);
-  const shareEnabled = Boolean(dashboard?.sharedEnabled);
+  const shareStatusQuery = useQuery({
+    queryKey: ["reportsV2-public-share", id],
+    queryFn: () => base44.reportsV2.getPublicShareStatus(id),
+    enabled: Boolean(id) && shareOpen,
+  });
+
+  const shareStatus = shareStatusQuery.data || null;
+  const shareEnabled =
+    shareStatus?.status === "ACTIVE" || Boolean(dashboard?.sharedEnabled);
 
   const [filters, setFilters] = React.useState(() =>
     buildInitialFilters(normalizedLayout)
   );
   const debouncedFilters = useDebouncedValue(filters, 400);
+
+  React.useEffect(() => {
+    setShareUrl("");
+  }, [id]);
 
   React.useEffect(() => {
     setFilters(buildInitialFilters(normalizedLayout));
@@ -95,14 +117,19 @@ export default function ReportsV2Viewer() {
     return () => clearInterval(interval);
   }, [filters?.autoRefreshSec, id, queryClient]);
 
-  const shareMutation = useMutation({
-    mutationFn: () => base44.reportsV2.createShare(id),
+  const createShareMutation = useMutation({
+    mutationFn: () => base44.reportsV2.createPublicShare(id),
     onSuccess: (payload) => {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const url = payload?.publicUrlPath ? `${origin}${payload.publicUrlPath}` : "";
-      setShareUrl(url);
+      if (payload?.publicUrl) {
+        setShareUrl(payload.publicUrl);
+      }
       queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
-      showToast("Link publico gerado com sucesso.", "success");
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-public-share", id] });
+      if (payload?.publicUrl) {
+        showToast("Link publico gerado com sucesso.", "success");
+      } else {
+        showToast("Link ja esta ativo. Rotacione para gerar um novo token.", "success");
+      }
     },
     onError: (err) => {
       const message =
@@ -113,11 +140,31 @@ export default function ReportsV2Viewer() {
     },
   });
 
-  const disableShareMutation = useMutation({
-    mutationFn: () => base44.reportsV2.disableShare(id),
+  const rotateShareMutation = useMutation({
+    mutationFn: () => base44.reportsV2.rotatePublicShare(id),
+    onSuccess: (payload) => {
+      if (payload?.publicUrl) {
+        setShareUrl(payload.publicUrl);
+      }
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-public-share", id] });
+      showToast("Link rotacionado com sucesso.", "success");
+    },
+    onError: (err) => {
+      const message =
+        err?.data?.error?.message ||
+        err?.message ||
+        "Nao foi possivel rotacionar o link.";
+      showToast(message, "error");
+    },
+  });
+
+  const revokeShareMutation = useMutation({
+    mutationFn: () => base44.reportsV2.revokePublicShare(id),
     onSuccess: () => {
       setShareUrl("");
       queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboard", id] });
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-public-share", id] });
       showToast("Compartilhamento desativado.", "success");
     },
     onError: (err) => {
@@ -154,7 +201,24 @@ export default function ReportsV2Viewer() {
 
   const handleGenerateShare = () => {
     if (!ensurePublished()) return;
-    shareMutation.mutate();
+    createShareMutation.mutate();
+  };
+
+  const handleRotateShare = () => {
+    if (!ensurePublished()) return;
+    const confirmed = window.confirm(
+      "Rotacionar invalida o link atual e cria um novo. Deseja continuar?"
+    );
+    if (!confirmed) return;
+    rotateShareMutation.mutate();
+  };
+
+  const handleDisableShare = () => {
+    const confirmed = window.confirm(
+      "Desativar compartilhamento vai revogar o link publico atual. Continuar?"
+    );
+    if (!confirmed) return;
+    revokeShareMutation.mutate();
   };
 
   const handleExport = () => {
@@ -304,10 +368,29 @@ export default function ReportsV2Viewer() {
 
           <div className="space-y-4">
             <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-xs text-[var(--muted)]">
-              Status:{" "}
-              <span className="font-semibold text-[var(--text)]">
-                {shareEnabled ? "Link ativo" : "Compartilhamento desligado"}
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span>
+                  Status:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {shareStatusQuery.isLoading
+                      ? "Carregando..."
+                      : shareEnabled
+                      ? "Ativo"
+                      : "Inativo"}
+                  </span>
+                </span>
+                <span>
+                  Criado em:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {formatDateTime(shareStatus?.createdAt)}
+                  </span>
+                </span>
+              </div>
+              {shareStatusQuery.error ? (
+                <p className="mt-2 text-rose-600">
+                  Nao foi possivel carregar o status do compartilhamento.
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -330,15 +413,27 @@ export default function ReportsV2Viewer() {
                 </Button>
                 <Button
                   onClick={handleGenerateShare}
-                  disabled={shareMutation.isPending}
+                  disabled={
+                    createShareMutation.isPending ||
+                    dashboard?.status !== "PUBLISHED"
+                  }
                 >
-                  {shareMutation.isPending
-                    ? "Gerando..."
-                    : shareEnabled
-                    ? "Gerar novo link"
-                    : "Gerar link"}
+                  {createShareMutation.isPending ? "Gerando..." : "Gerar link"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleRotateShare}
+                  disabled={!shareEnabled || rotateShareMutation.isPending}
+                  leftIcon={RefreshCw}
+                >
+                  {rotateShareMutation.isPending ? "Rotacionando..." : "Rotacionar link"}
                 </Button>
               </div>
+              {shareEnabled && !shareUrl ? (
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Link ativo. Para copiar um novo link, clique em "Rotacionar link".
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -349,10 +444,11 @@ export default function ReportsV2Viewer() {
             {shareEnabled ? (
               <Button
                 variant="danger"
-                onClick={() => disableShareMutation.mutate()}
-                disabled={disableShareMutation.isPending}
+                onClick={handleDisableShare}
+                disabled={revokeShareMutation.isPending}
+                leftIcon={Link2Off}
               >
-                {disableShareMutation.isPending
+                {revokeShareMutation.isPending
                   ? "Desativando..."
                   : "Desativar compartilhamento"}
               </Button>

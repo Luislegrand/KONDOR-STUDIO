@@ -46,6 +46,7 @@ function createFakePrisma() {
     versions: [],
     clients: [],
     brandGroups: [],
+    publicShares: [],
   };
   const prisma = {
     client: {
@@ -75,6 +76,9 @@ function createFakePrisma() {
           status: data.status ?? 'DRAFT',
           publishedVersionId: data.publishedVersionId ?? null,
           createdByUserId: data.createdByUserId ?? null,
+          sharedEnabled: data.sharedEnabled ?? false,
+          sharedTokenHash: data.sharedTokenHash ?? null,
+          sharedAt: data.sharedAt ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -156,6 +160,50 @@ function createFakePrisma() {
           items = items.slice().sort((a, b) => b.versionNumber - a.versionNumber);
         }
         return items.map((item) => ({ ...item }));
+      },
+    },
+    reportPublicShare: {
+      create: async ({ data }) => {
+        const share = {
+          id: randomUUID(),
+          tenantId: data.tenantId,
+          dashboardId: data.dashboardId,
+          tokenHash: data.tokenHash,
+          status: data.status || 'ACTIVE',
+          createdByUserId: data.createdByUserId,
+          createdAt: data.createdAt || new Date(),
+          revokedAt: data.revokedAt || null,
+        };
+        state.publicShares.push(share);
+        return { ...share };
+      },
+      findFirst: async ({ where, orderBy }) => {
+        let items = state.publicShares.filter((item) => {
+          if (where.tenantId && item.tenantId !== where.tenantId) return false;
+          if (where.dashboardId && item.dashboardId !== where.dashboardId) return false;
+          if (where.tokenHash && item.tokenHash !== where.tokenHash) return false;
+          if (where.status && item.status !== where.status) return false;
+          return true;
+        });
+        if (!items.length) return null;
+        if (orderBy?.createdAt === 'desc') {
+          items = items.slice().sort((a, b) => b.createdAt - a.createdAt);
+        }
+        return { ...items[0] };
+      },
+      updateMany: async ({ where, data }) => {
+        let count = 0;
+        state.publicShares = state.publicShares.map((item) => {
+          if (where.tenantId && item.tenantId !== where.tenantId) return item;
+          if (where.dashboardId && item.dashboardId !== where.dashboardId) return item;
+          if (where.status && item.status !== where.status) return item;
+          count += 1;
+          return {
+            ...item,
+            ...data,
+          };
+        });
+        return { count };
       },
     },
     $transaction: async (fn) => fn(prisma),
@@ -398,4 +446,86 @@ test('clone prevents cross-tenant access', async () => {
     .set('x-tenant-id', 'tenant-1');
 
   assert.equal(res.statusCode, 404);
+});
+
+test('create public share returns active url for published dashboard', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Publicavel', brandId });
+
+  await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: createRes.body.latestVersion.id });
+
+  const shareRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/public-share`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(shareRes.statusCode, 201);
+  assert.equal(shareRes.body.status, 'ACTIVE');
+  assert.equal(typeof shareRes.body.publicUrl, 'string');
+  assert.ok(shareRes.body.publicUrl.includes('/public/reports/'));
+  assert.equal(state.publicShares.length, 1);
+  assert.equal(state.publicShares[0].status, 'ACTIVE');
+});
+
+test('rotate public share revokes old active token and creates a new one', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dash rotacao', brandId });
+
+  await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: createRes.body.latestVersion.id });
+
+  const firstShare = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/public-share`)
+    .set('x-role', 'MEMBER');
+  assert.equal(firstShare.statusCode, 201);
+
+  const rotateRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/public-share/rotate`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(rotateRes.statusCode, 201);
+  assert.equal(rotateRes.body.status, 'ACTIVE');
+  assert.equal(state.publicShares.length, 2);
+  assert.equal(
+    state.publicShares.filter((item) => item.status === 'ACTIVE').length,
+    1,
+  );
+  assert.equal(
+    state.publicShares.filter((item) => item.status === 'REVOKED').length,
+    1,
+  );
+});
+
+test('dashboard not published cannot create public share', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Rascunho', brandId });
+
+  const shareRes = await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/public-share`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(shareRes.statusCode, 400);
+  assert.equal(shareRes.body.error.code, 'DASHBOARD_NOT_PUBLISHED');
 });
