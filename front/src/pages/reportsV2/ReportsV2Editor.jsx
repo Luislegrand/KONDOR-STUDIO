@@ -21,7 +21,12 @@ import ThemeProvider from "@/components/reportsV2/ThemeProvider.jsx";
 import SidePanel from "@/components/reportsV2/editor/SidePanel.jsx";
 import AddMenu from "@/components/reportsV2/editor/AddMenu.jsx";
 import WidgetContextMenu from "@/components/reportsV2/editor/WidgetContextMenu.jsx";
+import GuidesOverlay from "@/components/reportsV2/editor/GuidesOverlay.jsx";
 import useHistoryState from "@/components/reportsV2/editor/useHistoryState.js";
+import {
+  SNAP_THRESHOLD,
+  computeSnapPosition,
+} from "@/components/reportsV2/editor/snapUtils.js";
 import { PIE_DEFAULTS } from "@/components/reportsV2/widgets/pieUtils.js";
 import {
   normalizeFilterArrayValue,
@@ -111,6 +116,9 @@ const FORMAT_OPTIONS = [
 ];
 
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const CANVAS_COLS = 12;
+const CANVAS_ROW_HEIGHT = 28;
+const CANVAS_MARGIN = [16, 16];
 
 const WIDGET_PRESETS = {
   kpi: {
@@ -604,6 +612,10 @@ export default function ReportsV2Editor() {
   const [themeFormError, setThemeFormError] = React.useState("");
   const [lastSavedKey, setLastSavedKey] = React.useState("");
   const [hasHydrated, setHasHydrated] = React.useState(false);
+  const [activeGuides, setActiveGuides] = React.useState(null);
+  const interactionRef = React.useRef(false);
+  const skipNextLayoutChangeRef = React.useRef(false);
+  const guidesRef = React.useRef(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["reportsV2-dashboard", id],
@@ -837,6 +849,150 @@ export default function ReportsV2Editor() {
     });
   }, [activeWidgets]);
 
+  const activeStaticRects = React.useMemo(() => {
+    return activeWidgets.map((widget) => {
+      const layout = widget.layout || {};
+      return {
+        id: widget.id,
+        x: normalizeLayoutValue(layout.x, 0),
+        y: normalizeLayoutValue(layout.y, 0),
+        w: Math.max(1, normalizeLayoutValue(layout.w, 1)),
+        h: Math.max(1, normalizeLayoutValue(layout.h, 1)),
+      };
+    });
+  }, [activePageId, activeWidgets]);
+
+  const activeStaticRectById = React.useMemo(() => {
+    const map = new Map();
+    activeStaticRects.forEach((rect) => {
+      map.set(rect.id, rect);
+    });
+    return map;
+  }, [activeStaticRects]);
+
+  const guidesCanvasHeight = React.useMemo(() => {
+    const rows = rglLayout.reduce((maxRows, item) => {
+      const bottom = normalizeLayoutValue(item?.y, 0) + Math.max(1, normalizeLayoutValue(item?.h, 1));
+      return Math.max(maxRows, bottom);
+    }, 1);
+    const rowHeight = CANVAS_ROW_HEIGHT;
+    const marginY = CANVAS_MARGIN[1];
+    return Math.max(
+      320,
+      rows * rowHeight + Math.max(0, rows - 1) * marginY
+    );
+  }, [rglLayout]);
+
+  const applyGuides = React.useCallback((guides) => {
+    const normalized =
+      Number.isFinite(guides?.vertical) || Number.isFinite(guides?.horizontal)
+        ? {
+            ...(Number.isFinite(guides?.vertical) ? { vertical: guides.vertical } : {}),
+            ...(Number.isFinite(guides?.horizontal)
+              ? { horizontal: guides.horizontal }
+              : {}),
+          }
+        : null;
+    const current = guidesRef.current;
+    const same =
+      (current === null && normalized === null) ||
+      (current !== null &&
+        normalized !== null &&
+        current.vertical === normalized.vertical &&
+        current.horizontal === normalized.horizontal);
+    if (same) return;
+    guidesRef.current = normalized;
+    setActiveGuides(normalized);
+  }, []);
+
+  React.useEffect(() => {
+    interactionRef.current = false;
+    skipNextLayoutChangeRef.current = false;
+    applyGuides(null);
+  }, [activePageId, applyGuides]);
+
+  const snapLayoutForInteraction = React.useCallback(
+    (nextLayout, movingItem, operation) => {
+      if (!Array.isArray(nextLayout)) {
+        return {
+          layout: [],
+          guides: null,
+        };
+      }
+
+      const normalizedLayout = nextLayout.map((item) => ({
+        ...item,
+        x: normalizeLayoutValue(item?.x, 0),
+        y: normalizeLayoutValue(item?.y, 0),
+        w: Math.max(1, normalizeLayoutValue(item?.w, 1)),
+        h: Math.max(1, normalizeLayoutValue(item?.h, 1)),
+        minW: Math.max(1, normalizeLayoutValue(item?.minW, 1)),
+        minH: Math.max(1, normalizeLayoutValue(item?.minH, 1)),
+      }));
+
+      if (!movingItem?.i || width <= 0) {
+        return {
+          layout: normalizedLayout,
+          guides: null,
+        };
+      }
+
+      const movingRect = {
+        x: normalizeLayoutValue(movingItem.x, 0),
+        y: normalizeLayoutValue(movingItem.y, 0),
+        w: Math.max(1, normalizeLayoutValue(movingItem.w, 1)),
+        h: Math.max(1, normalizeLayoutValue(movingItem.h, 1)),
+        minW: Math.max(1, normalizeLayoutValue(movingItem.minW, 1)),
+        minH: Math.max(1, normalizeLayoutValue(movingItem.minH, 1)),
+        operation,
+      };
+
+      const staticRects = normalizedLayout
+        .filter((item) => item.i !== movingItem.i)
+        .map((item) => {
+          const fallback = activeStaticRectById.get(item.i);
+          return {
+            x: fallback ? fallback.x : item.x,
+            y: fallback ? fallback.y : item.y,
+            w: fallback ? fallback.w : item.w,
+            h: fallback ? fallback.h : item.h,
+          };
+        });
+
+      const snap = computeSnapPosition(
+        movingRect,
+        staticRects,
+        {
+          cols: CANVAS_COLS,
+          rowHeight: CANVAS_ROW_HEIGHT,
+          margin: CANVAS_MARGIN,
+          containerWidth: width,
+        },
+        SNAP_THRESHOLD
+      );
+
+      const snappedLayout = normalizedLayout.map((item) => {
+        if (item.i !== movingItem.i) return item;
+        const nextItem = {
+          ...item,
+          x: snap.snappedX,
+          y: snap.snappedY,
+        };
+        if (operation === "resize") {
+          nextItem.w = snap.snappedW;
+          nextItem.h = snap.snappedH;
+        }
+        return nextItem;
+      });
+
+      return {
+        layout: snappedLayout,
+        guides: snap.guides,
+      };
+    },
+    [activeStaticRectById, width]
+  );
+
   const updateWidget = React.useCallback(
     (widgetId, updater, options = {}) => {
       const applyMutation =
@@ -887,18 +1043,70 @@ export default function ReportsV2Editor() {
 
   const handleLayoutChange = React.useCallback(
     (nextLayout) => {
+      if (skipNextLayoutChangeRef.current) {
+        skipNextLayoutChangeRef.current = false;
+        return;
+      }
+      if (interactionRef.current) return;
       stageLayoutChange((prev) => applyGridLayout(prev, nextLayout));
     },
     [applyGridLayout, stageLayoutChange]
   );
 
-  const handleLayoutCommit = React.useCallback(
-    (nextLayout) => {
+  const handleDragStart = React.useCallback(() => {
+    interactionRef.current = true;
+    skipNextLayoutChangeRef.current = false;
+    applyGuides(null);
+  }, [applyGuides]);
+
+  const handleResizeStart = React.useCallback(() => {
+    interactionRef.current = true;
+    skipNextLayoutChangeRef.current = false;
+    applyGuides(null);
+  }, [applyGuides]);
+
+  const handleDrag = React.useCallback(
+    (nextLayout, _oldItem, newItem) => {
+      const snapped = snapLayoutForInteraction(nextLayout, newItem, "drag");
+      applyGuides(snapped.guides);
+      stageLayoutChange((prev) => applyGridLayout(prev, snapped.layout));
+    },
+    [applyGridLayout, applyGuides, snapLayoutForInteraction, stageLayoutChange]
+  );
+
+  const handleResize = React.useCallback(
+    (nextLayout, _oldItem, newItem) => {
+      const snapped = snapLayoutForInteraction(nextLayout, newItem, "resize");
+      applyGuides(snapped.guides);
+      stageLayoutChange((prev) => applyGridLayout(prev, snapped.layout));
+    },
+    [applyGridLayout, applyGuides, snapLayoutForInteraction, stageLayoutChange]
+  );
+
+  const handleDragStop = React.useCallback(
+    (nextLayout, _oldItem, newItem) => {
+      const snapped = snapLayoutForInteraction(nextLayout, newItem, "drag");
+      interactionRef.current = false;
+      skipNextLayoutChangeRef.current = true;
+      applyGuides(null);
       commitLayoutChange((prev) => {
-        return applyGridLayout(prev, nextLayout);
+        return applyGridLayout(prev, snapped.layout);
       });
     },
-    [applyGridLayout, commitLayoutChange]
+    [applyGridLayout, applyGuides, commitLayoutChange, snapLayoutForInteraction]
+  );
+
+  const handleResizeStop = React.useCallback(
+    (nextLayout, _oldItem, newItem) => {
+      const snapped = snapLayoutForInteraction(nextLayout, newItem, "resize");
+      interactionRef.current = false;
+      skipNextLayoutChangeRef.current = true;
+      applyGuides(null);
+      commitLayoutChange((prev) => {
+        return applyGridLayout(prev, snapped.layout);
+      });
+    },
+    [applyGridLayout, applyGuides, commitLayoutChange, snapLayoutForInteraction]
   );
 
   React.useEffect(() => {
@@ -1866,29 +2074,40 @@ export default function ReportsV2Editor() {
                 />
               </div>
             ) : activeWidgets.length ? (
-              <DashboardCanvas
-                layout={rglLayout}
-                items={activeWidgets}
-                width={width}
-                containerRef={containerRef}
-                isEditable
-                rowHeight={28}
-                margin={[16, 16]}
-                onLayoutChange={handleLayoutChange}
-                onDragStop={handleLayoutCommit}
-                onResizeStop={handleLayoutCommit}
-                renderItem={(widget) => (
-                  <EditorWidgetCard
-                    widget={widget}
-                    selected={selectedWidgetId === widget.id}
-                    hasErrors={Boolean(validation.widgetIssues[widget.id])}
-                    errorCount={validation.widgetIssues[widget.id]?.length || 0}
-                    onSelect={setSelectedWidgetId}
-                    onDuplicate={handleDuplicateWidget}
-                    onRemove={handleRemoveWidget}
-                  />
-                )}
-              />
+              <div className="relative">
+                <DashboardCanvas
+                  layout={rglLayout}
+                  items={activeWidgets}
+                  width={width}
+                  containerRef={containerRef}
+                  isEditable
+                  rowHeight={CANVAS_ROW_HEIGHT}
+                  margin={CANVAS_MARGIN}
+                  onLayoutChange={handleLayoutChange}
+                  onDragStart={handleDragStart}
+                  onDrag={handleDrag}
+                  onDragStop={handleDragStop}
+                  onResizeStart={handleResizeStart}
+                  onResize={handleResize}
+                  onResizeStop={handleResizeStop}
+                  renderItem={(widget) => (
+                    <EditorWidgetCard
+                      widget={widget}
+                      selected={selectedWidgetId === widget.id}
+                      hasErrors={Boolean(validation.widgetIssues[widget.id])}
+                      errorCount={validation.widgetIssues[widget.id]?.length || 0}
+                      onSelect={setSelectedWidgetId}
+                      onDuplicate={handleDuplicateWidget}
+                      onRemove={handleRemoveWidget}
+                    />
+                  )}
+                />
+                <GuidesOverlay
+                  guides={activeGuides}
+                  width={width}
+                  height={guidesCanvasHeight}
+                />
+              </div>
             ) : (
               <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-sm text-[var(--text-muted)]">
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-[var(--border)]">
