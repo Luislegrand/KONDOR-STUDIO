@@ -23,6 +23,7 @@ export default function SidePanel({
   onShowLegendChange,
   onFormatChange,
   onTextContentChange,
+  onVariantChange,
 }) {
   return (
     <div className="sticky top-24 rounded-[20px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
@@ -84,6 +85,7 @@ export default function SidePanel({
               onShowLegendChange={onShowLegendChange}
               onFormatChange={onFormatChange}
               onTextContentChange={onTextContentChange}
+              onVariantChange={onVariantChange}
             />
           </TabsContent>
         </Tabs>

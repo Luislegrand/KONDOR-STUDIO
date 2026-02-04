@@ -98,6 +98,31 @@ test('reportLayoutSchema accepts query sort and limit', () => {
   assert.equal(result.success, true);
 });
 
+test('reportLayoutSchema accepts donut widget with single metric and dimension', () => {
+  const base = buildBaseLayout({
+    widgets: [
+      {
+        id: '88888888-8888-4888-8888-888888888888',
+        type: 'donut',
+        title: 'Distribuicao de spend',
+        layout: { x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+        query: {
+          dimensions: ['platform'],
+          metrics: ['spend'],
+          filters: [],
+        },
+        viz: {
+          variant: 'donut',
+          showLegend: true,
+          format: 'auto',
+        },
+      },
+    ],
+  });
+  const result = reportLayoutSchema.safeParse(base);
+  assert.equal(result.success, true);
+});
+
 test('reportLayoutSchema accepts text widget and controls flags', () => {
   const base = buildBaseLayout({
     globalFilters: {
@@ -300,6 +325,46 @@ test('reportLayoutSchema rejects bar with date dimension', () => {
         type: 'bar',
         title: 'Spend by Date',
         layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 },
+        query: {
+          dimensions: ['date'],
+          metrics: ['spend'],
+          filters: [],
+        },
+      },
+    ],
+  });
+  const result = reportLayoutSchema.safeParse(base);
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects pie with multiple metrics', () => {
+  const base = buildBaseLayout({
+    widgets: [
+      {
+        id: '99999999-9999-4999-8999-999999999999',
+        type: 'pie',
+        title: 'Pie invalido',
+        layout: { x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+        query: {
+          dimensions: ['platform'],
+          metrics: ['spend', 'clicks'],
+          filters: [],
+        },
+      },
+    ],
+  });
+  const result = reportLayoutSchema.safeParse(base);
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects donut with date dimension', () => {
+  const base = buildBaseLayout({
+    widgets: [
+      {
+        id: '12121212-1212-4121-8121-121212121212',
+        type: 'donut',
+        title: 'Donut invalido',
+        layout: { x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
         query: {
           dimensions: ['date'],
           metrics: ['spend'],

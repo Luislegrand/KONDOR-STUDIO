@@ -1,11 +1,25 @@
 import React from "react";
-import { Plus, BarChart3, LineChart, Table2, Gauge, Type, CalendarDays, Filter, UserRound } from "lucide-react";
+import {
+  Plus,
+  BarChart3,
+  LineChart,
+  Table2,
+  Gauge,
+  PieChart,
+  Circle,
+  Type,
+  CalendarDays,
+  Filter,
+  UserRound,
+} from "lucide-react";
 
 const CHART_ITEMS = [
   { type: "kpi", label: "KPI", icon: Gauge },
   { type: "timeseries", label: "Serie temporal", icon: LineChart },
   { type: "bar", label: "Barras", icon: BarChart3 },
   { type: "table", label: "Tabela", icon: Table2 },
+  { type: "pie", label: "Pizza", icon: PieChart },
+  { type: "donut", label: "Donut", icon: Circle },
 ];
 
 const CONTROL_ITEMS = [

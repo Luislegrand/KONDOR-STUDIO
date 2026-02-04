@@ -7,9 +7,6 @@ import {
   Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   Legend,
   XAxis,
   YAxis,
@@ -22,6 +19,7 @@ import WidgetSkeleton from "@/components/reports/widgets/WidgetSkeleton.jsx";
 import WidgetEmptyState from "@/components/reports/widgets/WidgetEmptyState.jsx";
 import WidgetErrorState from "@/components/reports/widgets/WidgetErrorState.jsx";
 import WidgetText from "@/components/reportsV2/widgets/WidgetText.jsx";
+import WidgetPie from "@/components/reportsV2/widgets/WidgetPie.jsx";
 import {
   buildWidgetQueryKey,
   mergeWidgetFilters,
@@ -547,39 +545,25 @@ export default function WidgetRenderer({
     );
   }
 
-  if (widgetType === "pie") {
-    const dimension = dimensions[0] || "label";
-    const chartData = rows.map((row) => ({
-      name: row[dimension],
-      value: row[metrics[0]],
-    }));
-    const innerRadius = Number.isFinite(vizOptions.innerRadius)
-      ? vizOptions.innerRadius
-      : 45;
-    const outerRadius = Number.isFinite(vizOptions.outerRadius)
-      ? vizOptions.outerRadius
-      : 80;
+  if (widgetType === "pie" || widgetType === "donut") {
+    const metric = metrics[0];
+    const dimension = dimensions[0] || "platform";
+    const variant =
+      widgetType === "donut"
+        ? "donut"
+        : widget?.viz?.variant === "donut"
+        ? "donut"
+        : "pie";
     return (
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            innerRadius={innerRadius}
-            outerRadius={outerRadius}
-          >
-            {chartData.map((entry, index) => (
-              <Cell
-                key={`cell-${entry.name}-${index}`}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip content={<ChartTooltip meta={meta} formatOverride={formatOverride} />} />
-          {showLegend ? <Legend {...legendProps} /> : null}
-        </PieChart>
-      </ResponsiveContainer>
+      <WidgetPie
+        rows={rows}
+        dimension={dimension}
+        metric={metric}
+        meta={meta}
+        format={formatOverride}
+        showLegend={showLegend}
+        variant={variant}
+      />
     );
   }
 

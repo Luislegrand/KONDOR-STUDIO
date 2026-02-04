@@ -73,6 +73,7 @@ const WIDGET_TYPES = [
   { value: "bar", label: "Bar" },
   { value: "table", label: "Table" },
   { value: "pie", label: "Pie" },
+  { value: "donut", label: "Donut" },
   { value: "text", label: "Texto" },
 ];
 
@@ -134,7 +135,12 @@ const WIDGET_PRESETS = {
     },
   },
   pie: {
-    title: "Pie",
+    title: "Pizza",
+    layout: { w: 4, h: 4, minW: 3, minH: 3 },
+    query: { metrics: ["spend"], dimensions: ["platform"] },
+  },
+  donut: {
+    title: "Donut",
     layout: { w: 4, h: 4, minW: 3, minH: 3 },
     query: { metrics: ["spend"], dimensions: ["platform"] },
   },
@@ -250,7 +256,13 @@ function sanitizeLayoutForSave(layout) {
         minH: Math.min(minH, h),
       },
       viz: {
-        variant: widget?.viz?.variant || "default",
+        variant:
+          widget?.viz?.variant ||
+          (widget?.type === "donut"
+            ? "donut"
+            : widget?.type === "pie"
+            ? "pie"
+            : "default"),
         showLegend: widget?.viz?.showLegend !== false,
         format: widget?.viz?.format || "auto",
         options: widget?.viz?.options || {},
@@ -385,9 +397,18 @@ function validateLayout(layout) {
       }
     }
 
-    if (widget?.type === "bar" || widget?.type === "pie") {
+    if (widget?.type === "bar") {
       if (dimensions.length !== 1 || dimensions[0] === "date") {
         errors.push("Grafico exige uma dimensao nao-date");
+      }
+    }
+
+    if (widget?.type === "pie" || widget?.type === "donut") {
+      if (dimensions.length !== 1 || dimensions[0] === "date") {
+        errors.push("Pie/Donut exige exatamente 1 dimensao nao-date");
+      }
+      if (metrics.length !== 1) {
+        errors.push("Pie/Donut exige exatamente 1 metrica");
       }
     }
 
@@ -906,7 +927,7 @@ export default function ReportsV2Editor() {
         ...(preset.query.limit ? { limit: preset.query.limit } : {}),
       },
       viz: {
-        variant: "default",
+        variant: type === "donut" ? "donut" : type === "pie" ? "pie" : "default",
         showLegend: true,
         format: "auto",
         options: {},
@@ -1112,10 +1133,15 @@ export default function ReportsV2Editor() {
       if (nextType === "timeseries") {
         dimensions = ["date"];
       }
-      if (nextType === "bar" || nextType === "pie") {
+      if (nextType === "bar") {
         if (dimensions.length !== 1 || dimensions[0] === "date") {
           dimensions = ["platform"];
         }
+      }
+      if (nextType === "pie" || nextType === "donut") {
+        const fallbackDimension =
+          dimensions.find((value) => value && value !== "date") || "platform";
+        dimensions = [fallbackDimension];
       }
       if (nextType === "kpi") {
         if (dimensions.length > 1) dimensions = dimensions.slice(0, 1);
@@ -1123,6 +1149,10 @@ export default function ReportsV2Editor() {
           dimensions = [];
         }
       }
+      const nextMetrics =
+        nextType === "pie" || nextType === "donut"
+          ? [metrics[0] || "spend"]
+          : metrics;
       if (nextType === "table") {
         if (!limit) {
           limit = 25;
@@ -1133,13 +1163,15 @@ export default function ReportsV2Editor() {
             ? { field: fallbackSortField, direction: "desc" }
             : undefined;
         }
+      } else if (nextType === "pie" || nextType === "donut") {
+        sort = null;
       } else {
         sort = null;
       }
 
       const nextQuery = {
         ...widget.query,
-        metrics,
+        metrics: nextMetrics,
         dimensions,
         ...(limit ? { limit } : {}),
       };
@@ -1155,6 +1187,15 @@ export default function ReportsV2Editor() {
         ...widget,
         type: nextType,
         query: nextQuery,
+        viz: {
+          ...widget.viz,
+          variant:
+            nextType === "donut"
+              ? "donut"
+              : nextType === "pie"
+              ? "pie"
+              : widget?.viz?.variant || "default",
+        },
         content: undefined,
       };
     });
@@ -1170,7 +1211,7 @@ export default function ReportsV2Editor() {
       const dimensions = Array.isArray(widget.query?.dimensions)
         ? widget.query.dimensions
         : [];
-      if (widget.type === "kpi") {
+      if (widget.type === "kpi" || widget.type === "pie" || widget.type === "donut") {
         const nextMetrics = [metric];
         const sort = sanitizeSortForFields(widget.query?.sort, [
           ...dimensions,
@@ -1217,7 +1258,12 @@ export default function ReportsV2Editor() {
     if (!selectedWidget) return;
     if (selectedWidget.type === "text") return;
     updateWidget(selectedWidget.id, (widget) => {
-      const nextDimensions = value === "none" ? [] : [value];
+      const isPieLike = widget.type === "pie" || widget.type === "donut";
+      const nextDimensions = isPieLike
+        ? [value === "date" || value === "none" ? "platform" : value]
+        : value === "none"
+        ? []
+        : [value];
       const metrics = Array.isArray(widget.query?.metrics) ? widget.query.metrics : [];
       const sort = sanitizeSortForFields(widget.query?.sort, [
         ...nextDimensions,
@@ -1315,6 +1361,19 @@ export default function ReportsV2Editor() {
       viz: {
         ...selectedWidget.viz,
         format: value,
+      },
+    });
+  };
+
+  const handleVariantChange = (value) => {
+    if (!selectedWidget) return;
+    if (selectedWidget.type !== "pie" && selectedWidget.type !== "donut") return;
+    const variant = value === "donut" ? "donut" : "pie";
+    updateWidget(selectedWidget.id, {
+      type: variant,
+      viz: {
+        ...selectedWidget.viz,
+        variant,
       },
     });
   };
@@ -1698,6 +1757,7 @@ export default function ReportsV2Editor() {
             onShowLegendChange={handleShowLegendChange}
             onFormatChange={handleFormatChange}
             onTextContentChange={handleTextContentChange}
+            onVariantChange={handleVariantChange}
           />
 
           <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">

@@ -3,7 +3,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Input } from "@/components/ui/input.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 
-const LEGEND_WIDGETS = new Set(["timeseries", "bar", "pie"]);
+const LEGEND_WIDGETS = new Set(["timeseries", "bar", "pie", "donut"]);
 
 export default function StylePanel({
   widget,
@@ -12,6 +12,7 @@ export default function StylePanel({
   onShowLegendChange,
   onFormatChange,
   onTextContentChange,
+  onVariantChange,
 }) {
   if (!widget) return null;
 
@@ -55,6 +56,9 @@ export default function StylePanel({
   )
     ? widget.viz.format
     : "auto";
+  const isPieLike = widget.type === "pie" || widget.type === "donut";
+  const variantValue =
+    widget?.viz?.variant === "donut" || widget.type === "donut" ? "donut" : "pie";
 
   return (
     <div className="space-y-4">
@@ -83,6 +87,23 @@ export default function StylePanel({
             checked={widget.viz?.showLegend !== false}
             onCheckedChange={(checked) => onShowLegendChange(Boolean(checked))}
           />
+        </div>
+      ) : null}
+
+      {isPieLike ? (
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+            Variante
+          </label>
+          <Select value={variantValue} onValueChange={onVariantChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pie" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pie">Pie</SelectItem>
+              <SelectItem value="donut">Donut</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       ) : null}
 

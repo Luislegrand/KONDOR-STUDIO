@@ -31,6 +31,7 @@ export default function DataPanel({
     ? widget.query.dimensions
     : [];
   const isTextWidget = widget.type === "text";
+  const isPieLike = widget.type === "pie" || widget.type === "donut";
   const sortOptions = buildSortOptions(widget);
   const sortField = sortOptions.includes(widget.query?.sort?.field)
     ? widget.query.sort.field
@@ -39,6 +40,12 @@ export default function DataPanel({
   const limitValue = Number.isFinite(Number(widget.query?.limit))
     ? String(widget.query.limit)
     : "25";
+
+  const dimensionChoices = isPieLike
+    ? dimensionOptions.filter(
+        (dimension) => dimension.value !== "none" && dimension.value !== "date"
+      )
+    : dimensionOptions;
 
   return (
     <div className="space-y-4">
@@ -90,6 +97,11 @@ export default function DataPanel({
             })}
           </div>
         )}
+        {isPieLike ? (
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            Pie/Donut usa exatamente 1 metrica.
+          </p>
+        ) : null}
       </div>
 
       <div>
@@ -97,7 +109,7 @@ export default function DataPanel({
           Dimensao
         </label>
         <Select
-          value={dimensions[0] || "none"}
+          value={dimensions[0] || (isPieLike ? "platform" : "none")}
           onValueChange={onDimensionChange}
           disabled={widget.type === "timeseries" || isTextWidget}
         >
@@ -105,7 +117,7 @@ export default function DataPanel({
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
-            {dimensionOptions.map((dimension) => (
+            {dimensionChoices.map((dimension) => (
               <SelectItem key={dimension.value} value={dimension.value}>
                 {dimension.label}
               </SelectItem>
@@ -115,6 +127,10 @@ export default function DataPanel({
         {widget.type === "timeseries" ? (
           <p className="mt-2 text-xs text-[var(--text-muted)]">
             Time series sempre usa dimensao date.
+          </p>
+        ) : isPieLike ? (
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
+            Pie/Donut exige 1 dimensao e nao aceita date.
           </p>
         ) : null}
       </div>

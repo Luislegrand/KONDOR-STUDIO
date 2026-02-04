@@ -170,7 +170,7 @@ const textContentSchema = z
 const widgetSchema = z
   .object({
     id: z.string().uuid(),
-    type: z.enum(['kpi', 'timeseries', 'bar', 'table', 'pie', 'text']),
+    type: z.enum(['kpi', 'timeseries', 'bar', 'table', 'pie', 'donut', 'text']),
     title: z.string().min(1),
     layout: layoutSchema,
     query: querySchema.optional(),
@@ -201,6 +201,9 @@ const widgetSchema = z
 
     const dimensions = Array.isArray(value.query?.dimensions)
       ? value.query.dimensions
+      : [];
+    const metrics = Array.isArray(value.query?.metrics)
+      ? value.query.metrics
       : [];
 
     if (value.type === 'kpi') {
@@ -236,11 +239,17 @@ const widgetSchema = z
       }
     }
 
-    if (value.type === 'pie') {
+    if (value.type === 'pie' || value.type === 'donut') {
       if (dimensions.length !== 1 || dimensions[0] === 'date') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Widget pie exige uma dimensão não-date',
+          message: 'Widget pie/donut exige exatamente 1 dimensão não-date',
+        });
+      }
+      if (metrics.length !== 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Widget pie/donut exige exatamente 1 métrica',
         });
       }
     }
