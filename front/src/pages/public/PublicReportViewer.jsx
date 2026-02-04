@@ -5,7 +5,10 @@ import PageShell from "@/components/ui/page-shell.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import { base44 } from "@/apiClient/base44Client";
-import { useDebouncedValue } from "@/components/reportsV2/utils.js";
+import {
+  useDebouncedValue,
+  normalizeLayoutFront,
+} from "@/components/reportsV2/utils.js";
 
 const themeStyle = {
   "--background": "#FFFFFF",
@@ -56,12 +59,25 @@ export default function PublicReportViewer() {
   });
 
   const layout = data?.layoutJson || null;
-  const [filters, setFilters] = React.useState(() => buildInitialFilters(layout));
+  const normalizedLayout = normalizeLayoutFront(layout);
+  const pages = normalizedLayout?.pages || [];
+  const [activePageId, setActivePageId] = React.useState(pages[0]?.id || null);
+  const [filters, setFilters] = React.useState(() =>
+    buildInitialFilters(normalizedLayout)
+  );
   const debouncedFilters = useDebouncedValue(filters, 400);
 
   React.useEffect(() => {
-    setFilters(buildInitialFilters(layout));
-  }, [layout]);
+    setFilters(buildInitialFilters(normalizedLayout));
+  }, [normalizedLayout]);
+
+  React.useEffect(() => {
+    if (!pages.length) return;
+    setActivePageId((current) => {
+      if (current && pages.some((page) => page.id === current)) return current;
+      return pages[0].id;
+    });
+  }, [pages]);
 
   React.useEffect(() => {
     if (isPdf) return undefined;
@@ -120,13 +136,40 @@ export default function PublicReportViewer() {
           </div>
         ) : null}
 
-        {layout ? (
-          <DashboardRenderer
-            layout={layout}
-            dashboardId={data.dashboard?.id}
-            publicToken={token}
-            globalFilters={debouncedFilters}
-          />
+        {normalizedLayout ? (
+          <>
+            {!isPdf && pages.length > 1 ? (
+              <div
+                role="tablist"
+                aria-label="Paginas do dashboard"
+                className="mb-4 flex flex-wrap gap-2 rounded-[16px] border border-[var(--border)] bg-white p-2"
+              >
+                {pages.map((page) => (
+                  <button
+                    key={page.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={page.id === activePageId}
+                    className={
+                      page.id === activePageId
+                        ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                        : "rounded-[12px] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                    }
+                    onClick={() => setActivePageId(page.id)}
+                  >
+                    {page.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <DashboardRenderer
+              layout={normalizedLayout}
+              dashboardId={data.dashboard?.id}
+              publicToken={token}
+              globalFilters={debouncedFilters}
+              activePageId={activePageId}
+            />
+          </>
         ) : (
           <div className="rounded-[16px] border border-[var(--border)] bg-white px-6 py-5 text-sm text-[var(--text-muted)]">
             Layout nao encontrado.

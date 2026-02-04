@@ -94,7 +94,11 @@ function deriveTemplateRequirements(template) {
     return { requiredPlatforms, requiresAds: false };
   }
 
-  const widgets = Array.isArray(template?.layoutJson?.widgets)
+  const widgets = Array.isArray(template?.layoutJson?.pages)
+    ? template.layoutJson.pages.flatMap((page) =>
+        Array.isArray(page?.widgets) ? page.widgets : []
+      )
+    : Array.isArray(template?.layoutJson?.widgets)
     ? template.layoutJson.widgets
     : [];
   const platforms = new Set();

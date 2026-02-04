@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   reportLayoutSchema,
+  normalizeLayout,
 } = require('../src/shared/validators/reportLayout.js');
 
 function buildBaseLayout(overrides = {}) {
@@ -57,6 +58,32 @@ test('reportLayoutSchema accepts valid layout', () => {
   assert.equal(result.success, true);
 });
 
+test('reportLayoutSchema accepts valid layout with pages', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    theme: base.theme,
+    globalFilters: base.globalFilters,
+    pages: [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+        name: 'Pagina 1',
+        widgets: base.widgets,
+      },
+    ],
+  });
+  assert.equal(result.success, true);
+});
+
+test('normalizeLayout wraps legacy widgets into a page', () => {
+  const base = buildBaseLayout();
+  const parsed = reportLayoutSchema.parse(base);
+  const normalized = normalizeLayout(parsed);
+  assert.equal(Array.isArray(normalized.pages), true);
+  assert.equal(normalized.pages.length, 1);
+  assert.equal(normalized.pages[0].name, 'Pagina 1');
+  assert.equal(normalized.pages[0].widgets.length, 1);
+});
+
 test('reportLayoutSchema rejects duplicate widget ids', () => {
   const base = buildBaseLayout();
   const duplicate = {
@@ -70,6 +97,74 @@ test('reportLayoutSchema rejects duplicate widget ids', () => {
     ],
   };
   const result = reportLayoutSchema.safeParse(duplicate);
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects duplicate widget ids across pages', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    theme: base.theme,
+    globalFilters: base.globalFilters,
+    pages: [
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+        name: 'Pagina 1',
+        widgets: base.widgets,
+      },
+      {
+        id: 'cccccccc-cccc-4ccc-cccc-cccccccccccc',
+        name: 'Pagina 2',
+        widgets: base.widgets,
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects pages without name', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    theme: base.theme,
+    globalFilters: base.globalFilters,
+    pages: [
+      {
+        id: 'dddddddd-dddd-4ddd-dddd-dddddddddddd',
+        name: '',
+        widgets: base.widgets,
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects duplicate page ids', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    theme: base.theme,
+    globalFilters: base.globalFilters,
+    pages: [
+      {
+        id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+        name: 'Pagina 1',
+        widgets: base.widgets,
+      },
+      {
+        id: 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee',
+        name: 'Pagina 2',
+        widgets: [],
+      },
+    ],
+  });
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects empty pages list', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    theme: base.theme,
+    globalFilters: base.globalFilters,
+    pages: [],
+  });
   assert.equal(result.success, false);
 });
 

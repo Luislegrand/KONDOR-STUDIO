@@ -1,6 +1,7 @@
 import React from "react";
 import WidgetRenderer from "./WidgetRenderer.jsx";
 import WidgetEmptyState from "@/components/reports/widgets/WidgetEmptyState.jsx";
+import { normalizeLayoutFront, getActivePage } from "./utils.js";
 
 function buildGridStyle(layout) {
   const x = Number(layout?.x || 0);
@@ -21,9 +22,12 @@ export default function DashboardRenderer({
   dashboardId,
   brandId,
   publicToken,
+  activePageId,
   globalFilters,
 }) {
-  const widgets = Array.isArray(layout?.widgets) ? layout.widgets : [];
+  const normalized = normalizeLayoutFront(layout);
+  const activePage = getActivePage(normalized, activePageId);
+  const widgets = Array.isArray(activePage?.widgets) ? activePage.widgets : [];
 
   if (!widgets.length) {
     return (
@@ -65,6 +69,7 @@ export default function DashboardRenderer({
               dashboardId={dashboardId}
               brandId={brandId}
               publicToken={publicToken}
+              pageId={activePage?.id}
               globalFilters={globalFilters}
             />
           </div>

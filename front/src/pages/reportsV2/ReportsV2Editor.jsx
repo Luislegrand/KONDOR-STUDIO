@@ -17,7 +17,13 @@ import {
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
-import { useDebouncedValue, stableStringify } from "@/components/reportsV2/utils.js";
+import {
+  useDebouncedValue,
+  stableStringify,
+  normalizeLayoutFront,
+  getActivePage,
+  generateUuid,
+} from "@/components/reportsV2/utils.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
@@ -54,7 +60,13 @@ const DEFAULT_LAYOUT = {
     compareTo: null,
     autoRefreshSec: 0,
   },
-  widgets: [],
+  pages: [
+    {
+      id: generateUuid(),
+      name: "Pagina 1",
+      widgets: [],
+    },
+  ],
 };
 
 const WIDGET_TYPES = [
@@ -134,27 +146,6 @@ const WIDGET_PRESETS = {
   },
 };
 
-function generateUuid() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  const bytes = new Uint8Array(16);
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
-    16,
-    20
-  )}-${hex.slice(20)}`;
-}
-
 function buildThemeStyle(layout) {
   const theme = layout?.theme || DEFAULT_LAYOUT.theme;
   const colors = deriveThemeColors({
@@ -182,21 +173,24 @@ function buildThemeStyle(layout) {
 }
 
 function mergeLayoutDefaults(layout) {
-  if (!layout) return DEFAULT_LAYOUT;
+  const normalized = normalizeLayoutFront(layout) || DEFAULT_LAYOUT;
   return {
     theme: {
       ...DEFAULT_LAYOUT.theme,
-      ...(layout.theme || {}),
+      ...(normalized.theme || {}),
     },
     globalFilters: {
       ...DEFAULT_LAYOUT.globalFilters,
-      ...(layout.globalFilters || {}),
+      ...(normalized.globalFilters || {}),
       dateRange: {
         ...DEFAULT_LAYOUT.globalFilters.dateRange,
-        ...(layout.globalFilters?.dateRange || {}),
+        ...(normalized.globalFilters?.dateRange || {}),
       },
     },
-    widgets: Array.isArray(layout.widgets) ? layout.widgets : [],
+    pages:
+      Array.isArray(normalized.pages) && normalized.pages.length
+        ? normalized.pages
+        : DEFAULT_LAYOUT.pages,
   };
 }
 
@@ -237,77 +231,86 @@ function normalizeLayoutValue(value, fallback = 0) {
 
 function sanitizeLayoutForSave(layout) {
   const merged = mergeLayoutDefaults(layout);
+  const sanitizeWidget = (widget) => {
+    const metrics = Array.isArray(widget?.query?.metrics)
+      ? widget.query.metrics.filter(Boolean)
+      : [];
+    const dimensions = Array.isArray(widget?.query?.dimensions)
+      ? widget.query.dimensions.filter(Boolean)
+      : [];
+    const requiredPlatforms = Array.isArray(widget?.query?.requiredPlatforms)
+      ? widget.query.requiredPlatforms.filter(Boolean)
+      : [];
+    const filters = Array.isArray(widget?.query?.filters)
+      ? widget.query.filters.map((filter) => {
+          const op = filter?.op || "eq";
+          let value = filter?.value ?? "";
+          if (op === "in") {
+            if (Array.isArray(value)) {
+              value = value.map((entry) => String(entry).trim()).filter(Boolean);
+            } else {
+              value = String(value)
+                .split(",")
+                .map((entry) => entry.trim())
+                .filter(Boolean);
+            }
+          } else if (Array.isArray(value)) {
+            value = value[0] ? String(value[0]) : "";
+          } else {
+            value = String(value);
+          }
+          return {
+            field: filter?.field || "platform",
+            op,
+            value,
+          };
+        })
+      : [];
+
+    const layoutValue = widget.layout || {};
+    const w = normalizeLayoutValue(layoutValue.w, 4) || 4;
+    const h = normalizeLayoutValue(layoutValue.h, 3) || 3;
+    const minW = Math.max(1, normalizeLayoutValue(layoutValue.minW, 2));
+    const minH = Math.max(1, normalizeLayoutValue(layoutValue.minH, 2));
+
+    return {
+      id: widget.id,
+      type: widget.type || "kpi",
+      title: String(widget.title || "Widget"),
+      layout: {
+        x: normalizeLayoutValue(layoutValue.x, 0),
+        y: normalizeLayoutValue(layoutValue.y, 0),
+        w,
+        h,
+        minW: Math.min(minW, w),
+        minH: Math.min(minH, h),
+      },
+      query: {
+        metrics,
+        dimensions,
+        filters,
+        ...(requiredPlatforms.length ? { requiredPlatforms } : {}),
+      },
+      viz: {
+        variant: widget?.viz?.variant || "default",
+        showLegend: widget?.viz?.showLegend !== false,
+        format: widget?.viz?.format || "auto",
+        options: widget?.viz?.options || {},
+      },
+    };
+  };
+
   return {
     theme: merged.theme,
     globalFilters: merged.globalFilters,
-    widgets: merged.widgets.map((widget) => {
-      const metrics = Array.isArray(widget?.query?.metrics)
-        ? widget.query.metrics.filter(Boolean)
-        : [];
-      const dimensions = Array.isArray(widget?.query?.dimensions)
-        ? widget.query.dimensions.filter(Boolean)
-        : [];
-      const requiredPlatforms = Array.isArray(widget?.query?.requiredPlatforms)
-        ? widget.query.requiredPlatforms.filter(Boolean)
-        : [];
-      const filters = Array.isArray(widget?.query?.filters)
-        ? widget.query.filters.map((filter) => {
-            const op = filter?.op || "eq";
-            let value = filter?.value ?? "";
-            if (op === "in") {
-              if (Array.isArray(value)) {
-                value = value.map((entry) => String(entry).trim()).filter(Boolean);
-              } else {
-                value = String(value)
-                  .split(",")
-                  .map((entry) => entry.trim())
-                  .filter(Boolean);
-              }
-            } else if (Array.isArray(value)) {
-              value = value[0] ? String(value[0]) : "";
-            } else {
-              value = String(value);
-            }
-            return {
-              field: filter?.field || "platform",
-              op,
-              value,
-            };
-          })
-        : [];
-
-      const layoutValue = widget.layout || {};
-      const w = normalizeLayoutValue(layoutValue.w, 4) || 4;
-      const h = normalizeLayoutValue(layoutValue.h, 3) || 3;
-      const minW = Math.max(1, normalizeLayoutValue(layoutValue.minW, 2));
-      const minH = Math.max(1, normalizeLayoutValue(layoutValue.minH, 2));
-
-      return {
-        id: widget.id,
-        type: widget.type || "kpi",
-        title: String(widget.title || "Widget"),
-        layout: {
-          x: normalizeLayoutValue(layoutValue.x, 0),
-          y: normalizeLayoutValue(layoutValue.y, 0),
-          w,
-          h,
-          minW: Math.min(minW, w),
-          minH: Math.min(minH, h),
-        },
-        query: {
-          metrics,
-          dimensions,
-          filters,
-          ...(requiredPlatforms.length ? { requiredPlatforms } : {}),
-        },
-        viz: {
-          variant: widget?.viz?.variant || "default",
-          showLegend: widget?.viz?.showLegend !== false,
-          format: widget?.viz?.format || "auto",
-          options: widget?.viz?.options || {},
-        },
-      };
-    }),
+    pages: merged.pages.map((page, index) => ({
+      id: page.id || generateUuid(),
+      name:
+        page.name && String(page.name).trim()
+          ? String(page.name).trim().slice(0, 60)
+          : `Pagina ${index + 1}`,
+      widgets: (page.widgets || []).map(sanitizeWidget),
+    })),
   };
 }
 
@@ -315,7 +318,20 @@ function validateLayout(layout) {
   const issues = [];
   const widgetIssues = {};
 
-  (layout?.widgets || []).forEach((widget) => {
+  const pages = Array.isArray(layout?.pages)
+    ? layout.pages
+    : Array.isArray(layout?.widgets)
+    ? [
+        {
+          id: "legacy",
+        name: "Pagina 1",
+          widgets: layout.widgets,
+        },
+      ]
+    : [];
+
+  pages.forEach((page) => {
+    (page.widgets || []).forEach((widget) => {
     const errors = [];
     const metrics = Array.isArray(widget?.query?.metrics)
       ? widget.query.metrics.filter(Boolean)
@@ -378,8 +394,11 @@ function validateLayout(layout) {
 
     if (errors.length) {
       widgetIssues[widget.id] = errors;
-      errors.forEach((message) => issues.push({ widgetId: widget.id, message }));
+      errors.forEach((message) =>
+        issues.push({ widgetId: widget.id, message, pageName: page.name })
+      );
     }
+  });
   });
 
   return { issues, widgetIssues };
@@ -494,6 +513,7 @@ export default function ReportsV2Editor() {
   });
 
   const [layoutJson, setLayoutJson] = React.useState(DEFAULT_LAYOUT);
+  const [activePageId, setActivePageId] = React.useState(null);
   const [selectedWidgetId, setSelectedWidgetId] = React.useState(null);
   const [activeTab, setActiveTab] = React.useState("data");
   const [previewMode, setPreviewMode] = React.useState(false);
@@ -507,6 +527,8 @@ export default function ReportsV2Editor() {
   const [autoSaveEnabled, setAutoSaveEnabled] = React.useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = React.useState("idle");
   const [showHistory, setShowHistory] = React.useState(false);
+  const [showRenamePage, setShowRenamePage] = React.useState(false);
+  const [pageNameDraft, setPageNameDraft] = React.useState("");
   const [lastSavedKey, setLastSavedKey] = React.useState("");
   const [hasHydrated, setHasHydrated] = React.useState(false);
   const addMenuRef = React.useRef(null);
@@ -535,8 +557,12 @@ export default function ReportsV2Editor() {
     const initialPayload = sanitizeLayoutForSave(merged);
     setLayoutJson(merged);
     setPreviewFilters(buildInitialFilters(merged));
-    if (merged.widgets.length) {
-      setSelectedWidgetId(merged.widgets[0].id);
+    const firstPage = Array.isArray(merged.pages) ? merged.pages[0] : null;
+    if (firstPage?.id) {
+      setActivePageId(firstPage.id);
+      if (firstPage.widgets?.length) {
+        setSelectedWidgetId(firstPage.widgets[0].id);
+      }
     }
     setLastSavedKey(stableStringify(initialPayload));
     setHasHydrated(true);
@@ -552,6 +578,27 @@ export default function ReportsV2Editor() {
     window.addEventListener("mousedown", handleClick);
     return () => window.removeEventListener("mousedown", handleClick);
   }, [showAddMenu]);
+
+  React.useEffect(() => {
+    const pages = Array.isArray(layoutJson.pages) ? layoutJson.pages : [];
+    if (!pages.length) return;
+    setActivePageId((current) => {
+      if (current && pages.some((page) => page.id === current)) return current;
+      return pages[0].id;
+    });
+  }, [layoutJson.pages]);
+
+  React.useEffect(() => {
+    const activePage = getActivePage(layoutJson, activePageId);
+    if (!activePage) return;
+    if (
+      selectedWidgetId &&
+      activePage.widgets?.some((widget) => widget.id === selectedWidgetId)
+    ) {
+      return;
+    }
+    setSelectedWidgetId(activePage.widgets?.[0]?.id || null);
+  }, [activePageId, layoutJson.pages, selectedWidgetId]);
 
   const validation = React.useMemo(
     () => validateLayout(layoutJson),
@@ -640,7 +687,11 @@ export default function ReportsV2Editor() {
     },
   });
 
-  const selectedWidget = layoutJson.widgets.find(
+  const pages = Array.isArray(layoutJson.pages) ? layoutJson.pages : [];
+  const activePage = getActivePage(layoutJson, activePageId);
+  const activeWidgets = Array.isArray(activePage?.widgets) ? activePage.widgets : [];
+
+  const selectedWidget = activeWidgets.find(
     (widget) => widget.id === selectedWidgetId
   );
   const versions = Array.isArray(versionsQuery.data?.items)
@@ -649,18 +700,26 @@ export default function ReportsV2Editor() {
 
   const validationSummary = React.useMemo(() => {
     if (!validation.issues.length) return [];
+    const widgetLookup = new Map();
+    pages.forEach((page) => {
+      (page.widgets || []).forEach((widget) => {
+        widgetLookup.set(widget.id, widget);
+      });
+    });
     return validation.issues.map((issue, index) => {
-      const widget = layoutJson.widgets.find((item) => item.id === issue.widgetId);
+      const widget = widgetLookup.get(issue.widgetId);
       return {
         key: `${issue.widgetId}-${index}`,
         widgetTitle: widget?.title || "Widget",
-        message: issue.message,
+        message: issue.pageName
+          ? `${issue.pageName}: ${issue.message}`
+          : issue.message,
       };
     });
-  }, [layoutJson.widgets, validation.issues]);
+  }, [pages, validation.issues]);
 
   const rglLayout = React.useMemo(() => {
-    return layoutJson.widgets.map((widget) => {
+    return activeWidgets.map((widget) => {
       const layout = widget.layout || {};
       return {
         i: widget.id,
@@ -672,40 +731,54 @@ export default function ReportsV2Editor() {
         minH: Math.max(1, normalizeLayoutValue(layout.minH, 2)),
       };
     });
-  }, [layoutJson.widgets]);
+  }, [activeWidgets]);
 
-  const updateWidget = React.useCallback((widgetId, updater) => {
-    setLayoutJson((prev) => {
-      const nextWidgets = prev.widgets.map((widget) => {
-        if (widget.id !== widgetId) return widget;
-        const next = typeof updater === "function" ? updater(widget) : updater;
-        return { ...widget, ...next };
+  const updateWidget = React.useCallback(
+    (widgetId, updater) => {
+      setLayoutJson((prev) => {
+        const pages = prev.pages.map((page) => {
+          if (page.id !== activePageId) return page;
+          const nextWidgets = (page.widgets || []).map((widget) => {
+            if (widget.id !== widgetId) return widget;
+            const next = typeof updater === "function" ? updater(widget) : updater;
+            return { ...widget, ...next };
+          });
+          return { ...page, widgets: nextWidgets };
+        });
+        return { ...prev, pages };
       });
-      return { ...prev, widgets: nextWidgets };
-    });
-  }, []);
+    },
+    [activePageId]
+  );
 
-  const handleLayoutChange = React.useCallback((nextLayout) => {
-    setLayoutJson((prev) => {
-      const nextWidgets = prev.widgets.map((widget) => {
-        const next = nextLayout.find((item) => item.i === widget.id);
-        if (!next) return widget;
-        return {
-          ...widget,
-          layout: {
-            ...widget.layout,
-            x: next.x,
-            y: next.y,
-            w: next.w,
-            h: next.h,
-            minW: next.minW || widget.layout?.minW || 2,
-            minH: next.minH || widget.layout?.minH || 2,
-          },
-        };
+  const handleLayoutChange = React.useCallback(
+    (nextLayout) => {
+      setLayoutJson((prev) => {
+        const pages = prev.pages.map((page) => {
+          if (page.id !== activePageId) return page;
+          const nextWidgets = (page.widgets || []).map((widget) => {
+            const next = nextLayout.find((item) => item.i === widget.id);
+            if (!next) return widget;
+            return {
+              ...widget,
+              layout: {
+                ...widget.layout,
+                x: next.x,
+                y: next.y,
+                w: next.w,
+                h: next.h,
+                minW: next.minW || widget.layout?.minW || 2,
+                minH: next.minH || widget.layout?.minH || 2,
+              },
+            };
+          });
+          return { ...page, widgets: nextWidgets };
+        });
+        return { ...prev, pages };
       });
-      return { ...prev, widgets: nextWidgets };
-    });
-  }, []);
+    },
+    [activePageId]
+  );
 
   React.useEffect(() => {
     if (!autoSaveEnabled || !hasHydrated || !id) return;
@@ -742,7 +815,8 @@ export default function ReportsV2Editor() {
 
   const handleAddWidget = (type) => {
     const preset = WIDGET_PRESETS[type] || WIDGET_PRESETS.kpi;
-    const position = getNextWidgetPosition(layoutJson.widgets);
+    if (!activePageId) return;
+    const position = getNextWidgetPosition(activeWidgets);
     const newWidget = {
       id: generateUuid(),
       type,
@@ -767,18 +841,24 @@ export default function ReportsV2Editor() {
         options: {},
       },
     };
-    setLayoutJson((prev) => ({
-      ...prev,
-      widgets: [...prev.widgets, newWidget],
-    }));
+    setLayoutJson((prev) => {
+      const pages = prev.pages.map((page) => {
+        if (page.id !== activePageId) return page;
+        return {
+          ...page,
+          widgets: [...(page.widgets || []), newWidget],
+        };
+      });
+      return { ...prev, pages };
+    });
     setSelectedWidgetId(newWidget.id);
     setShowAddMenu(false);
   };
 
   const handleDuplicateWidget = (widgetId) => {
-    const widget = layoutJson.widgets.find((item) => item.id === widgetId);
+    const widget = activeWidgets.find((item) => item.id === widgetId);
     if (!widget) return;
-    const position = getNextWidgetPosition(layoutJson.widgets);
+    const position = getNextWidgetPosition(activeWidgets);
     const clone = {
       ...widget,
       id: generateUuid(),
@@ -789,20 +869,82 @@ export default function ReportsV2Editor() {
         y: position.y,
       },
     };
-    setLayoutJson((prev) => ({
-      ...prev,
-      widgets: [...prev.widgets, clone],
-    }));
+    setLayoutJson((prev) => {
+      const pages = prev.pages.map((page) => {
+        if (page.id !== activePageId) return page;
+        return {
+          ...page,
+          widgets: [...(page.widgets || []), clone],
+        };
+      });
+      return { ...prev, pages };
+    });
     setSelectedWidgetId(clone.id);
   };
 
   const handleRemoveWidget = (widgetId) => {
-    setLayoutJson((prev) => ({
-      ...prev,
-      widgets: prev.widgets.filter((widget) => widget.id !== widgetId),
-    }));
+    setLayoutJson((prev) => {
+      const pages = prev.pages.map((page) => {
+        if (page.id !== activePageId) return page;
+        return {
+          ...page,
+          widgets: (page.widgets || []).filter((widget) => widget.id !== widgetId),
+        };
+      });
+      return { ...prev, pages };
+    });
     if (selectedWidgetId === widgetId) {
       setSelectedWidgetId(null);
+    }
+  };
+
+  const handleAddPage = () => {
+    const nextIndex = pages.length + 1;
+    const newPage = {
+      id: generateUuid(),
+      name: `Pagina ${nextIndex}`,
+      widgets: [],
+    };
+    setLayoutJson((prev) => ({
+      ...prev,
+      pages: [...prev.pages, newPage],
+    }));
+    setActivePageId(newPage.id);
+    setSelectedWidgetId(null);
+  };
+
+  const handleRenamePage = () => {
+    if (!activePage) return;
+    setPageNameDraft(activePage.name || "");
+    setShowRenamePage(true);
+  };
+
+  const handleConfirmRename = () => {
+    const nextName = String(pageNameDraft || "").trim().slice(0, 60);
+    if (!nextName || !activePageId) return;
+    setLayoutJson((prev) => ({
+      ...prev,
+      pages: prev.pages.map((page) =>
+        page.id === activePageId ? { ...page, name: nextName } : page
+      ),
+    }));
+    setShowRenamePage(false);
+  };
+
+  const handleRemovePage = () => {
+    if (pages.length <= 1 || !activePageId) return;
+    const ok = window.confirm(
+      "Tem certeza que deseja remover esta pagina? Os widgets dela serao removidos."
+    );
+    if (!ok) return;
+    setLayoutJson((prev) => {
+      const nextPages = prev.pages.filter((page) => page.id !== activePageId);
+      return { ...prev, pages: nextPages.length ? nextPages : prev.pages };
+    });
+    const nextPage = pages.find((page) => page.id !== activePageId);
+    if (nextPage) {
+      setActivePageId(nextPage.id);
+      setSelectedWidgetId(nextPage.widgets?.[0]?.id || null);
     }
   };
 
@@ -1002,7 +1144,11 @@ export default function ReportsV2Editor() {
     const merged = mergeLayoutDefaults(version.layoutJson);
     setLayoutJson(merged);
     setPreviewFilters(buildInitialFilters(merged));
-    setSelectedWidgetId(merged.widgets[0]?.id || null);
+    const firstPage = Array.isArray(merged.pages) ? merged.pages[0] : null;
+    if (firstPage?.id) {
+      setActivePageId(firstPage.id);
+      setSelectedWidgetId(firstPage.widgets?.[0]?.id || null);
+    }
     setPreviewMode(false);
     setShowHistory(false);
     setActionMessage({
@@ -1150,6 +1296,55 @@ export default function ReportsV2Editor() {
         <main className="flex-1">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Pagina atual
+              </p>
+              <div
+                role="tablist"
+                aria-label="Paginas do dashboard"
+                className="mt-2 flex flex-wrap gap-2 rounded-[16px] border border-[var(--border)] bg-white p-2"
+              >
+                {pages.map((page) => (
+                  <button
+                    key={page.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={page.id === activePageId}
+                    className={
+                      page.id === activePageId
+                        ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                        : "rounded-[12px] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                    }
+                    onClick={() => setActivePageId(page.id)}
+                  >
+                    {page.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" onClick={handleAddPage}>
+                + Nova pagina
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleRenamePage}
+                disabled={!activePageId}
+              >
+                Renomear
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleRemovePage}
+                disabled={pages.length <= 1}
+              >
+                Remover
+              </Button>
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
               <p className="text-sm font-semibold text-[var(--text)]">
                 Canvas do dashboard
               </p>
@@ -1225,12 +1420,13 @@ export default function ReportsV2Editor() {
                   dashboardId={dashboard.id}
                   brandId={dashboard.brandId}
                   globalFilters={debouncedPreviewFilters}
+                  activePageId={activePageId}
                 />
               </div>
-            ) : layoutJson.widgets.length ? (
+            ) : activeWidgets.length ? (
               <DashboardCanvas
                 layout={rglLayout}
-                items={layoutJson.widgets}
+                items={activeWidgets}
                 width={width}
                 containerRef={containerRef}
                 isEditable
@@ -1539,6 +1735,41 @@ export default function ReportsV2Editor() {
           </div>
         </aside>
       </div>
+
+      <Dialog open={showRenamePage} onOpenChange={setShowRenamePage}>
+        <DialogContent className="max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Renomear pagina</DialogTitle>
+            <DialogDescription>
+              Defina um nome curto para identificar esta pagina.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              Nome da pagina
+            </label>
+            <Input
+              value={pageNameDraft}
+              onChange={(event) => setPageNameDraft(event.target.value)}
+              placeholder="Ex: Visao geral"
+              maxLength={60}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowRenamePage(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmRename}
+              disabled={!String(pageNameDraft || "").trim()}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
         <DialogContent className="max-w-[760px]">

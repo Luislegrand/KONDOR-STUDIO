@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { z } = require('zod');
 
 const hexColor = z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
@@ -183,16 +184,83 @@ const widgetSchema = z
     }
   });
 
+const pageSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().min(1).max(60),
+    widgets: z.array(widgetSchema).default([]),
+  })
+  .strict();
+
 const reportLayoutSchema = z
   .object({
     theme: themeSchema,
     globalFilters: globalFiltersSchema,
-    widgets: z.array(widgetSchema),
+    pages: z.array(pageSchema).optional(),
+    widgets: z.array(widgetSchema).optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
+    const hasPages = Array.isArray(value.pages);
+    const hasWidgets = Array.isArray(value.widgets);
+
+    if (hasPages && hasWidgets) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'layout não pode conter pages e widgets simultaneamente',
+        path: ['pages'],
+      });
+      return;
+    }
+
+    if (!hasPages && !hasWidgets) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'layout deve conter pages ou widgets',
+        path: ['pages'],
+      });
+      return;
+    }
+
+    if (hasPages) {
+      if (!value.pages.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'pages deve conter ao menos 1 pagina',
+          path: ['pages'],
+        });
+        return;
+      }
+
+      const pageIds = new Set();
+      const widgetIds = new Set();
+
+      value.pages.forEach((page, pageIndex) => {
+        if (pageIds.has(page.id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'pages[].id deve ser único',
+            path: ['pages', pageIndex, 'id'],
+          });
+        }
+        pageIds.add(page.id);
+
+        (page.widgets || []).forEach((widget, widgetIndex) => {
+          if (widgetIds.has(widget.id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'widgets[].id deve ser único no relatório inteiro',
+              path: ['pages', pageIndex, 'widgets', widgetIndex, 'id'],
+            });
+          }
+          widgetIds.add(widget.id);
+        });
+      });
+      return;
+    }
+
     const ids = new Set();
-    value.widgets.forEach((widget, index) => {
+    (value.widgets || []).forEach((widget, index) => {
       if (ids.has(widget.id)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -204,6 +272,47 @@ const reportLayoutSchema = z
     });
   });
 
+function generateUuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const bytes = crypto.randomBytes(16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20,
+  )}-${hex.slice(20)}`;
+}
+
+function normalizeLayout(parsedLayout) {
+  if (Array.isArray(parsedLayout.pages) && parsedLayout.pages.length) {
+    return {
+      theme: parsedLayout.theme,
+      globalFilters: parsedLayout.globalFilters,
+      pages: parsedLayout.pages.map((page) => ({
+        id: page.id,
+        name: page.name,
+        widgets: Array.isArray(page.widgets) ? page.widgets : [],
+      })),
+    };
+  }
+
+  const widgets = Array.isArray(parsedLayout.widgets) ? parsedLayout.widgets : [];
+  return {
+    theme: parsedLayout.theme,
+    globalFilters: parsedLayout.globalFilters,
+    pages: [
+      {
+        id: generateUuid(),
+        name: 'Pagina 1',
+        widgets,
+      },
+    ],
+  };
+}
+
 function validateReportLayout(payload) {
   return reportLayoutSchema.parse(payload);
 }
@@ -211,4 +320,5 @@ function validateReportLayout(payload) {
 module.exports = {
   reportLayoutSchema,
   validateReportLayout,
+  normalizeLayout,
 };

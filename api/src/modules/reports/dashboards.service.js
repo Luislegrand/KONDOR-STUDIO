@@ -1,6 +1,9 @@
 const crypto = require('crypto');
 const { prisma } = require('../../prisma');
-const { reportLayoutSchema } = require('../../shared/validators/reportLayout');
+const {
+  reportLayoutSchema,
+  normalizeLayout,
+} = require('../../shared/validators/reportLayout');
 
 const DEFAULT_LAYOUT = {
   theme: {
@@ -21,7 +24,13 @@ const DEFAULT_LAYOUT = {
     compareTo: null,
     autoRefreshSec: 0,
   },
-  widgets: [],
+  pages: [
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Pagina 1',
+      widgets: [],
+    },
+  ],
 };
 
 function generateShareToken() {
@@ -79,7 +88,14 @@ function ensureLayoutValid(layoutJson) {
     err.details = parsed.error.flatten ? parsed.error.flatten() : parsed.error.errors;
     throw err;
   }
-  return parsed.data;
+  return normalizeLayout(parsed.data);
+}
+
+function normalizeLayoutForRead(layoutJson) {
+  if (!layoutJson) return layoutJson;
+  const parsed = reportLayoutSchema.safeParse(layoutJson);
+  if (!parsed.success) return layoutJson;
+  return normalizeLayout(parsed.data);
 }
 
 async function createDashboard(tenantId, userId, payload) {
@@ -179,6 +195,12 @@ async function getDashboard(tenantId, id, role) {
   if (role === 'viewer') {
     return {
       ...dashboard,
+      publishedVersion: dashboard.publishedVersion
+        ? {
+            ...dashboard.publishedVersion,
+            layoutJson: normalizeLayoutForRead(dashboard.publishedVersion.layoutJson),
+          }
+        : null,
       latestVersion: null,
     };
   }
@@ -190,7 +212,18 @@ async function getDashboard(tenantId, id, role) {
   const { versions, ...rest } = dashboard;
   return {
     ...rest,
-    latestVersion,
+    latestVersion: latestVersion
+      ? {
+          ...latestVersion,
+          layoutJson: normalizeLayoutForRead(latestVersion.layoutJson),
+        }
+      : null,
+    publishedVersion: rest.publishedVersion
+      ? {
+          ...rest.publishedVersion,
+          layoutJson: normalizeLayoutForRead(rest.publishedVersion.layoutJson),
+        }
+      : null,
   };
 }
 
@@ -265,10 +298,14 @@ async function listVersions(tenantId, dashboardId) {
   });
   if (!dashboard) return null;
 
-  return prisma.reportDashboardVersion.findMany({
+  const versions = await prisma.reportDashboardVersion.findMany({
     where: { dashboardId },
     orderBy: { versionNumber: 'desc' },
   });
+  return versions.map((version) => ({
+    ...version,
+    layoutJson: normalizeLayoutForRead(version.layoutJson),
+  }));
 }
 
 async function publishDashboard(tenantId, userId, dashboardId, versionId) {

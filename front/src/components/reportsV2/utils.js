@@ -39,16 +39,81 @@ export function stableStringify(value) {
     .join(",")}}`;
 }
 
+export function generateUuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20
+  )}-${hex.slice(20)}`;
+}
+
+export function normalizeLayoutFront(layout) {
+  if (!layout || typeof layout !== "object") return null;
+  const theme = layout.theme || {};
+  const globalFilters = layout.globalFilters || {};
+
+  const normalizePage = (page, index) => ({
+    id: page?.id || generateUuid(),
+    name:
+      page?.name && String(page.name).trim()
+        ? String(page.name).trim().slice(0, 60)
+        : `Pagina ${index + 1}`,
+    widgets: Array.isArray(page?.widgets) ? page.widgets : [],
+  });
+
+  if (Array.isArray(layout.pages) && layout.pages.length) {
+    return {
+      theme,
+      globalFilters,
+      pages: layout.pages.map(normalizePage),
+    };
+  }
+
+  const widgets = Array.isArray(layout.widgets) ? layout.widgets : [];
+  return {
+    theme,
+    globalFilters,
+    pages: [
+      {
+        id: generateUuid(),
+        name: "Pagina 1",
+        widgets,
+      },
+    ],
+  };
+}
+
+export function getActivePage(layout, activePageId) {
+  const pages = Array.isArray(layout?.pages) ? layout.pages : [];
+  if (!pages.length) return null;
+  return pages.find((page) => page.id === activePageId) || pages[0];
+}
+
 export function buildWidgetQueryKey({
   dashboardId,
   widget,
   globalFilters,
   pagination,
+  pageId,
 }) {
   const filtersKey = stableStringify({
     globalFilters,
     query: widget?.query || {},
     pagination: pagination || null,
+    pageId: pageId || null,
   });
   return ["reportsV2-widget", dashboardId, widget?.id || "unknown", filtersKey];
 }

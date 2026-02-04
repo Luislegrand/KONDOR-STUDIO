@@ -146,6 +146,7 @@ export default function WidgetRenderer({
   dashboardId,
   brandId,
   publicToken,
+  pageId,
   globalFilters,
 }) {
   const navigate = useNavigate();
@@ -205,6 +206,7 @@ export default function WidgetRenderer({
     widget,
     globalFilters: { ...globalFilters, dateRange },
     pagination,
+    pageId,
   });
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
