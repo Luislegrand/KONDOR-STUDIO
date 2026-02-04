@@ -45,7 +45,6 @@ import { useActiveClient } from "@/hooks/useActiveClient.js";
 import { useTenantTheme } from "@/hooks/useTenantTheme.js";
 import { resolveTenantBranding } from "@/utils/theme.js";
 
-const REQUIRED_REPORTS_PLATFORMS = ["META_ADS", "GOOGLE_ADS", "GA4"];
 const PLATFORM_ALIASES = {
   META_ADS: ["FB_IG"],
   FB_IG: ["META_ADS"],
@@ -225,15 +224,10 @@ function LayoutContent() {
     return platforms;
   }, [connections]);
 
-  const missingPlatforms = useMemo(
-    () => REQUIRED_REPORTS_PLATFORMS.filter((platform) => !activePlatforms.has(platform)),
-    [activePlatforms]
-  );
-
-  const hasRequiredConnections =
-    Boolean(activeClientId) && !connectionsLoading && missingPlatforms.length === 0;
+  const hasAnyConnections =
+    Boolean(activeClientId) && !connectionsLoading && activePlatforms.size > 0;
   const needsConnections =
-    Boolean(activeClientId) && !connectionsLoading && missingPlatforms.length > 0;
+    Boolean(activeClientId) && !connectionsLoading && activePlatforms.size === 0;
   const isCheckingConnections = Boolean(activeClientId) && connectionsLoading;
 
   return (
@@ -355,19 +349,19 @@ function LayoutContent() {
               <div className="flex items-center gap-2">
                 <div
                   className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
-                    hasRequiredConnections
+                    hasAnyConnections
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border-amber-200 bg-amber-50 text-amber-700"
                   }`}
                 >
-                  {hasRequiredConnections ? (
+                  {hasAnyConnections ? (
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   ) : (
                     <AlertTriangle className="h-3.5 w-3.5" />
                   )}
                   {isCheckingConnections
                     ? "Verificando conexoes"
-                    : hasRequiredConnections
+                    : hasAnyConnections
                       ? "Conexoes OK"
                       : "Conexoes pendentes"}
                 </div>
