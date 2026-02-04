@@ -350,6 +350,69 @@ test('exportDashboardPdf invalidates temporary token when generation fails', asy
   }
 });
 
+test('exportDashboardPdf allows export when only missing connections are detected', async () => {
+  const warnDashboard = {
+    id: 'dashboard-1',
+    tenantId: 'tenant-1',
+    brandId: 'brand-1',
+    name: 'Dashboard Warn',
+    status: 'PUBLISHED',
+    publishedVersionId: 'version-1',
+    publishedVersion: {
+      id: 'version-1',
+      layoutJson: {
+        theme: {},
+        globalFilters: {
+          dateRange: { preset: 'last_7_days' },
+          platforms: [],
+          accounts: [],
+          compareTo: null,
+          autoRefreshSec: 0,
+        },
+        pages: [
+          {
+            id: '74d19647-13f3-4c6f-b0d4-fe1779f7043c',
+            name: 'Pagina 1',
+            widgets: [
+              {
+                id: '190f521b-98da-4f72-9499-92b41235f6d2',
+                type: 'bar',
+                title: 'Meta Ads',
+                layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 },
+                query: {
+                  dimensions: ['platform'],
+                  metrics: ['spend'],
+                  filters: [{ field: 'platform', op: 'eq', value: 'META_ADS' }],
+                },
+                viz: {},
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+  const { service, createCalls, restore } = buildExportServiceHarness({
+    dashboard: warnDashboard,
+  });
+  try {
+    const result = await service.exportDashboardPdf(
+      'tenant-1',
+      'user-1',
+      'dashboard-1',
+      {
+        page: 'current',
+        orientation: 'portrait',
+      },
+    );
+
+    assert.equal(Buffer.from(result.buffer).toString('utf8'), 'pdf-bytes');
+    assert.equal(createCalls.length, 1);
+  } finally {
+    restore();
+  }
+});
+
 test('exportDashboardPdf blocks when health status is BLOCKED', async () => {
   const blockedDashboard = {
     id: 'dashboard-1',
@@ -380,9 +443,9 @@ test('exportDashboardPdf blocks when health status is BLOCKED', async () => {
                 title: 'Meta Ads',
                 layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 },
                 query: {
-                  dimensions: ['platform'],
+                  dimensions: [],
                   metrics: ['spend'],
-                  filters: [{ field: 'platform', op: 'eq', value: 'META_ADS' }],
+                  filters: [],
                 },
                 viz: {},
               },

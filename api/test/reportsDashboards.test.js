@@ -546,7 +546,7 @@ test('dashboard not published cannot create public share', async () => {
   assert.equal(shareRes.body.error.code, 'DASHBOARD_NOT_PUBLISHED');
 });
 
-test('public share is blocked when dashboard health is BLOCKED', async () => {
+test('public share is blocked when dashboard health is BLOCKED by invalid widget query', async () => {
   const { app, state } = buildApp();
   const brandId = randomUUID();
   state.clients.push({ id: brandId, tenantId: 'tenant-1' });
@@ -556,7 +556,15 @@ test('public share is blocked when dashboard health is BLOCKED', async () => {
     .set('x-role', 'MEMBER')
     .send({ name: 'Bloqueado', brandId });
 
-  const blockedLayout = {
+  await request(app)
+    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
+    .set('x-role', 'MEMBER')
+    .send({ versionId: createRes.body.latestVersion.id });
+
+  const publishedVersion = state.versions.find(
+    (version) => version.id === createRes.body.latestVersion.id,
+  );
+  publishedVersion.layoutJson = {
     ...buildLayout(),
     pages: [
       {
@@ -569,32 +577,16 @@ test('public share is blocked when dashboard health is BLOCKED', async () => {
             title: 'Meta Ads',
             layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 },
             query: {
-              dimensions: ['platform'],
+              dimensions: [],
               metrics: ['spend'],
-              filters: [{ field: 'platform', op: 'eq', value: 'META_ADS' }],
+              filters: [],
             },
             viz: {},
           },
         ],
       },
     ],
-    widgets: undefined,
   };
-
-  await request(app)
-    .post(`/api/reports/dashboards/${createRes.body.id}/versions`)
-    .set('x-role', 'MEMBER')
-    .send({ layoutJson: blockedLayout });
-
-  const versionsRes = await request(app)
-    .get(`/api/reports/dashboards/${createRes.body.id}/versions`)
-    .set('x-role', 'MEMBER');
-  const blockedVersionId = versionsRes.body.items[0].id;
-
-  await request(app)
-    .post(`/api/reports/dashboards/${createRes.body.id}/publish`)
-    .set('x-role', 'MEMBER')
-    .send({ versionId: blockedVersionId });
 
   const shareRes = await request(app)
     .post(`/api/reports/dashboards/${createRes.body.id}/public-share`)

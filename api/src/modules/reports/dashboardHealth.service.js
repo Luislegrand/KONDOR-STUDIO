@@ -243,7 +243,7 @@ async function computeDashboardHealthForDashboard(dashboard) {
     if (!queryValidation.valid) {
       widgetHealth.push({
         widgetId,
-        status: 'INVALID_QUERY',
+        status: 'BLOCKED',
         reasonCode: 'INVALID_QUERY',
       });
       return;
@@ -256,7 +256,7 @@ async function computeDashboardHealthForDashboard(dashboard) {
         pushedMissingConnection = true;
         widgetHealth.push({
           widgetId,
-          status: 'MISSING_CONNECTION',
+          status: 'WARN',
           platform,
           reasonCode: 'MISSING_CONNECTION',
         });
@@ -274,20 +274,21 @@ async function computeDashboardHealthForDashboard(dashboard) {
 
   const uniqueWidgetHealth = uniqIssues(widgetHealth);
   const invalidWidgets = uniqueWidgetHealth.filter(
-    (item) => item.status === 'MISSING_CONNECTION' || item.status === 'INVALID_QUERY',
+    (item) =>
+      item.reasonCode === 'MISSING_CONNECTION' || item.reasonCode === 'INVALID_QUERY',
   );
 
   const hasMissingConnectionIssues = invalidWidgets.some(
-    (item) => item.status === 'MISSING_CONNECTION',
+    (item) => item.reasonCode === 'MISSING_CONNECTION',
   );
   const hasInvalidQueryIssues = invalidWidgets.some(
-    (item) => item.status === 'INVALID_QUERY',
+    (item) => item.reasonCode === 'INVALID_QUERY',
   );
 
   let status = 'OK';
-  if (missingPlatforms.length || hasMissingConnectionIssues || hasInvalidQueryIssues) {
+  if (hasInvalidQueryIssues) {
     status = 'BLOCKED';
-  } else if (unknownPlatformRequirement) {
+  } else if (missingPlatforms.length || hasMissingConnectionIssues || unknownPlatformRequirement) {
     status = 'WARN';
   }
 

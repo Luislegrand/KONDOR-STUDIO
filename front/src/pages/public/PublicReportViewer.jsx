@@ -95,6 +95,7 @@ export default function PublicReportViewer() {
   const layout = data?.layoutJson || null;
   const normalizedLayout = normalizeLayoutFront(layout);
   const pages = normalizedLayout?.pages || [];
+  const health = data?.health || null;
   const globalFilterControls = normalizedLayout?.globalFilters?.controls;
   const [activePageId, setActivePageId] = React.useState(
     exportActivePageId || pages[0]?.id || null
@@ -112,6 +113,15 @@ export default function PublicReportViewer() {
     const current = pages.filter((page) => page.id === activePageId);
     return current.length ? current : pages.slice(0, 1);
   }, [activePageId, pages, shouldRenderAllPages]);
+  const healthIssuesByWidgetId = React.useMemo(() => {
+    const map = {};
+    const widgets = Array.isArray(health?.widgets) ? health.widgets : [];
+    widgets.forEach((issue) => {
+      if (!issue?.widgetId || issue?.status === "OK") return;
+      map[issue.widgetId] = issue;
+    });
+    return map;
+  }, [health?.widgets]);
   const exportReady =
     (isExport || isPdf) &&
     !isLoading &&
@@ -282,6 +292,7 @@ export default function PublicReportViewer() {
                     publicToken={token}
                     globalFilters={debouncedFilters}
                     activePageId={page.id}
+                    healthIssuesByWidgetId={healthIssuesByWidgetId}
                   />
                 </section>
               ))}

@@ -105,7 +105,7 @@ function createPublishedDashboard(state, layoutJson) {
   return dashboardId;
 }
 
-test('health returns BLOCKED when required platform is missing', async () => {
+test('health returns WARN when required platform is missing', async () => {
   const { app, state } = buildApp();
   const dashboardId = createPublishedDashboard(state, {
     theme: {},
@@ -140,10 +140,10 @@ test('health returns BLOCKED when required platform is missing', async () => {
 
   const res = await request(app).get(`/api/reports/dashboards/${dashboardId}/health`);
   assert.equal(res.status, 200);
-  assert.equal(res.body?.status, 'BLOCKED');
+  assert.equal(res.body?.status, 'WARN');
   assert.deepEqual(res.body?.summary?.missingPlatforms, ['META_ADS']);
   assert.equal(
-    res.body?.widgets?.find((item) => item.status === 'MISSING_CONNECTION')?.platform,
+    res.body?.widgets?.find((item) => item.reasonCode === 'MISSING_CONNECTION')?.platform,
     'META_ADS',
   );
 });
@@ -213,7 +213,7 @@ test('health returns BLOCKED with INVALID_QUERY widget issues', async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body?.status, 'BLOCKED');
   assert.equal(
-    res.body?.widgets?.find((item) => item.status === 'INVALID_QUERY')?.reasonCode,
+    res.body?.widgets?.find((item) => item.reasonCode === 'INVALID_QUERY')?.reasonCode,
     'INVALID_QUERY',
   );
 });

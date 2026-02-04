@@ -79,10 +79,10 @@ function buildConnectionsPath(brandId, platform) {
 
 function describeIssue(issue) {
   if (!issue) return "Widget com pendencia.";
-  if (issue.status === "MISSING_CONNECTION") {
+  if (issue.reasonCode === "MISSING_CONNECTION") {
     return `Conexao pendente: ${formatPlatform(issue.platform || "plataforma desconhecida")}.`;
   }
-  if (issue.status === "INVALID_QUERY") {
+  if (issue.reasonCode === "INVALID_QUERY") {
     return "Configuracao de widget invalida.";
   }
   return "Widget com pendencia.";
@@ -175,8 +175,8 @@ export default function ReportsV2Viewer() {
         return;
       }
       if (
-        current.status !== "MISSING_CONNECTION" &&
-        issue.status === "MISSING_CONNECTION"
+        current.reasonCode !== "MISSING_CONNECTION" &&
+        issue.reasonCode === "MISSING_CONNECTION"
       ) {
         map[issue.widgetId] = issue;
       }
@@ -400,6 +400,11 @@ export default function ReportsV2Viewer() {
             <p className="text-sm text-[var(--muted)]">
               {dashboard.status === "PUBLISHED" ? "Publicado" : "Rascunho"}
             </p>
+            {isHealthWarn ? (
+              <span className="mt-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                Dados parcialmente indisponiveis
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -439,23 +444,32 @@ export default function ReportsV2Viewer() {
               <div>
                 <p className="text-sm font-semibold text-[var(--text)]">
                   {isHealthBlocked
-                    ? "Conexoes pendentes"
-                    : "Alguns widgets podem estar indisponiveis"}
+                    ? "Configuracao invalida"
+                    : "Dados parcialmente indisponiveis"}
                 </p>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   {isHealthBlocked
-                    ? "Conecte as fontes para habilitar todos os graficos e exportar/compartilhar."
-                    : "Revise a configuracao de widgets para garantir a visualizacao completa."}
+                    ? "Corrija widgets invalidos no editor para habilitar exportacao e compartilhamento."
+                    : "Alguns widgets nao puderam ser carregados por falta de conexao."}
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  navigate(buildConnectionsPath(dashboard.brandId, missingPlatforms[0]))
-                }
-              >
-                Gerenciar conexoes
-              </Button>
+              {missingPlatforms.length ? (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(buildConnectionsPath(dashboard.brandId, missingPlatforms[0]))
+                  }
+                >
+                  Gerenciar conexoes
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(`/relatorios/v2/${dashboard.id}/edit`)}
+                >
+                  Abrir no editor
+                </Button>
+              )}
             </div>
 
             {missingPlatforms.length ? (
@@ -626,7 +640,7 @@ export default function ReportsV2Viewer() {
               ) : null}
               {isHealthBlocked ? (
                 <p className="mt-2 text-xs text-amber-700">
-                  Compartilhamento bloqueado ate resolver as pendencias bloqueantes do dashboard.
+                  Compartilhamento bloqueado ate corrigir widgets com configuracao invalida.
                 </p>
               ) : null}
             </div>
@@ -661,8 +675,9 @@ export default function ReportsV2Viewer() {
                 : "Exportacao bloqueada"}
             </DialogTitle>
             <DialogDescription>
-              Nao e possivel {blockedAction === "share" ? "compartilhar" : "exportar"} este
-              relatorio enquanto houver pendencias bloqueantes.
+              {missingPlatforms.length
+                ? `Nao e possivel ${blockedAction === "share" ? "compartilhar" : "exportar"} este relatorio enquanto houver conexoes pendentes.`
+                : `Nao e possivel ${blockedAction === "share" ? "compartilhar" : "exportar"} este relatorio enquanto houver widgets com configuracao invalida.`}
             </DialogDescription>
           </DialogHeader>
 

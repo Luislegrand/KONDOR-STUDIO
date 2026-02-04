@@ -191,6 +191,8 @@ export default function WidgetRenderer({
   const sortField = String(widget?.query?.sort?.field || "").trim();
   const sortDirection = widget?.query?.sort?.direction === "desc" ? "desc" : "asc";
   const sort = sortField ? { field: sortField, direction: sortDirection } : undefined;
+  const healthReason =
+    healthIssue?.reasonCode || healthIssue?.reason || healthIssue?.status || null;
 
   const [pageSize, setPageSize] = React.useState(widgetLimit || 25);
   const [pageIndex, setPageIndex] = React.useState(0);
@@ -266,7 +268,7 @@ export default function WidgetRenderer({
         : base44.reportsV2.queryMetrics(payload),
     enabled: Boolean(
       widgetType !== "text" &&
-        !(healthIssue?.status === "MISSING_CONNECTION" || healthIssue?.status === "INVALID_QUERY") &&
+        !(healthReason === "MISSING_CONNECTION" || healthReason === "INVALID_QUERY") &&
         (isPublic ? publicToken : brandId) &&
         dateRange.start &&
         dateRange.end &&
@@ -289,19 +291,23 @@ export default function WidgetRenderer({
     );
   }
 
-  if (healthIssue?.status === "MISSING_CONNECTION") {
+  if (healthReason === "MISSING_CONNECTION") {
     const platformLabel = formatPlatformList([healthIssue.platform]);
     return (
       <>
         <WidgetStatusReporter
           widgetId={widget?.id}
-          status="invalid"
+          status="warn"
           reason="MISSING_CONNECTIONS"
           onStatusChange={onStatusChange}
         />
         <WidgetEmptyState
-          title="Conexao pendente"
-          description={`Conecte uma conta de ${platformLabel} para habilitar este grafico.`}
+          title="Dados parcialmente indisponiveis"
+          description={
+            isPublic
+              ? "Dados indisponiveis. Conecte a plataforma para visualizar."
+              : `Dados indisponiveis. Conecte ${platformLabel} para visualizar este grafico.`
+          }
           variant="connection"
           actionLabel={isPublic ? undefined : "Conectar agora"}
           onAction={
@@ -321,7 +327,7 @@ export default function WidgetRenderer({
     );
   }
 
-  if (healthIssue?.status === "INVALID_QUERY") {
+  if (healthReason === "INVALID_QUERY") {
     return (
       <>
         <WidgetStatusReporter

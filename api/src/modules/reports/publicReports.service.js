@@ -5,6 +5,7 @@ const {
   reportLayoutSchema,
   normalizeLayout,
 } = require('../../shared/validators/reportLayout');
+const { computeDashboardHealth } = require('./dashboardHealth.service');
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
@@ -84,6 +85,7 @@ async function getPublicReport(token) {
       groupId: dashboard.groupId || null,
     },
     layoutJson,
+    health: await computeDashboardHealth(dashboard),
     meta: {
       generatedAt: new Date().toISOString(),
     },

@@ -80,6 +80,9 @@ function createFakePrisma() {
         return exportRecord;
       },
     },
+    brandSourceConnection: {
+      findMany: async () => [],
+    },
   };
 
   return { prisma, state };
