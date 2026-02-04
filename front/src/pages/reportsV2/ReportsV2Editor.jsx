@@ -17,12 +17,15 @@ import {
 import DashboardCanvas from "@/components/reports/widgets/DashboardCanvas.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
+import ThemeProvider from "@/components/reportsV2/ThemeProvider.jsx";
 import {
   useDebouncedValue,
   stableStringify,
   normalizeLayoutFront,
   getActivePage,
   generateUuid,
+  normalizeThemeFront,
+  DEFAULT_REPORT_THEME,
 } from "@/components/reportsV2/utils.js";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -38,21 +41,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog.jsx";
 import { cn } from "@/utils/classnames.js";
-import { deriveThemeColors } from "@/utils/theme.js";
 import { base44 } from "@/apiClient/base44Client";
 
 const DEFAULT_LAYOUT = {
-  theme: {
-    mode: "light",
-    brandColor: "#F59E0B",
-    accentColor: "#22C55E",
-    bg: "#FFFFFF",
-    text: "#0F172A",
-    mutedText: "#64748B",
-    cardBg: "#FFFFFF",
-    border: "#E2E8F0",
-    radius: 16,
-  },
+  theme: DEFAULT_REPORT_THEME,
   globalFilters: {
     dateRange: { preset: "last_7_days" },
     platforms: [],
@@ -118,6 +110,8 @@ const FORMAT_OPTIONS = [
   { value: "compact", label: "Compacto" },
 ];
 
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 const WIDGET_PRESETS = {
   kpi: {
     title: "KPI",
@@ -145,32 +139,6 @@ const WIDGET_PRESETS = {
     query: { metrics: ["spend"], dimensions: ["platform"] },
   },
 };
-
-function buildThemeStyle(layout) {
-  const theme = layout?.theme || DEFAULT_LAYOUT.theme;
-  const colors = deriveThemeColors({
-    primary: theme.brandColor,
-    accent: theme.accentColor,
-  });
-
-  return {
-    "--background": theme.bg || "#FFFFFF",
-    "--surface": theme.cardBg || "#FFFFFF",
-    "--surface-muted": "#F8FAFC",
-    "--border": theme.border || "#E2E8F0",
-    "--text": theme.text || "#0F172A",
-    "--text-muted": theme.mutedText || "#64748B",
-    "--primary": colors.primary,
-    "--primary-dark": colors.primaryDark,
-    "--primary-light": colors.primaryLight,
-    "--accent": colors.accent,
-    "--shadow-sm": "0 2px 6px rgba(15, 23, 42, 0.08)",
-    "--shadow-md": "0 18px 32px rgba(15, 23, 42, 0.12)",
-    "--radius-card": "16px",
-    "--radius-button": "16px",
-    "--radius-input": "12px",
-  };
-}
 
 function mergeLayoutDefaults(layout) {
   const normalized = normalizeLayoutFront(layout) || DEFAULT_LAYOUT;
@@ -529,6 +497,12 @@ export default function ReportsV2Editor() {
   const [showHistory, setShowHistory] = React.useState(false);
   const [showRenamePage, setShowRenamePage] = React.useState(false);
   const [pageNameDraft, setPageNameDraft] = React.useState("");
+  const [themeDraft, setThemeDraft] = React.useState(() => ({
+    brandColor: DEFAULT_LAYOUT.theme.brandColor,
+    accentColor: DEFAULT_LAYOUT.theme.accentColor,
+    radius: String(DEFAULT_LAYOUT.theme.radius),
+  }));
+  const [themeFormError, setThemeFormError] = React.useState("");
   const [lastSavedKey, setLastSavedKey] = React.useState("");
   const [hasHydrated, setHasHydrated] = React.useState(false);
   const addMenuRef = React.useRef(null);
@@ -556,6 +530,12 @@ export default function ReportsV2Editor() {
     const merged = mergeLayoutDefaults(layoutFromApi);
     const initialPayload = sanitizeLayoutForSave(merged);
     setLayoutJson(merged);
+    setThemeDraft({
+      brandColor: merged.theme.brandColor,
+      accentColor: merged.theme.accentColor,
+      radius: String(merged.theme.radius),
+    });
+    setThemeFormError("");
     setPreviewFilters(buildInitialFilters(merged));
     const firstPage = Array.isArray(merged.pages) ? merged.pages[0] : null;
     if (firstPage?.id) {
@@ -948,6 +928,43 @@ export default function ReportsV2Editor() {
     }
   };
 
+  const handleApplyDashboardTheme = () => {
+    const brandColor = String(themeDraft.brandColor || "").trim();
+    const accentColor = String(themeDraft.accentColor || "").trim();
+    const radiusRaw = Number(themeDraft.radius);
+
+    if (!HEX_COLOR_RE.test(brandColor) || !HEX_COLOR_RE.test(accentColor)) {
+      setThemeFormError("Use cores validas no formato hexadecimal (#RRGGBB).");
+      return;
+    }
+
+    const radius = Number.isFinite(radiusRaw)
+      ? Math.max(0, Math.min(32, Math.round(radiusRaw)))
+      : DEFAULT_LAYOUT.theme.radius;
+
+    const normalizedTheme = normalizeThemeFront({
+      ...(layoutJson.theme || {}),
+      brandColor,
+      accentColor,
+      radius,
+    });
+
+    setLayoutJson((prev) => ({
+      ...prev,
+      theme: normalizedTheme,
+    }));
+    setThemeDraft({
+      brandColor: normalizedTheme.brandColor,
+      accentColor: normalizedTheme.accentColor,
+      radius: String(normalizedTheme.radius),
+    });
+    setThemeFormError("");
+    setActionMessage({
+      type: "success",
+      text: "Tema aplicado ao dashboard.",
+    });
+  };
+
   const handleChangeWidgetType = (nextType) => {
     if (!selectedWidget) return;
     updateWidget(selectedWidget.id, (widget) => {
@@ -1143,6 +1160,12 @@ export default function ReportsV2Editor() {
     if (!version?.layoutJson) return;
     const merged = mergeLayoutDefaults(version.layoutJson);
     setLayoutJson(merged);
+    setThemeDraft({
+      brandColor: merged.theme.brandColor,
+      accentColor: merged.theme.accentColor,
+      radius: String(merged.theme.radius),
+    });
+    setThemeFormError("");
     setPreviewFilters(buildInitialFilters(merged));
     const firstPage = Array.isArray(merged.pages) ? merged.pages[0] : null;
     if (firstPage?.id) {
@@ -1170,41 +1193,39 @@ export default function ReportsV2Editor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white" style={buildThemeStyle(layoutJson)}>
+      <ThemeProvider theme={layoutJson?.theme} className="min-h-screen bg-[var(--bg)]">
         <div className="mx-auto max-w-[1400px] px-6 py-10">
           <div className="h-6 w-48 rounded-full kondor-shimmer" />
           <div className="mt-6 h-16 rounded-[16px] border border-[var(--border)] kondor-shimmer" />
           <div className="mt-6 h-[420px] rounded-[24px] border border-[var(--border)] kondor-shimmer" />
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
   if (error || !dashboard) {
     return (
-      <div className="min-h-screen bg-white" style={buildThemeStyle(layoutJson)}>
+      <ThemeProvider theme={layoutJson?.theme} className="min-h-screen bg-[var(--bg)]">
         <div className="mx-auto max-w-[1200px] px-6 py-10">
           <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-6 py-5 text-sm text-rose-700">
             Nao foi possivel carregar o dashboard.
           </div>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
   if (!dashboard.latestVersion) {
     return (
-      <div className="min-h-screen bg-white" style={buildThemeStyle(layoutJson)}>
+      <ThemeProvider theme={layoutJson?.theme} className="min-h-screen bg-[var(--bg)]">
         <div className="mx-auto max-w-[1200px] px-6 py-10">
           <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-6 py-5 text-sm text-amber-700">
             Voce nao tem permissao para editar este dashboard.
           </div>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
-
-  const themeStyle = buildThemeStyle(layoutJson);
   const autoSaveLabel = autoSaveEnabled
     ? autoSaveStatus === "saving"
       ? "Salvando..."
@@ -1216,7 +1237,7 @@ export default function ReportsV2Editor() {
     : "Desligado";
 
   return (
-    <div className="min-h-screen bg-white" style={themeStyle}>
+    <ThemeProvider theme={layoutJson?.theme} className="min-h-screen bg-[var(--bg)]">
       <div className="sticky top-0 z-30 border-b border-[var(--border)] bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div className="flex items-center gap-4">
@@ -1732,6 +1753,121 @@ export default function ReportsV2Editor() {
                 Selecione um widget para editar.
               </div>
             )}
+
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-[var(--text)]">
+                  Tema do dashboard
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  Ajuste as cores e o raio para viewer e preview.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="dashboard-theme-brand"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]"
+                  >
+                    Brand color
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="Cor principal do dashboard"
+                      value={HEX_COLOR_RE.test(themeDraft.brandColor) ? themeDraft.brandColor : "#F59E0B"}
+                      onChange={(event) => {
+                        setThemeDraft((prev) => ({
+                          ...prev,
+                          brandColor: event.target.value,
+                        }));
+                        setThemeFormError("");
+                      }}
+                      className="h-10 w-12 cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1"
+                    />
+                    <Input
+                      id="dashboard-theme-brand"
+                      value={themeDraft.brandColor}
+                      onChange={(event) => {
+                        setThemeDraft((prev) => ({
+                          ...prev,
+                          brandColor: event.target.value,
+                        }));
+                        setThemeFormError("");
+                      }}
+                      placeholder="#F59E0B"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="dashboard-theme-accent"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]"
+                  >
+                    Accent color
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="Cor de destaque do dashboard"
+                      value={HEX_COLOR_RE.test(themeDraft.accentColor) ? themeDraft.accentColor : "#22C55E"}
+                      onChange={(event) => {
+                        setThemeDraft((prev) => ({
+                          ...prev,
+                          accentColor: event.target.value,
+                        }));
+                        setThemeFormError("");
+                      }}
+                      className="h-10 w-12 cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1"
+                    />
+                    <Input
+                      id="dashboard-theme-accent"
+                      value={themeDraft.accentColor}
+                      onChange={(event) => {
+                        setThemeDraft((prev) => ({
+                          ...prev,
+                          accentColor: event.target.value,
+                        }));
+                        setThemeFormError("");
+                      }}
+                      placeholder="#22C55E"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="dashboard-theme-radius"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]"
+                  >
+                    Radius (0-32)
+                  </label>
+                  <Input
+                    id="dashboard-theme-radius"
+                    type="number"
+                    min={0}
+                    max={32}
+                    value={themeDraft.radius}
+                    onChange={(event) => {
+                      setThemeDraft((prev) => ({
+                        ...prev,
+                        radius: event.target.value,
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+
+              {themeFormError ? (
+                <p className="mt-3 text-xs text-rose-600">{themeFormError}</p>
+              ) : null}
+
+              <Button className="mt-4 w-full" onClick={handleApplyDashboardTheme}>
+                Aplicar tema
+              </Button>
+            </div>
           </div>
         </aside>
       </div>
@@ -1852,6 +1988,6 @@ export default function ReportsV2Editor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </ThemeProvider>
   );
 }

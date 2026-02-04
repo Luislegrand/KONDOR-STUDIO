@@ -28,7 +28,13 @@ import {
   stableStringify,
 } from "./utils.js";
 
-const CHART_COLORS = ["#1f6feb", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
+const CHART_COLORS = [
+  "var(--primary)",
+  "var(--accent)",
+  "#1f6feb",
+  "var(--danger)",
+  "#8b5cf6",
+];
 const PERCENT_METRICS = new Set(["ctr"]);
 const RATIO_METRICS = new Set(["roas"]);
 const CURRENCY_METRICS = new Set(["spend", "revenue", "cpc", "cpm", "cpa"]);
@@ -84,8 +90,8 @@ function formatMetricValue(metricKey, value, meta, formatOverride = "auto") {
 function ChartTooltip({ active, payload, label, meta, formatOverride }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[12px] border border-[var(--border)] bg-white px-3 py-2 text-xs shadow-[var(--shadow-sm)]">
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs shadow-[var(--shadow-sm)]">
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
         {label}
       </p>
       <div className="space-y-1">
@@ -304,16 +310,16 @@ export default function WidgetRenderer({
     const value = getKpiValue(rows, totals, metric, dimensions);
     return (
       <div className="flex h-full flex-col justify-between gap-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
           {metric}
         </div>
         <div className="text-3xl font-semibold text-[var(--text)]">
           {formatMetricValue(metric, value, meta, formatOverride)}
         </div>
         {isFetching ? (
-          <div className="text-xs text-[var(--text-muted)]">Atualizando...</div>
+          <div className="text-xs text-[var(--muted)]">Atualizando...</div>
         ) : (
-          <div className="text-xs text-[var(--text-muted)]">Atualizado agora</div>
+          <div className="text-xs text-[var(--muted)]">Atualizado agora</div>
         )}
       </div>
     );
@@ -383,12 +389,12 @@ export default function WidgetRenderer({
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="sticky top-0 bg-white">
+            <thead className="sticky top-0 bg-[var(--card)]">
               <tr className="border-b border-[var(--border)]">
                 {columns.map((col) => (
                   <th
                     key={col}
-                    className="px-3 py-2 text-xs font-semibold uppercase text-[var(--text-muted)]"
+                    className="px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]"
                   >
                     {col}
                   </th>
@@ -419,14 +425,14 @@ export default function WidgetRenderer({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           {showTotals ? (
-            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Totais
               </div>
               <div className="mt-1 flex flex-wrap gap-3">
                 {metrics.map((metric) => (
                   <div key={`total-${metric}`} className="text-[var(--text)]">
-                    <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--text-muted)]">
+                    <span className="mr-1 text-[11px] font-semibold uppercase text-[var(--muted)]">
                       {metric}
                     </span>
                     {formatMetricValue(metric, totals?.[metric], meta, formatOverride)}
@@ -436,7 +442,7 @@ export default function WidgetRenderer({
             </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
             <label
               className="text-[11px] font-semibold uppercase tracking-[0.2em]"
               htmlFor={`page-size-${widget?.id || "table"}`}
@@ -450,7 +456,7 @@ export default function WidgetRenderer({
                 setPageSize(Number(event.target.value));
                 setPageIndex(0);
               }}
-              className="rounded-[10px] border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text)]"
+              className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)]"
             >
               {pageOptions.map((option) => (
                 <option key={option} value={option}>
@@ -459,7 +465,7 @@ export default function WidgetRenderer({
               ))}
             </select>
 
-            <div className="text-xs text-[var(--text-muted)]">
+            <div className="text-xs text-[var(--muted)]">
               Pagina {currentPage}
             </div>
 
@@ -467,7 +473,7 @@ export default function WidgetRenderer({
               type="button"
               onClick={() => setPageIndex((prev) => Math.max(prev - 1, 0))}
               disabled={pageIndex === 0}
-              className="rounded-[10px] border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Anterior
             </button>
@@ -475,7 +481,7 @@ export default function WidgetRenderer({
               type="button"
               onClick={() => setPageIndex((prev) => prev + 1)}
               disabled={!pageInfo?.hasMore}
-              className="rounded-[10px] border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Proximo
             </button>

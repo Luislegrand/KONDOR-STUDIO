@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_REPORT_THEME,
   reportLayoutSchema,
   normalizeLayout,
 } = require('../src/shared/validators/reportLayout.js');
@@ -82,6 +83,19 @@ test('normalizeLayout wraps legacy widgets into a page', () => {
   assert.equal(normalized.pages.length, 1);
   assert.equal(normalized.pages[0].name, 'Pagina 1');
   assert.equal(normalized.pages[0].widgets.length, 1);
+});
+
+test('reportLayoutSchema applies default theme when theme is missing', () => {
+  const base = buildBaseLayout();
+  const result = reportLayoutSchema.safeParse({
+    globalFilters: base.globalFilters,
+    widgets: base.widgets,
+  });
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data.theme, DEFAULT_REPORT_THEME);
+
+  const normalized = normalizeLayout(result.data);
+  assert.deepEqual(normalized.theme, DEFAULT_REPORT_THEME);
 });
 
 test('reportLayoutSchema rejects duplicate widget ids', () => {
@@ -236,6 +250,18 @@ test('reportLayoutSchema rejects invalid autoRefreshSec', () => {
       accounts: [],
       compareTo: null,
       autoRefreshSec: 15,
+    },
+  });
+  const result = reportLayoutSchema.safeParse(base);
+  assert.equal(result.success, false);
+});
+
+test('reportLayoutSchema rejects theme radius above max', () => {
+  const current = buildBaseLayout();
+  const base = buildBaseLayout({
+    theme: {
+      ...current.theme,
+      radius: 99,
     },
   });
   const result = reportLayoutSchema.safeParse(base);

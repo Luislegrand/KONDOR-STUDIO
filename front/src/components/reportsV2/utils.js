@@ -1,5 +1,45 @@
 import { useEffect, useState } from "react";
 
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export const DEFAULT_REPORT_THEME = Object.freeze({
+  mode: "light",
+  brandColor: "#F59E0B",
+  accentColor: "#22C55E",
+  bg: "#FFFFFF",
+  text: "#0F172A",
+  mutedText: "#64748B",
+  cardBg: "#FFFFFF",
+  border: "#E2E8F0",
+  radius: 16,
+});
+
+function normalizeHexColor(value, fallback) {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!HEX_COLOR_RE.test(trimmed)) return fallback;
+  return trimmed.length === 4
+    ? `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`.toUpperCase()
+    : trimmed.toUpperCase();
+}
+
+export function normalizeThemeFront(theme) {
+  return {
+    mode: "light",
+    brandColor: normalizeHexColor(theme?.brandColor, DEFAULT_REPORT_THEME.brandColor),
+    accentColor: normalizeHexColor(theme?.accentColor, DEFAULT_REPORT_THEME.accentColor),
+    bg: normalizeHexColor(theme?.bg, DEFAULT_REPORT_THEME.bg),
+    text: normalizeHexColor(theme?.text, DEFAULT_REPORT_THEME.text),
+    mutedText: normalizeHexColor(theme?.mutedText, DEFAULT_REPORT_THEME.mutedText),
+    cardBg: normalizeHexColor(theme?.cardBg, DEFAULT_REPORT_THEME.cardBg),
+    border: normalizeHexColor(theme?.border, DEFAULT_REPORT_THEME.border),
+    radius: Math.max(
+      0,
+      Math.min(32, Number.isFinite(Number(theme?.radius)) ? Number(theme.radius) : DEFAULT_REPORT_THEME.radius)
+    ),
+  };
+}
+
 export function toDateKey(date) {
   if (!(date instanceof Date)) return "";
   return date.toISOString().slice(0, 10);
@@ -62,7 +102,7 @@ export function generateUuid() {
 
 export function normalizeLayoutFront(layout) {
   if (!layout || typeof layout !== "object") return null;
-  const theme = layout.theme || {};
+  const theme = normalizeThemeFront(layout.theme || {});
   const globalFilters = layout.globalFilters || {};
 
   const normalizePage = (page, index) => ({

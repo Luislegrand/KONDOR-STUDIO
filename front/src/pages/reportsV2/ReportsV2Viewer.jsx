@@ -16,30 +16,13 @@ import {
 import Toast from "@/components/ui/toast.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
+import ThemeProvider from "@/components/reportsV2/ThemeProvider.jsx";
 import { base44 } from "@/apiClient/base44Client";
 import {
   useDebouncedValue,
   normalizeLayoutFront,
-  getActivePage,
 } from "@/components/reportsV2/utils.js";
 import useToast from "@/hooks/useToast.js";
-
-const themeStyle = {
-  "--background": "#FFFFFF",
-  "--surface": "#FFFFFF",
-  "--surface-muted": "#F8FAFC",
-  "--border": "#E2E8F0",
-  "--text": "#0F172A",
-  "--text-muted": "#64748B",
-  "--primary": "#F59E0B",
-  "--primary-dark": "#D97706",
-  "--accent": "#22C55E",
-  "--shadow-sm": "0 2px 6px rgba(15, 23, 42, 0.08)",
-  "--shadow-md": "0 18px 32px rgba(15, 23, 42, 0.12)",
-  "--radius-card": "16px",
-  "--radius-button": "16px",
-  "--radius-input": "12px",
-};
 
 function buildInitialFilters(layout) {
   const base = {
@@ -188,36 +171,36 @@ export default function ReportsV2Viewer() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white" style={themeStyle}>
+      <ThemeProvider theme={normalizedLayout?.theme} className="min-h-screen bg-[var(--bg)]">
         <PageShell>
           <div className="h-6 w-40 rounded-full kondor-shimmer" />
           <div className="mt-6 h-32 rounded-[16px] border border-[var(--border)] kondor-shimmer" />
           <div className="mt-6 h-64 rounded-[16px] border border-[var(--border)] kondor-shimmer" />
         </PageShell>
-      </div>
+      </ThemeProvider>
     );
   }
 
   if (error || !dashboard) {
     return (
-      <div className="min-h-screen bg-white" style={themeStyle}>
+      <ThemeProvider theme={normalizedLayout?.theme} className="min-h-screen bg-[var(--bg)]">
         <PageShell>
           <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-6 py-5 text-sm text-rose-700">
             Dashboard nao encontrado.
           </div>
         </PageShell>
-      </div>
+      </ThemeProvider>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white" style={themeStyle}>
+    <ThemeProvider theme={normalizedLayout?.theme} className="min-h-screen bg-[var(--bg)]">
       <PageShell>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <button
               type="button"
-              className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]"
+              className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]"
               onClick={() => navigate("/relatorios/v2")}
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -226,7 +209,7 @@ export default function ReportsV2Viewer() {
             <h1 className="text-2xl font-semibold text-[var(--text)]">
               {dashboard.name}
             </h1>
-            <p className="text-sm text-[var(--text-muted)]">
+            <p className="text-sm text-[var(--muted)]">
               {dashboard.status === "PUBLISHED" ? "Publicado" : "Rascunho"}
             </p>
           </div>
@@ -267,7 +250,7 @@ export default function ReportsV2Viewer() {
                 <div
                   role="tablist"
                   aria-label="Paginas do dashboard"
-                  className="mb-4 flex flex-wrap gap-2 rounded-[16px] border border-[var(--border)] bg-white p-2"
+                  className="mb-4 flex flex-wrap gap-2 rounded-[16px] border border-[var(--border)] bg-[var(--card)] p-2"
                 >
                   {pages.map((page) => (
                     <button
@@ -277,8 +260,8 @@ export default function ReportsV2Viewer() {
                       aria-selected={page.id === activePageId}
                       className={
                         page.id === activePageId
-                          ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-                          : "rounded-[12px] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                        ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                          : "rounded-[12px] px-4 py-2 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                       }
                       onClick={() => setActivePageId(page.id)}
                     >
@@ -296,7 +279,7 @@ export default function ReportsV2Viewer() {
             />
             </>
           ) : (
-            <div className="rounded-[16px] border border-[var(--border)] bg-white px-6 py-5 text-sm text-[var(--text-muted)]">
+            <div className="rounded-[16px] border border-[var(--border)] bg-[var(--card)] px-6 py-5 text-sm text-[var(--muted)]">
               Layout nao encontrado para este dashboard.
             </div>
           )}
@@ -313,7 +296,7 @@ export default function ReportsV2Viewer() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-xs text-[var(--text-muted)]">
+            <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-xs text-[var(--muted)]">
               Status:{" "}
               <span className="font-semibold text-[var(--text)]">
                 {shareEnabled ? "Link ativo" : "Compartilhamento desligado"}
@@ -321,7 +304,7 @@ export default function ReportsV2Viewer() {
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Link publico
               </label>
               <Input
@@ -372,6 +355,6 @@ export default function ReportsV2Viewer() {
       </Dialog>
 
       <Toast toast={toast} />
-    </div>
+    </ThemeProvider>
   );
 }

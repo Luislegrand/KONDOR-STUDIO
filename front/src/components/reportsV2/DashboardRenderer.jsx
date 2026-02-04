@@ -50,7 +50,7 @@ export default function DashboardRenderer({
       {widgets.map((widget) => (
         <div
           key={widget.id}
-          className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]"
+          className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-sm)]"
           style={buildGridStyle(widget.layout)}
         >
           <div className="mb-3 flex items-center justify-between">
@@ -58,7 +58,7 @@ export default function DashboardRenderer({
               <p className="text-sm font-semibold text-[var(--text)]">
                 {widget.title}
               </p>
-              <p className="text-xs text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--muted)]">
                 {String(widget.type || "").toUpperCase()}
               </p>
             </div>

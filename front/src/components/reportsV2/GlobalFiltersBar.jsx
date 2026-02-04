@@ -33,15 +33,15 @@ export default function GlobalFiltersBar({
   };
 
   return (
-    <FilterBar className={cn("gap-5 bg-white", className)}>
+    <FilterBar className={cn("gap-5 bg-[var(--card)]", className)}>
       <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-        <Filter className="h-4 w-4 text-[var(--text-muted)]" />
+        <Filter className="h-4 w-4 text-[var(--muted)]" />
         Filtros globais
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[180px]">
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             Periodo
           </label>
           <Select
@@ -72,7 +72,7 @@ export default function GlobalFiltersBar({
         {preset === "custom" ? (
           <>
             <div className="min-w-[160px]">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Inicio
               </label>
               <DateField
@@ -87,7 +87,7 @@ export default function GlobalFiltersBar({
               />
             </div>
             <div className="min-w-[160px]">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 Fim
               </label>
               <DateField
@@ -105,7 +105,7 @@ export default function GlobalFiltersBar({
         ) : null}
 
         <div className="min-w-[200px]">
-          <label className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          <label className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             <Calendar className="h-3.5 w-3.5" />
             Plataformas
           </label>
@@ -121,7 +121,7 @@ export default function GlobalFiltersBar({
                     "rounded-full border px-3 py-1 text-xs font-semibold transition",
                     active
                       ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
-                      : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-slate-300"
+                      : "border-[var(--border)] bg-[var(--card)] text-[var(--muted)] hover:border-slate-300"
                   )}
                 >
                   {platform.label}
@@ -132,7 +132,7 @@ export default function GlobalFiltersBar({
         </div>
 
         <div className="min-w-[180px]">
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             Comparacao
           </label>
           <Select
@@ -156,7 +156,7 @@ export default function GlobalFiltersBar({
         </div>
 
         <div className="min-w-[160px]">
-          <label className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          <label className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             <RefreshCw className="h-3.5 w-3.5" />
             Auto refresh
           </label>

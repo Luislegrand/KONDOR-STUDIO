@@ -4,17 +4,29 @@ const { z } = require('zod');
 const hexColor = z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
 const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+const DEFAULT_REPORT_THEME = Object.freeze({
+  mode: 'light',
+  brandColor: '#F59E0B',
+  accentColor: '#22C55E',
+  bg: '#FFFFFF',
+  text: '#0F172A',
+  mutedText: '#64748B',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  radius: 16,
+});
+
 const themeSchema = z
   .object({
-    mode: z.enum(['light']),
-    brandColor: hexColor,
-    accentColor: hexColor,
-    bg: hexColor,
-    text: hexColor,
-    mutedText: hexColor,
-    cardBg: hexColor,
-    border: hexColor,
-    radius: z.number().int().nonnegative(),
+    mode: z.enum(['light']).default('light'),
+    brandColor: hexColor.default(DEFAULT_REPORT_THEME.brandColor),
+    accentColor: hexColor.default(DEFAULT_REPORT_THEME.accentColor),
+    bg: hexColor.default(DEFAULT_REPORT_THEME.bg),
+    text: hexColor.default(DEFAULT_REPORT_THEME.text),
+    mutedText: hexColor.default(DEFAULT_REPORT_THEME.mutedText),
+    cardBg: hexColor.default(DEFAULT_REPORT_THEME.cardBg),
+    border: hexColor.default(DEFAULT_REPORT_THEME.border),
+    radius: z.number().int().min(0).max(32).default(DEFAULT_REPORT_THEME.radius),
   })
   .strict();
 
@@ -194,7 +206,7 @@ const pageSchema = z
 
 const reportLayoutSchema = z
   .object({
-    theme: themeSchema,
+    theme: themeSchema.default(DEFAULT_REPORT_THEME),
     globalFilters: globalFiltersSchema,
     pages: z.array(pageSchema).optional(),
     widgets: z.array(widgetSchema).optional(),
@@ -287,9 +299,12 @@ function generateUuid() {
 }
 
 function normalizeLayout(parsedLayout) {
+  const parsedTheme = themeSchema.safeParse(parsedLayout?.theme || {});
+  const theme = parsedTheme.success ? parsedTheme.data : DEFAULT_REPORT_THEME;
+
   if (Array.isArray(parsedLayout.pages) && parsedLayout.pages.length) {
     return {
-      theme: parsedLayout.theme,
+      theme,
       globalFilters: parsedLayout.globalFilters,
       pages: parsedLayout.pages.map((page) => ({
         id: page.id,
@@ -301,7 +316,7 @@ function normalizeLayout(parsedLayout) {
 
   const widgets = Array.isArray(parsedLayout.widgets) ? parsedLayout.widgets : [];
   return {
-    theme: parsedLayout.theme,
+    theme,
     globalFilters: parsedLayout.globalFilters,
     pages: [
       {
@@ -318,6 +333,7 @@ function validateReportLayout(payload) {
 }
 
 module.exports = {
+  DEFAULT_REPORT_THEME,
   reportLayoutSchema,
   validateReportLayout,
   normalizeLayout,
