@@ -21,6 +21,7 @@ function createFakePrisma() {
     dashboards: [],
     versions: [],
     publicShares: [],
+    exports: [],
   };
 
   const prisma = {
@@ -51,7 +52,33 @@ function createFakePrisma() {
       },
     },
     reportDashboardExport: {
-      findFirst: async () => null,
+      findFirst: async ({ where, include }) => {
+        const allowedStatuses = where?.status?.in || null;
+        const found = state.exports.find((item) => {
+          if (where?.publicTokenHash && item.publicTokenHash !== where.publicTokenHash) {
+            return false;
+          }
+          if (allowedStatuses && !allowedStatuses.includes(item.status)) return false;
+          return true;
+        });
+        if (!found) return null;
+        const exportRecord = { ...found };
+        if (include?.dashboard) {
+          const dashboard = state.dashboards.find((item) => item.id === found.dashboardId);
+          if (!dashboard) {
+            exportRecord.dashboard = null;
+            return exportRecord;
+          }
+          const dashboardResult = { ...dashboard };
+          if (include.dashboard.include?.publishedVersion) {
+            dashboardResult.publishedVersion =
+              state.versions.find((version) => version.id === dashboard.publishedVersionId) ||
+              null;
+          }
+          exportRecord.dashboard = dashboardResult;
+        }
+        return exportRecord;
+      },
     },
   };
 
@@ -254,4 +281,78 @@ test('old token is invalid after rotation while new active token works', async (
   const newRes = await request(app).get(`/api/public/reports/${newToken}`);
   assert.equal(newRes.status, 200);
   assert.equal(newRes.body?.dashboard?.name, 'Rotacionado');
+});
+
+test('public report resolves with valid temporary export token', async () => {
+  const { app, state } = buildApp();
+  const token = 'export-token-valid';
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const versionId = randomUUID();
+  const dashboardId = randomUUID();
+
+  state.versions.push({
+    id: versionId,
+    layoutJson: { widgets: [], theme: {}, globalFilters: {} },
+  });
+
+  state.dashboards.push({
+    id: dashboardId,
+    tenantId: 'tenant-5',
+    brandId: 'brand-5',
+    name: 'Export Temp',
+    status: 'PUBLISHED',
+    publishedVersionId: versionId,
+  });
+
+  state.exports.push({
+    id: randomUUID(),
+    tenantId: 'tenant-5',
+    dashboardId,
+    status: 'PROCESSING',
+    format: 'PDF',
+    publicTokenHash: tokenHash,
+    publicTokenExpiresAt: new Date(Date.now() + 60_000),
+    meta: { purpose: 'pdf_temp_export' },
+  });
+
+  const res = await request(app).get(`/api/public/reports/${token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body?.dashboard?.name, 'Export Temp');
+});
+
+test('public report rejects expired temporary export token', async () => {
+  const { app, state } = buildApp();
+  const token = 'export-token-expired';
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const versionId = randomUUID();
+  const dashboardId = randomUUID();
+
+  state.versions.push({
+    id: versionId,
+    layoutJson: { widgets: [], theme: {}, globalFilters: {} },
+  });
+
+  state.dashboards.push({
+    id: dashboardId,
+    tenantId: 'tenant-6',
+    brandId: 'brand-6',
+    name: 'Export Temp Expired',
+    status: 'PUBLISHED',
+    publishedVersionId: versionId,
+  });
+
+  state.exports.push({
+    id: randomUUID(),
+    tenantId: 'tenant-6',
+    dashboardId,
+    status: 'PROCESSING',
+    format: 'PDF',
+    publicTokenHash: tokenHash,
+    publicTokenExpiresAt: new Date(Date.now() - 60_000),
+    meta: { purpose: 'pdf_temp_export' },
+  });
+
+  const res = await request(app).get(`/api/public/reports/${token}`);
+  assert.equal(res.status, 404);
+  assert.equal(res.body?.error?.code, 'PUBLIC_REPORT_NOT_FOUND');
 });

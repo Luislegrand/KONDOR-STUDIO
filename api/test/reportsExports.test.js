@@ -15,6 +15,88 @@ function resetModule(path) {
   delete require.cache[resolved];
 }
 
+function buildExportServiceHarness(options = {}) {
+  const createCalls = [];
+  const updateCalls = [];
+
+  mockModule('../src/prisma', {
+    prisma: {
+      reportDashboard: {
+        findFirst: async () => ({
+          id: 'dashboard-1',
+          tenantId: 'tenant-1',
+          name: 'Dashboard Exportavel',
+          status: 'PUBLISHED',
+          publishedVersionId: 'version-1',
+          publishedVersion: { id: 'version-1' },
+        }),
+      },
+      reportDashboardExport: {
+        create: async ({ data }) => {
+          createCalls.push(data);
+          return {
+            id: 'export-temp-1',
+            ...data,
+            meta: data.meta || null,
+          };
+        },
+        update: async ({ data }) => {
+          updateCalls.push(data);
+          return {
+            id: 'export-temp-1',
+            ...data,
+          };
+        },
+      },
+      upload: {
+        create: async () => ({ id: 'upload-1' }),
+      },
+    },
+  });
+
+  mockModule('../src/services/uploadsService', {
+    uploadBuffer: async () => ({ key: 'key', url: 'https://files.example.com/file.pdf' }),
+  });
+
+  const page = {
+    goto: async () => {},
+    waitForFunction: async () => {},
+    waitForTimeout: async () => {},
+    pdf: async () => {
+      if (options.failPdfGeneration) throw new Error('pdf-fail');
+      return Buffer.from('pdf-bytes');
+    },
+    close: async () => {},
+  };
+  const browser = {
+    newPage: async () => page,
+    close: async () => {},
+  };
+  const playwrightResolved = require.resolve('playwright');
+  const previousPlaywright = require.cache[playwrightResolved];
+  require.cache[playwrightResolved] = {
+    exports: {
+      chromium: {
+        launch: async () => browser,
+      },
+    },
+  };
+
+  resetModule('../src/modules/reports/exports.service');
+  const service = require('../src/modules/reports/exports.service');
+
+  function restore() {
+    if (previousPlaywright) {
+      require.cache[playwrightResolved] = previousPlaywright;
+    } else {
+      delete require.cache[playwrightResolved];
+    }
+    resetModule('../src/modules/reports/exports.service');
+  }
+
+  return { service, createCalls, updateCalls, restore };
+}
+
 function buildApp(options = {}) {
   const userRole = options.userRole || 'ADMIN';
   const serviceMock =
@@ -134,4 +216,54 @@ test('export-pdf requires editor permissions', async () => {
     .send({});
 
   assert.equal(res.status, 403);
+});
+
+test('exportDashboardPdf persists temporary token expiry and clears token after success', async () => {
+  const { service, createCalls, updateCalls, restore } = buildExportServiceHarness();
+  try {
+    const result = await service.exportDashboardPdf(
+      'tenant-1',
+      'user-1',
+      'dashboard-1',
+      { page: 'current', orientation: 'portrait' },
+    );
+
+    assert.equal(Buffer.from(result.buffer).toString('utf8'), 'pdf-bytes');
+    assert.equal(createCalls.length, 1);
+    assert.ok(createCalls[0].publicTokenHash);
+    assert.ok(createCalls[0].publicTokenExpiresAt instanceof Date);
+
+    const finalUpdate = updateCalls[updateCalls.length - 1];
+    assert.equal(finalUpdate.status, 'READY');
+    assert.equal(finalUpdate.publicTokenHash, null);
+    assert.equal(finalUpdate.publicTokenExpiresAt, null);
+    assert.ok(finalUpdate.publicTokenUsedAt instanceof Date);
+  } finally {
+    restore();
+  }
+});
+
+test('exportDashboardPdf invalidates temporary token when generation fails', async () => {
+  const { service, createCalls, updateCalls, restore } = buildExportServiceHarness({
+    failPdfGeneration: true,
+  });
+  try {
+    await assert.rejects(
+      () =>
+        service.exportDashboardPdf('tenant-1', 'user-1', 'dashboard-1', {
+          page: 'current',
+          orientation: 'portrait',
+        }),
+      /pdf-fail/,
+    );
+
+    assert.equal(createCalls.length, 1);
+    const finalUpdate = updateCalls[updateCalls.length - 1];
+    assert.equal(finalUpdate.status, 'ERROR');
+    assert.equal(finalUpdate.publicTokenHash, null);
+    assert.equal(finalUpdate.publicTokenExpiresAt, null);
+    assert.ok(finalUpdate.publicTokenUsedAt instanceof Date);
+  } finally {
+    restore();
+  }
 });

@@ -165,6 +165,7 @@ async function exportDashboardPdf(tenantId, userId, dashboardId, options = {}) {
       status: 'PROCESSING',
       format: 'PDF',
       publicTokenHash: tokenHash,
+      publicTokenExpiresAt: expiresAt,
       meta: {
         purpose: 'pdf_temp_export',
         expiresAt: expiresAt.toISOString(),
@@ -185,6 +186,8 @@ async function exportDashboardPdf(tenantId, userId, dashboardId, options = {}) {
       data: {
         status: 'READY',
         publicTokenHash: null,
+        publicTokenExpiresAt: null,
+        publicTokenUsedAt: new Date(),
         meta: {
           ...(exportRecord.meta || {}),
           purpose: 'pdf_temp_export',
@@ -204,6 +207,8 @@ async function exportDashboardPdf(tenantId, userId, dashboardId, options = {}) {
       data: {
         status: 'ERROR',
         publicTokenHash: null,
+        publicTokenExpiresAt: null,
+        publicTokenUsedAt: new Date(),
         meta: {
           ...(exportRecord.meta || {}),
           purpose: 'pdf_temp_export',
@@ -238,6 +243,7 @@ async function createDashboardExport(tenantId, dashboardId, options = {}) {
 
   const token = generateToken();
   const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
   const exportRecord = await prisma.reportDashboardExport.create({
     data: {
@@ -246,6 +252,7 @@ async function createDashboardExport(tenantId, dashboardId, options = {}) {
       status: 'PROCESSING',
       format: String(options.format || 'PDF').toUpperCase(),
       publicTokenHash: tokenHash,
+      publicTokenExpiresAt: expiresAt,
     },
   });
 
@@ -291,6 +298,9 @@ async function createDashboardExport(tenantId, dashboardId, options = {}) {
       data: {
         status: 'READY',
         fileId: uploadRecord.id,
+        publicTokenHash: null,
+        publicTokenExpiresAt: null,
+        publicTokenUsedAt: new Date(),
         meta: {
           generatedAt: new Date().toISOString(),
           filename,
@@ -309,6 +319,9 @@ async function createDashboardExport(tenantId, dashboardId, options = {}) {
       where: { id: exportRecord.id },
       data: {
         status: 'ERROR',
+        publicTokenHash: null,
+        publicTokenExpiresAt: null,
+        publicTokenUsedAt: new Date(),
         meta: {
           error: err?.message || 'Falha ao gerar PDF',
         },

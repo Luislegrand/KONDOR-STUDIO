@@ -1125,6 +1125,8 @@ model ReportDashboardExport {
   fileId         String?
   file           Upload?           @relation("ReportDashboardExportFile", fields: [fileId], references: [id], onDelete: SetNull)
   publicTokenHash String?
+  publicTokenExpiresAt DateTime?
+  publicTokenUsedAt DateTime?
   meta           Json?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -1133,6 +1135,7 @@ model ReportDashboardExport {
   @@index([dashboardId])
   @@index([status])
   @@index([publicTokenHash])
+  @@index([publicTokenExpiresAt])
   @@map("report_dashboard_export")
 }
 

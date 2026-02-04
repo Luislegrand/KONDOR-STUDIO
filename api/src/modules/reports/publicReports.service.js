@@ -48,12 +48,12 @@ async function resolveDashboardByToken(token) {
 
   if (!exportRecord?.dashboard) return null;
 
-  const expiresAtRaw = exportRecord?.meta?.expiresAt;
-  if (expiresAtRaw) {
-    const expiresAt = new Date(expiresAtRaw);
-    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()) {
-      return null;
-    }
+  const expiresAt =
+    exportRecord.publicTokenExpiresAt ||
+    (exportRecord?.meta?.expiresAt ? new Date(exportRecord.meta.expiresAt) : null);
+
+  if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+    return null;
   }
 
   return { dashboard: exportRecord.dashboard, source: 'export', export: exportRecord };
