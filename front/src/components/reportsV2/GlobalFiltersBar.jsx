@@ -1,5 +1,5 @@
 import React from "react";
-import { Filter, Calendar, RefreshCw, UserRound } from "lucide-react";
+import { Filter, Calendar, RefreshCw, UserRound, ChevronDown, ChevronUp } from "lucide-react";
 import { FilterBar } from "@/components/ui/filter-bar.jsx";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
 import { DateField } from "@/components/ui/date-field.jsx";
@@ -31,6 +31,8 @@ export default function GlobalFiltersBar({
   onChange,
   controls,
   className = "",
+  collapsible = true,
+  defaultCollapsed = false,
 }) {
   const platforms = Array.isArray(filters?.platforms) ? filters.platforms : [];
   const compareTo = filters?.compareTo || "none";
@@ -59,6 +61,7 @@ export default function GlobalFiltersBar({
     platforms[0] ||
     (typeof accounts[0] === "object" ? accounts[0]?.platform : null) ||
     "META_ADS";
+  const [collapsed, setCollapsed] = React.useState(Boolean(defaultCollapsed));
 
   const togglePlatform = (value) => {
     const next = platforms.includes(value)
@@ -79,13 +82,26 @@ export default function GlobalFiltersBar({
   };
 
   return (
-    <FilterBar className={cn("gap-5 bg-[var(--card)]", className)}>
-      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-        <Filter className="h-4 w-4 text-[var(--muted)]" />
-        Filtros globais
+    <FilterBar className={cn("gap-4 bg-[var(--card)]", className)}>
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+          <Filter className="h-4 w-4 text-[var(--muted)]" />
+          Filtros globais
+        </div>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+          >
+            {collapsed ? "Expandir" : "Recolher"}
+            {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          </button>
+        ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      {!collapsed ? (
+        <div className="flex flex-wrap items-end gap-3">
         {effectiveControls.showDateRange !== false ? (
           <>
             <div className="min-w-[180px]">
@@ -254,7 +270,12 @@ export default function GlobalFiltersBar({
             </SelectContent>
           </Select>
         </div>
-      </div>
+        </div>
+      ) : (
+        <div className="text-xs text-[var(--muted)]">
+          Filtros recolhidos. Clique em "Expandir" para ajustar data, plataforma e contas.
+        </div>
+      )}
     </FilterBar>
   );
 }

@@ -16,7 +16,9 @@ export default function StylePanel({
   widget,
   formatOptions,
   onTitleChange,
+  onShowTitleChange,
   onShowLegendChange,
+  onGridlinesChange,
   onFormatChange,
   onTextContentChange,
   onVariantChange,
@@ -65,9 +67,12 @@ export default function StylePanel({
     ? widget.viz.format
     : "auto";
   const isPieLike = widget.type === "pie" || widget.type === "donut";
+  const isChartWithGrid = widget.type === "timeseries" || widget.type === "bar";
   const variantValue =
     widget?.viz?.variant === "donut" || widget.type === "donut" ? "donut" : "pie";
   const showOthers = widget?.viz?.options?.showOthers !== false;
+  const showTitle = widget?.viz?.options?.showTitle !== false;
+  const showGrid = widget?.viz?.options?.showGrid !== false;
 
   if (widget.type === "text") {
     return (
@@ -108,6 +113,21 @@ export default function StylePanel({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text)]">
+            Mostrar titulo
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">
+            Exibe titulo no card do viewer.
+          </p>
+        </div>
+        <Checkbox
+          checked={showTitle}
+          onCheckedChange={(checked) => onShowTitleChange(Boolean(checked))}
+        />
+      </div>
+
       <div>
         <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
           Titulo do widget
@@ -117,6 +137,7 @@ export default function StylePanel({
           onChange={(event) => setTitleDraft(event.target.value)}
           onBlur={commitTitle}
           placeholder="Nome do widget"
+          disabled={!showTitle}
         />
       </div>
 
@@ -133,6 +154,23 @@ export default function StylePanel({
           <Checkbox
             checked={widget.viz?.showLegend !== false}
             onCheckedChange={(checked) => onShowLegendChange(Boolean(checked))}
+          />
+        </div>
+      ) : null}
+
+      {isChartWithGrid ? (
+        <div className="flex items-center justify-between rounded-[12px] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+          <div>
+            <p className="text-sm font-semibold text-[var(--text)]">
+              Gridlines
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Mostra linhas de grade no grafico.
+            </p>
+          </div>
+          <Checkbox
+            checked={showGrid}
+            onCheckedChange={(checked) => onGridlinesChange(Boolean(checked))}
           />
         </div>
       ) : null}

@@ -532,7 +532,7 @@ function EditorWidgetCard({
         if (event.key === "Enter") onSelect(widget.id);
       }}
       className={cn(
-        "group flex h-full flex-col justify-between rounded-[16px] border bg-white p-4 text-left shadow-[var(--shadow-sm)] transition",
+        "group flex h-full flex-col justify-between rounded-[16px] border bg-white p-4 text-left shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]",
         selected
           ? "border-[var(--primary)] ring-2 ring-[var(--primary-light)]"
           : "border-[var(--border)] hover:border-slate-300",
@@ -1651,6 +1651,35 @@ export default function ReportsV2Editor() {
     });
   };
 
+  const handleShowTitleChange = (checked) => {
+    if (!selectedWidget) return;
+    updateWidget(selectedWidget.id, (widget) => ({
+      ...widget,
+      viz: {
+        ...(widget.viz || {}),
+        options: {
+          ...(widget?.viz?.options || {}),
+          showTitle: Boolean(checked),
+        },
+      },
+    }));
+  };
+
+  const handleGridlinesChange = (checked) => {
+    if (!selectedWidget) return;
+    if (selectedWidget.type !== "timeseries" && selectedWidget.type !== "bar") return;
+    updateWidget(selectedWidget.id, (widget) => ({
+      ...widget,
+      viz: {
+        ...(widget.viz || {}),
+        options: {
+          ...(widget?.viz?.options || {}),
+          showGrid: Boolean(checked),
+        },
+      },
+    }));
+  };
+
   const handleFormatChange = (value) => {
     if (!selectedWidget) return;
     updateWidget(selectedWidget.id, {
@@ -1976,7 +2005,7 @@ export default function ReportsV2Editor() {
                     aria-selected={page.id === activePageId}
                     className={
                       page.id === activePageId
-                        ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                        ? "rounded-[12px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                         : "rounded-[12px] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                     }
                     onClick={() => setActivePageId(page.id)}
@@ -2044,7 +2073,7 @@ export default function ReportsV2Editor() {
           ) : null}
 
           <div
-            className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4"
+            className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4"
             style={{
               minHeight: "520px",
               backgroundImage:
@@ -2139,14 +2168,16 @@ export default function ReportsV2Editor() {
             onSortChange={handleSortChange}
             onLimitChange={handleLimitChange}
             onTitleChange={handleTitleChange}
+            onShowTitleChange={handleShowTitleChange}
             onShowLegendChange={handleShowLegendChange}
+            onGridlinesChange={handleGridlinesChange}
             onFormatChange={handleFormatChange}
             onTextContentChange={handleTextContentChange}
             onVariantChange={handleVariantChange}
             onPieOptionsChange={handlePieOptionsChange}
           />
 
-          <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
+          <div className="mt-4 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
             <div className="mb-3">
               <p className="text-sm font-semibold text-[var(--text)]">
                 Tema do dashboard
@@ -2261,7 +2292,7 @@ export default function ReportsV2Editor() {
             </Button>
           </div>
 
-          <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
+          <div className="mt-4 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
             <div className="mb-3">
               <p className="text-sm font-semibold text-[var(--text)]">
                 Controles globais

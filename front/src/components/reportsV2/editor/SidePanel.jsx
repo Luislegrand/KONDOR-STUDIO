@@ -20,14 +20,16 @@ export default function SidePanel({
   onSortChange,
   onLimitChange,
   onTitleChange,
+  onShowTitleChange,
   onShowLegendChange,
+  onGridlinesChange,
   onFormatChange,
   onTextContentChange,
   onVariantChange,
   onPieOptionsChange,
 }) {
   return (
-    <div className="sticky top-24 rounded-[20px] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]">
+    <div className="sticky top-24 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-[var(--text)]">Configurações</p>
@@ -83,7 +85,9 @@ export default function SidePanel({
               widget={selectedWidget}
               formatOptions={formatOptions}
               onTitleChange={onTitleChange}
+              onShowTitleChange={onShowTitleChange}
               onShowLegendChange={onShowLegendChange}
+              onGridlinesChange={onGridlinesChange}
               onFormatChange={onFormatChange}
               onTextContentChange={onTextContentChange}
               onVariantChange={onVariantChange}

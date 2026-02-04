@@ -50,11 +50,12 @@ export default function DashboardRenderer({
     >
       {widgets.map((widget) => {
         const hasTitle = Boolean(String(widget?.title || "").trim());
-        const showHeader = widget?.type !== "text" || hasTitle;
+        const showTitle = widget?.viz?.options?.showTitle !== false;
+        const showHeader = showTitle && (widget?.type !== "text" || hasTitle);
         return (
           <div
             key={widget.id}
-            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-sm)]"
+            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]"
             style={buildGridStyle(widget.layout)}
           >
             {showHeader ? (
