@@ -19,6 +19,10 @@ import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import ThemeProvider from "@/components/reportsV2/ThemeProvider.jsx";
 import SidePanel from "@/components/reportsV2/editor/SidePanel.jsx";
 import {
+  normalizeFilterArrayValue,
+  normalizeFilterSingleValue,
+} from "@/components/reportsV2/editor/filterUtils.js";
+import {
   useDebouncedValue,
   stableStringify,
   normalizeLayoutFront,
@@ -188,6 +192,16 @@ function normalizeLayoutValue(value, fallback = 0) {
   return Math.max(0, Math.round(numeric));
 }
 
+function sanitizeSortForFields(sort, fields) {
+  if (!sort?.field) return null;
+  const allowed = new Set((fields || []).filter(Boolean));
+  if (!allowed.has(sort.field)) return null;
+  return {
+    field: String(sort.field),
+    direction: sort.direction === "desc" ? "desc" : "asc",
+  };
+}
+
 function sanitizeLayoutForSave(layout) {
   const merged = mergeLayoutDefaults(layout);
   const sanitizeWidget = (widget) => {
@@ -205,18 +219,9 @@ function sanitizeLayoutForSave(layout) {
           const op = filter?.op || "eq";
           let value = filter?.value ?? "";
           if (op === "in") {
-            if (Array.isArray(value)) {
-              value = value.map((entry) => String(entry).trim()).filter(Boolean);
-            } else {
-              value = String(value)
-                .split(",")
-                .map((entry) => entry.trim())
-                .filter(Boolean);
-            }
-          } else if (Array.isArray(value)) {
-            value = value[0] ? String(value[0]) : "";
+            value = normalizeFilterArrayValue(value);
           } else {
-            value = String(value);
+            value = normalizeFilterSingleValue(Array.isArray(value) ? value[0] : value);
           }
           return {
             field: filter?.field || "platform",
@@ -1016,18 +1021,27 @@ export default function ReportsV2Editor() {
             : undefined;
         }
       } else {
-        sort = undefined;
+        sort = null;
+      }
+
+      const nextQuery = {
+        ...widget.query,
+        metrics,
+        dimensions,
+        ...(limit ? { limit } : {}),
+      };
+      if (sort) {
+        nextQuery.sort = sort;
+      } else {
+        delete nextQuery.sort;
+      }
+      if (!limit) {
+        delete nextQuery.limit;
       }
       return {
         ...widget,
         type: nextType,
-        query: {
-          ...widget.query,
-          metrics,
-          dimensions,
-          ...(sort ? { sort } : {}),
-          ...(limit ? { limit } : {}),
-        },
+        query: nextQuery,
       };
     });
   };
@@ -1038,37 +1052,75 @@ export default function ReportsV2Editor() {
       const current = Array.isArray(widget.query?.metrics)
         ? widget.query.metrics
         : [];
+      const dimensions = Array.isArray(widget.query?.dimensions)
+        ? widget.query.dimensions
+        : [];
       if (widget.type === "kpi") {
+        const nextMetrics = [metric];
+        const sort = sanitizeSortForFields(widget.query?.sort, [
+          ...dimensions,
+          ...nextMetrics,
+        ]);
+        const nextQuery = {
+          ...widget.query,
+          metrics: nextMetrics,
+        };
+        if (sort) {
+          nextQuery.sort = sort;
+        } else {
+          delete nextQuery.sort;
+        }
         return {
           ...widget,
-          query: {
-            ...widget.query,
-            metrics: [metric],
-          },
+          query: nextQuery,
         };
       }
       const next = current.includes(metric)
         ? current.filter((item) => item !== metric)
         : [...current, metric];
+      const sort = sanitizeSortForFields(widget.query?.sort, [
+        ...dimensions,
+        ...next,
+      ]);
+      const nextQuery = {
+        ...widget.query,
+        metrics: next,
+      };
+      if (sort) {
+        nextQuery.sort = sort;
+      } else {
+        delete nextQuery.sort;
+      }
       return {
         ...widget,
-        query: {
-          ...widget.query,
-          metrics: next,
-        },
+        query: nextQuery,
       };
     });
   };
 
   const handleDimensionChange = (value) => {
     if (!selectedWidget) return;
-    updateWidget(selectedWidget.id, (widget) => ({
-      ...widget,
-      query: {
+    updateWidget(selectedWidget.id, (widget) => {
+      const nextDimensions = value === "none" ? [] : [value];
+      const metrics = Array.isArray(widget.query?.metrics) ? widget.query.metrics : [];
+      const sort = sanitizeSortForFields(widget.query?.sort, [
+        ...nextDimensions,
+        ...metrics,
+      ]);
+      const nextQuery = {
         ...widget.query,
-        dimensions: value === "none" ? [] : [value],
-      },
-    }));
+        dimensions: nextDimensions,
+      };
+      if (sort) {
+        nextQuery.sort = sort;
+      } else {
+        delete nextQuery.sort;
+      }
+      return {
+        ...widget,
+        query: nextQuery,
+      };
+    });
   };
 
   const handleFiltersChange = (nextFilters) => {

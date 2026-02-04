@@ -89,6 +89,7 @@ const metricsQuerySchema = z
     filters: z.array(filterSchema).default([]),
     requiredPlatforms: z.array(platformEnum).optional(),
     compareTo: compareToSchema.optional().nullable(),
+    limit: z.number().int().min(1).max(500).optional(),
     pagination: paginationSchema.optional(),
     sort: sortSchema.optional(),
   })

@@ -377,6 +377,13 @@ function normalizePagination(pagination) {
   return { limit, offset };
 }
 
+function normalizeLimit(limit) {
+  if (limit === undefined || limit === null) return null;
+  const parsed = Number(limit);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(Math.max(Math.round(parsed), 1), 500);
+}
+
 function computeDerivedValues(row, derivedMetrics) {
   const base = {
     spend: toNumber(row.spend),
@@ -474,6 +481,7 @@ async function runAggregates({
   derivedMetrics,
   sort,
   pagination,
+  limit,
 }) {
   const { whereSql, params } = buildWhereClause({
     tenantId,
@@ -491,13 +499,22 @@ async function runAggregates({
   const groupByClause = buildGroupByClause(dimensions);
   const orderByClause = buildOrderByClause({ dimensions, sort });
   const page = normalizePagination(pagination);
+  const cap = normalizeLimit(limit);
 
   let paginationClause = '';
   const nextParams = [...params];
   if (page) {
-    const limitPlus = page.limit + 1;
+    const offset = page.offset;
+    let limitPlus = page.limit + 1;
+    if (cap) {
+      const remaining = cap - offset;
+      limitPlus = remaining > 0 ? Math.min(limitPlus, remaining) : 0;
+    }
     paginationClause = `LIMIT $${nextParams.length + 1} OFFSET $${nextParams.length + 2}`;
-    nextParams.push(limitPlus, page.offset);
+    nextParams.push(limitPlus, offset);
+  } else if (cap) {
+    paginationClause = `LIMIT $${nextParams.length + 1}`;
+    nextParams.push(cap);
   }
 
   const baseQuery = `SELECT ${selectClause} FROM "fact_kondor_metrics_daily" WHERE ${whereSql} ${groupByClause} ${orderByClause} ${paginationClause}`;
@@ -516,9 +533,12 @@ async function runAggregates({
   let pageInfo = null;
   let safeRows = rows || [];
   if (page) {
-    const hasMore = safeRows.length > page.limit;
+    let hasMore = safeRows.length > page.limit;
     if (hasMore) {
       safeRows = safeRows.slice(0, page.limit);
+    }
+    if (cap && page.offset + safeRows.length >= cap) {
+      hasMore = false;
     }
     pageInfo = { limit: page.limit, offset: page.offset, hasMore };
   }
@@ -534,7 +554,8 @@ async function queryMetrics(tenantId, payload = {}) {
     throw err;
   }
 
-  const { brandId, dateRange, dimensions, metrics, filters, compareTo } = payload;
+  const { brandId, dateRange, dimensions, metrics, filters, compareTo, limit } =
+    payload;
 
   const brand = await prisma.client.findFirst({
     where: { id: brandId, tenantId },
@@ -597,6 +618,7 @@ async function queryMetrics(tenantId, payload = {}) {
     filters,
     sort: resolvedSort,
     pagination: payload.pagination,
+    limit,
   });
 
   const rows = buildRows(
@@ -633,6 +655,7 @@ async function queryMetrics(tenantId, payload = {}) {
         filters,
         sort: resolvedSort,
         pagination: payload.pagination,
+        limit,
       });
 
       compare = {

@@ -520,6 +520,29 @@ test('metrics totals stay stable across pagination offsets', async () => {
   assert.notEqual(first.body.rows[0]?.date, second.body.rows[0]?.date);
 });
 
+test('metrics query honors row cap limit with pagination', async () => {
+  const { app } = buildMetricsApp({ rows: buildRows(80, '2026-01-01') });
+  const brandId = randomUUID();
+
+  const res = await request(app)
+    .post('/metrics/query')
+    .send({
+      brandId,
+      dateRange: { start: '2026-01-01', end: '2026-03-31' },
+      dimensions: ['date'],
+      metrics: ['spend'],
+      filters: [],
+      limit: 40,
+      pagination: { limit: 25, offset: 25 },
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.rows.length, 15);
+  assert.equal(res.body.pageInfo.limit, 25);
+  assert.equal(res.body.pageInfo.offset, 25);
+  assert.equal(res.body.pageInfo.hasMore, false);
+});
+
 test('metrics compare respects pagination and keeps totals', async () => {
   const { app } = buildMetricsApp({
     rows: buildRows(10, '2026-01-01'),

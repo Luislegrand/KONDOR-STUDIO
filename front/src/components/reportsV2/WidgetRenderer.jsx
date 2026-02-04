@@ -184,6 +184,17 @@ export default function WidgetRenderer({
 
   const [pageSize, setPageSize] = React.useState(widgetLimit || 25);
   const [pageIndex, setPageIndex] = React.useState(0);
+  const effectivePageSize = React.useMemo(() => {
+    const base = Math.max(1, Math.min(500, Number(pageSize) || 25));
+    if (!widgetLimit) return base;
+    return Math.max(1, Math.min(base, widgetLimit));
+  }, [pageSize, widgetLimit]);
+  const effectiveOffset = React.useMemo(() => {
+    const rawOffset = Math.max(0, pageIndex) * effectivePageSize;
+    if (!widgetLimit) return rawOffset;
+    const maxOffset = Math.max(widgetLimit - effectivePageSize, 0);
+    return Math.min(rawOffset, maxOffset);
+  }, [effectivePageSize, pageIndex, widgetLimit]);
 
   const dateRange = resolveDateRange(globalFilters?.dateRange || {});
   const mergedFilters = mergeWidgetFilters(widget?.query?.filters || [], globalFilters);
@@ -195,12 +206,13 @@ export default function WidgetRenderer({
     widgetId: widget?.id,
     globalFilters,
     query: widget?.query || {},
+    effectivePageSize,
   });
 
   React.useEffect(() => {
     if (!isTable) return;
     setPageIndex(0);
-  }, [isTable, pageSize, tableResetKey]);
+  }, [isTable, tableResetKey]);
 
   React.useEffect(() => {
     if (!isTable) return;
@@ -210,13 +222,8 @@ export default function WidgetRenderer({
 
   const pagination = isTable
     ? {
-        limit: pageSize,
-        offset: pageIndex * pageSize,
-      }
-    : widgetLimit
-    ? {
-        limit: widgetLimit,
-        offset: 0,
+        limit: effectivePageSize,
+        offset: effectiveOffset,
       }
     : undefined;
 
@@ -228,6 +235,7 @@ export default function WidgetRenderer({
     filters: mergedFilters,
     requiredPlatforms: widget?.query?.requiredPlatforms,
     compareTo,
+    ...(widgetLimit ? { limit: widgetLimit } : {}),
     pagination,
     sort,
   };
@@ -407,10 +415,20 @@ export default function WidgetRenderer({
 
   if (widgetType === "table") {
     const columns = [...dimensions, ...metrics];
-    const pageOptions = Array.from(new Set([25, 50, 100, 200, widgetLimit || 25])).sort(
-      (a, b) => a - b
-    );
-    const currentPage = Math.floor((pageInfo.offset || 0) / pageSize) + 1;
+    const basePageOptions = [25, 50, 100, 200];
+    const pageOptions = widgetLimit
+      ? Array.from(
+          new Set([
+            ...basePageOptions.filter((option) => option <= widgetLimit),
+            widgetLimit,
+          ])
+        ).sort((a, b) => a - b)
+      : basePageOptions;
+    const currentPage = Math.floor((pageInfo.offset || 0) / effectivePageSize) + 1;
+    const hasNextWithinLimit = widgetLimit
+      ? effectiveOffset + effectivePageSize < widgetLimit
+      : true;
+    const hasNextPage = Boolean(pageInfo?.hasMore) && hasNextWithinLimit;
     const showTotals = vizOptions.showTotals !== false;
     return (
       <div className="flex h-full flex-col">
@@ -495,6 +513,11 @@ export default function WidgetRenderer({
             <div className="text-xs text-[var(--muted)]">
               Pagina {currentPage}
             </div>
+            {widgetLimit ? (
+              <div className="text-[11px] text-[var(--muted)]">
+                Limite do widget: {widgetLimit} linhas
+              </div>
+            ) : null}
 
             <button
               type="button"
@@ -507,7 +530,7 @@ export default function WidgetRenderer({
             <button
               type="button"
               onClick={() => setPageIndex((prev) => prev + 1)}
-              disabled={!pageInfo?.hasMore}
+              disabled={!hasNextPage}
               className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs font-semibold text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Proximo

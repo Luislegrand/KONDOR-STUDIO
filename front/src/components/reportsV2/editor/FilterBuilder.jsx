@@ -3,6 +3,11 @@ import { Trash2, Plus } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { cn } from "@/utils/classnames.js";
+import {
+  normalizeFilterArrayValue,
+  normalizeFilterSingleValue,
+  normalizeFilterValueByOp,
+} from "@/components/reportsV2/editor/filterUtils.js";
 
 const FILTER_FIELDS = [
   { value: "platform", label: "Plataforma" },
@@ -23,15 +28,9 @@ function normalizeFilter(filter = {}) {
     ? filter.op
     : "eq";
   if (op === "in") {
-    const list = Array.isArray(filter.value)
-      ? filter.value.map((item) => String(item).trim()).filter(Boolean)
-      : String(filter.value || "")
-          .split(/\r?\n|,/)
-          .map((item) => item.trim())
-          .filter(Boolean);
-    return { field, op, value: list };
+    return { field, op, value: normalizeFilterArrayValue(filter.value) };
   }
-  return { field, op, value: String(filter.value || "") };
+  return { field, op, value: normalizeFilterSingleValue(filter.value) };
 }
 
 function getFilterError(filter) {
@@ -52,7 +51,14 @@ export default function FilterBuilder({ filters, onChange }) {
   const updateAt = (index, patch) => {
     const next = [...current];
     const prev = normalizeFilter(next[index] || {});
-    const updated = normalizeFilter({ ...prev, ...patch });
+    const nextPatch = { ...patch };
+    if (Object.prototype.hasOwnProperty.call(nextPatch, "value")) {
+      nextPatch.value = normalizeFilterValueByOp(
+        nextPatch.op || prev.op,
+        nextPatch.value
+      );
+    }
+    const updated = normalizeFilter({ ...prev, ...nextPatch });
     next[index] = updated;
     onChange(next);
   };
@@ -151,17 +157,14 @@ export default function FilterBuilder({ filters, onChange }) {
                     className="min-h-[88px] rounded-[12px] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                     value={Array.isArray(filter.value) ? filter.value.join("\n") : ""}
                     onChange={(event) => {
-                      const values = event.target.value
-                        .split(/\r?\n|,/)
-                        .map((item) => item.trim())
-                        .filter(Boolean);
+                      const values = normalizeFilterArrayValue(event.target.value);
                       updateAt(index, { value: values });
                     }}
                     placeholder={"Um valor por linha\nou separado por virgula"}
                   />
                 ) : (
                   <Input
-                    value={String(filter.value || "")}
+                    value={normalizeFilterSingleValue(filter.value)}
                     onChange={(event) =>
                       updateAt(index, { value: event.target.value })
                     }
