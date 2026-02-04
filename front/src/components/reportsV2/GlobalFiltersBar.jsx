@@ -5,7 +5,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { DateField } from "@/components/ui/date-field.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { cn } from "@/utils/classnames.js";
-import { DEFAULT_FILTER_CONTROLS } from "@/components/reportsV2/utils.js";
+import { DEFAULT_FILTER_CONTROLS, expandPlatformFilters } from "@/components/reportsV2/utils.js";
 
 const PLATFORM_OPTIONS = [
   { value: "META_ADS", label: "Meta Ads" },
@@ -30,6 +30,7 @@ export default function GlobalFiltersBar({
   filters,
   onChange,
   controls,
+  connections,
   className = "",
   collapsible = true,
   defaultCollapsed = false,
@@ -57,8 +58,12 @@ export default function GlobalFiltersBar({
 
   const accountInputValue = accountIds.join(", ");
 
+  const expandedPlatforms = React.useMemo(
+    () => expandPlatformFilters(platforms),
+    [platforms]
+  );
   const primaryPlatform =
-    platforms[0] ||
+    expandedPlatforms[0] ||
     (typeof accounts[0] === "object" ? accounts[0]?.platform : null) ||
     "META_ADS";
   const [collapsed, setCollapsed] = React.useState(Boolean(defaultCollapsed));
@@ -79,6 +84,59 @@ export default function GlobalFiltersBar({
         external_account_id: id,
       })),
     });
+  };
+
+  const activeConnections = React.useMemo(() => {
+    if (!Array.isArray(connections)) return [];
+    return connections.filter(
+      (item) => String(item?.status || "").toUpperCase() === "ACTIVE"
+    );
+  }, [connections]);
+
+  const availableAccounts = React.useMemo(() => {
+    if (!activeConnections.length) return [];
+    if (!expandedPlatforms.length) return activeConnections;
+    const allowed = new Set(expandedPlatforms);
+    return activeConnections.filter((item) => allowed.has(item.platform));
+  }, [activeConnections, expandedPlatforms]);
+
+  const selectedAccountKey = React.useMemo(() => {
+    const set = new Set();
+    accounts.forEach((item) => {
+      if (!item) return;
+      if (typeof item === "string") {
+        set.add(item);
+        return;
+      }
+      if (item.external_account_id) {
+        set.add(`${item.platform || "unknown"}:${item.external_account_id}`);
+      }
+    });
+    return set;
+  }, [accounts]);
+
+  const toggleAccount = (account) => {
+    if (!account?.externalAccountId && !account?.external_account_id) return;
+    const accountId = account.externalAccountId || account.external_account_id;
+    const platform = account.platform || primaryPlatform;
+    const key = `${platform}:${accountId}`;
+    const next = new Map();
+    accounts.forEach((item) => {
+      if (!item) return;
+      if (typeof item === "string") {
+        next.set(`unknown:${item}`, { platform: primaryPlatform, external_account_id: item });
+        return;
+      }
+      if (item.external_account_id) {
+        next.set(`${item.platform || "unknown"}:${item.external_account_id}`, item);
+      }
+    });
+    if (selectedAccountKey.has(key)) {
+      next.delete(key);
+    } else {
+      next.set(key, { platform, external_account_id: accountId });
+    }
+    onChange({ ...filters, accounts: Array.from(next.values()) });
   };
 
   return (
@@ -215,6 +273,31 @@ export default function GlobalFiltersBar({
               placeholder="acc_123, acc_456"
               aria-label="Filtro de contas"
             />
+            {availableAccounts.length ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {availableAccounts.map((account) => {
+                  const accountId =
+                    account.externalAccountId || account.external_account_id;
+                  const key = `${account.platform || "unknown"}:${accountId}`;
+                  const active = selectedAccountKey.has(key);
+                  return (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => toggleAccount(account)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                        active
+                          ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
+                          : "border-[var(--border)] bg-[var(--card)] text-[var(--muted)] hover:border-slate-300"
+                      )}
+                    >
+                      {account.externalAccountName || accountId}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <p className="mt-1 text-[11px] text-[var(--muted)]">
               IDs separados por virgula. Plataforma ativa: {primaryPlatform}
             </p>

@@ -46,6 +46,10 @@ import { useTenantTheme } from "@/hooks/useTenantTheme.js";
 import { resolveTenantBranding } from "@/utils/theme.js";
 
 const REQUIRED_REPORTS_PLATFORMS = ["META_ADS", "GOOGLE_ADS", "GA4"];
+const PLATFORM_ALIASES = {
+  META_ADS: ["FB_IG"],
+  FB_IG: ["META_ADS"],
+};
 
 const navGroups = [
   {
@@ -212,7 +216,11 @@ function LayoutContent() {
     const platforms = new Set();
     connections.forEach((connection) => {
       if (String(connection?.status || "").toUpperCase() !== "ACTIVE") return;
-      if (connection?.platform) platforms.add(connection.platform);
+      if (!connection?.platform) return;
+      platforms.add(connection.platform);
+      (PLATFORM_ALIASES[connection.platform] || []).forEach((alias) =>
+        platforms.add(alias)
+      );
     });
     return platforms;
   }, [connections]);

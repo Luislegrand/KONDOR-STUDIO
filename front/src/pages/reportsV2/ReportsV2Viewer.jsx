@@ -130,6 +130,12 @@ export default function ReportsV2Viewer() {
     queryFn: () => base44.reportsV2.getDashboardHealth(id),
     enabled: Boolean(id && dashboard?.status === "PUBLISHED"),
   });
+  const connectionsQuery = useQuery({
+    queryKey: ["reportsV2-connections-viewer", dashboard?.brandId],
+    queryFn: () => base44.reportsV2.listConnections({ brandId: dashboard?.brandId }),
+    enabled: Boolean(dashboard?.brandId),
+  });
+  const connections = connectionsQuery.data?.items || [];
   const health = healthQuery.data || null;
   const healthStatus = health?.status || null;
   const missingPlatforms = Array.isArray(health?.summary?.missingPlatforms)
@@ -614,6 +620,7 @@ export default function ReportsV2Viewer() {
             filters={filters}
             controls={globalFilterControls}
             onChange={setFilters}
+            connections={connections}
           />
         </div>
 

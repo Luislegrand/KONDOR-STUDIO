@@ -20,6 +20,22 @@ export const DEFAULT_FILTER_CONTROLS = Object.freeze({
   showAccounts: true,
 });
 
+const PLATFORM_ALIASES = {
+  META_ADS: ["FB_IG"],
+  FB_IG: ["META_ADS"],
+};
+
+export function expandPlatformFilters(platforms = []) {
+  const normalized = Array.isArray(platforms) ? platforms : [];
+  const expanded = new Set();
+  normalized.forEach((platform) => {
+    if (!platform) return;
+    expanded.add(platform);
+    (PLATFORM_ALIASES[platform] || []).forEach((alias) => expanded.add(alias));
+  });
+  return Array.from(expanded);
+}
+
 function normalizeHexColor(value, fallback) {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
@@ -276,8 +292,9 @@ export function mergeWidgetFilters(widgetFilters = [], globalFilters = {}) {
     ? globalFilters.accounts
     : [];
 
-  if (platforms.length) {
-    merged.push({ field: "platform", op: "in", value: platforms });
+  const expandedPlatforms = expandPlatformFilters(platforms);
+  if (expandedPlatforms.length) {
+    merged.push({ field: "platform", op: "in", value: expandedPlatforms });
   }
 
   const accountIds = Array.from(

@@ -10,6 +10,11 @@ const SUPPORTED_PLATFORMS = new Set([
   'FB_IG',
 ]);
 
+const PLATFORM_ALIASES = {
+  META_ADS: ['FB_IG'],
+  FB_IG: ['META_ADS'],
+};
+
 const WIDGET_QUERY_TYPES = new Set([
   'kpi',
   'timeseries',
@@ -29,6 +34,14 @@ function normalizePlatform(value) {
 function toArray(value) {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function expandPlatformSet(platformSet) {
+  const expanded = new Set(platformSet || []);
+  Array.from(platformSet || []).forEach((platform) => {
+    (PLATFORM_ALIASES[platform] || []).forEach((alias) => expanded.add(alias));
+  });
+  return expanded;
 }
 
 function normalizeLayoutPages(layoutJson) {
@@ -220,9 +233,10 @@ async function computeDashboardHealthForDashboard(dashboard) {
       .map((item) => normalizePlatform(item.platform))
       .filter(Boolean),
   );
+  const expandedConnectedPlatforms = expandPlatformSet(connectedPlatforms);
 
   const missingPlatforms = Array.from(requiredPlatforms).filter(
-    (platform) => !connectedPlatforms.has(platform),
+    (platform) => !expandedConnectedPlatforms.has(platform),
   );
 
   const widgetHealth = [];
@@ -252,7 +266,7 @@ async function computeDashboardHealthForDashboard(dashboard) {
     let pushedMissingConnection = false;
     const widgetRequired = buildWidgetRequiredPlatforms(widget, requiredPlatforms);
     widgetRequired.forEach((platform) => {
-      if (!connectedPlatforms.has(platform)) {
+      if (!expandedConnectedPlatforms.has(platform)) {
         pushedMissingConnection = true;
         widgetHealth.push({
           widgetId,
