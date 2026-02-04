@@ -9,12 +9,13 @@ export default function WidgetErrorState({
   onRetry,
   onConnect,
   showConnect = false,
+  compact = false,
   className = "",
 }) {
   return (
     <div
       className={cn(
-        "rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-center",
+        "flex h-full flex-col items-center justify-center rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-center",
         className
       )}
     >
@@ -22,7 +23,7 @@ export default function WidgetErrorState({
         <AlertTriangle className="h-4 w-4" />
       </div>
       <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
-      {description ? (
+      {description && !compact ? (
         <p className="mt-1 text-xs text-[var(--text-muted)]">{description}</p>
       ) : null}
       <div className="mt-3 flex justify-center gap-2">

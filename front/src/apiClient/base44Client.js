@@ -695,6 +695,18 @@ const ReportsV2 = {
     return jsonFetch(`/reports/dashboards${qs}`, { method: "GET" });
   },
 
+  async createDashboard(payload = {}) {
+    return jsonFetch("/reports/dashboards", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  async deleteDashboard(id) {
+    if (!id) throw new Error("dashboardId obrigatorio");
+    return jsonFetch(`/reports/dashboards/${id}`, { method: "DELETE" });
+  },
+
   async getDashboard(id) {
     if (!id) throw new Error("dashboardId obrigatorio");
     return jsonFetch(`/reports/dashboards/${id}`, { method: "GET" });

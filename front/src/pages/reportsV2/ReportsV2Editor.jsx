@@ -1895,7 +1895,7 @@ export default function ReportsV2Editor() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => navigate(`/relatorios/v2/${dashboard.id}`)}
+              onClick={() => navigate("/relatorios/v2")}
               className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -2151,7 +2151,7 @@ export default function ReportsV2Editor() {
           </div>
         </main>
 
-        <aside className="w-full max-w-[360px]">
+        <aside className="w-full max-w-[360px] space-y-4 self-start">
           <SidePanel
             selectedWidget={selectedWidget}
             activeTab={activeTab}
@@ -2177,7 +2177,7 @@ export default function ReportsV2Editor() {
             onPieOptionsChange={handlePieOptionsChange}
           />
 
-          <div className="mt-4 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
+          <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
             <div className="mb-3">
               <p className="text-sm font-semibold text-[var(--text)]">
                 Tema do dashboard
@@ -2292,7 +2292,7 @@ export default function ReportsV2Editor() {
             </Button>
           </div>
 
-          <div className="mt-4 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
+          <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
             <div className="mb-3">
               <p className="text-sm font-semibold text-[var(--text)]">
                 Controles globais

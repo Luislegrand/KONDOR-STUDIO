@@ -1,13 +1,16 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles, LayoutGrid, Boxes, Zap, Search, ArrowRight } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, LayoutGrid, Boxes, Zap, Search, ArrowRight, Plus } from "lucide-react";
 import PageShell from "@/components/ui/page-shell.jsx";
 import PageHeader from "@/components/ui/page-header.jsx";
 import { Card, CardContent } from "@/components/ui/card.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select.jsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog.jsx";
+import Toast from "@/components/ui/toast.jsx";
+import useToast from "@/hooks/useToast.js";
 import { base44 } from "@/apiClient/base44Client";
 import { cn } from "@/utils/classnames.js";
 
@@ -53,8 +56,13 @@ const themeStyle = {
 
 export default function ReportsV2Home() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast, showToast } = useToast();
   const [search, setSearch] = React.useState("");
   const [brandId, setBrandId] = React.useState("");
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [createName, setCreateName] = React.useState("");
+  const [createBrand, setCreateBrand] = React.useState("");
 
   const { data: clients = [] } = useQuery({
     queryKey: ["reportsV2-clients"],
@@ -82,6 +90,67 @@ export default function ReportsV2Home() {
     return map;
   }, [clients]);
 
+  React.useEffect(() => {
+    if (!createBrand && clients.length) {
+      setCreateBrand(brandId || clients[0]?.id || "");
+    }
+  }, [brandId, clients, createBrand]);
+
+  const createMutation = useMutation({
+    mutationFn: async (payload) => base44.reportsV2.createDashboard(payload),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboards"] });
+      setCreateOpen(false);
+      setCreateName("");
+      if (created?.id) {
+        navigate(`/relatorios/v2/${created.id}/edit`);
+      }
+    },
+    onError: () => {
+      showToast("Nao foi possivel criar o dashboard.", "error");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (dashboardId) => base44.reportsV2.deleteDashboard(dashboardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reportsV2-dashboards"] });
+      showToast("Dashboard excluido.", "success");
+    },
+    onError: () => {
+      showToast("Nao foi possivel excluir o dashboard.", "error");
+    },
+  });
+
+  const handleCreateDashboard = () => {
+    const selectedBrand = createBrand && createBrand !== "none" ? createBrand : brandId;
+    if (!selectedBrand) {
+      showToast("Selecione uma marca para criar o dashboard.", "info");
+      return;
+    }
+    const name = String(createName || "").trim() || "Novo dashboard";
+    createMutation.mutate({ name, brandId: selectedBrand });
+  };
+
+  const handleDeleteDashboard = (dashboard) => {
+    if (!dashboard?.id) return;
+    const confirmed = window.confirm(
+      `Excluir o dashboard "${dashboard.name}"? Esta acao nao pode ser desfeita.`
+    );
+    if (!confirmed) return;
+    deleteMutation.mutate(dashboard.id);
+  };
+
+  const featureActions = {
+    "Templates prontos": () => navigate("/relatorios/v2/templates"),
+    "Dashboards ao vivo": () =>
+      document
+        .getElementById("reports-dashboards-list")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    "Widgets flexiveis": () => setCreateOpen(true),
+    Automacoes: () => showToast("Automacoes em breve.", "info"),
+  };
+
   return (
     <div className="min-h-screen bg-white" style={themeStyle}>
       <div className="border-b border-[var(--border)] bg-[linear-gradient(135deg,rgba(245,158,11,0.08),rgba(34,197,94,0.04))]">
@@ -99,6 +168,14 @@ export default function ReportsV2Home() {
                   Conexoes por marca
                 </Button>
                 <Button
+                  variant="secondary"
+                  onClick={() => setCreateOpen(true)}
+                  className="gap-2"
+                >
+                  Criar do zero
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
                   onClick={() => navigate("/relatorios/v2/templates")}
                   className="gap-2"
                 >
@@ -112,28 +189,36 @@ export default function ReportsV2Home() {
             {FEATURE_CARDS.map((card) => {
               const Icon = card.icon;
               return (
-                <Card key={card.title} className="bg-white/70">
-                  <CardContent className="flex h-full flex-col gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[var(--primary-light)] text-[var(--primary)]">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text)]">
-                        {card.title}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">
-                        {card.description}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <button
+                  key={card.title}
+                  type="button"
+                  onClick={() => featureActions[card.title]?.()}
+                  className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[16px]"
+                >
+                  <Card className="bg-white/70 transition hover:shadow-[var(--shadow-sm)]">
+                    <CardContent className="flex h-full flex-col gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[var(--primary-light)] text-[var(--primary)]">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-[var(--text)]">
+                          {card.title}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text-muted)]">
+                          {card.description}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
               );
             })}
           </div>
         </PageShell>
       </div>
 
-      <PageShell>
+      <div id="reports-dashboards-list">
+        <PageShell>
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-1 flex-wrap gap-3">
             <div className="min-w-[220px] flex-1">
@@ -269,6 +354,15 @@ export default function ReportsV2Home() {
                           >
                             Editar
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteDashboard(dashboard)}
+                            disabled={deleteMutation.isPending}
+                            className="text-rose-600 hover:text-rose-700"
+                          >
+                            Excluir
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -276,7 +370,7 @@ export default function ReportsV2Home() {
                 ) : (
                   <tr>
                     <td colSpan={4} className="px-6 py-6 text-sm text-[var(--text-muted)]">
-                      Nenhum dashboard encontrado. Use um template para comecar.
+                      Nenhum dashboard encontrado. Crie do zero ou use um template.
                     </td>
                   </tr>
                 )}
@@ -284,7 +378,68 @@ export default function ReportsV2Home() {
             </table>
           </div>
         </div>
-      </PageShell>
+        </PageShell>
+      </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Novo dashboard</DialogTitle>
+            <DialogDescription>
+              Crie um dashboard vazio para montar seus widgets manualmente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Marca
+              </label>
+              <Select
+                value={createBrand || "none"}
+                onValueChange={(value) => setCreateBrand(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  {!clients.length ? (
+                    <SelectItem value="none" disabled>
+                      Nenhuma marca disponivel
+                    </SelectItem>
+                  ) : null}
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                Nome do dashboard
+              </label>
+              <Input
+                value={createName}
+                onChange={(event) => setCreateName(event.target.value)}
+                placeholder="Ex: Overview da marca"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateDashboard} disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Criando..." : "Criar dashboard"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Toast toast={toast} />
     </div>
   );
 }

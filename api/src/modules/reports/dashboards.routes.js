@@ -13,6 +13,7 @@ router.post('/', allowEditor, dashboardsController.create);
 router.get('/:id', allowViewer, dashboardsController.get);
 router.get('/:id/health', allowViewer, dashboardsController.getHealth);
 router.put('/:id', allowEditor, dashboardsController.update);
+router.delete('/:id', allowEditor, dashboardsController.remove);
 router.post('/:id/clone', allowEditor, dashboardsController.clone);
 router.post('/:id/exports', allowEditor, exportsController.create);
 router.post('/:id/export-pdf', allowEditor, exportsController.exportPdf);

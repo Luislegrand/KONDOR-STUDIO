@@ -29,7 +29,7 @@ export default function SidePanel({
   onPieOptionsChange,
 }) {
   return (
-    <div className="sticky top-24 rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
+    <div className="rounded-[16px] border border-[var(--border)] bg-white p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-[var(--text)]">Configurações</p>

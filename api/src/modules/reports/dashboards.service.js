@@ -290,6 +290,18 @@ async function updateDashboard(tenantId, id, payload) {
   });
 }
 
+async function deleteDashboard(tenantId, id) {
+  const existing = await prisma.reportDashboard.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+  await prisma.reportDashboard.delete({
+    where: { id: existing.id },
+  });
+  return { ok: true };
+}
+
 async function createVersion(tenantId, userId, dashboardId, layoutJson) {
   const dashboard = await prisma.reportDashboard.findFirst({
     where: { id: dashboardId, tenantId },
@@ -685,6 +697,7 @@ module.exports = {
   listDashboards,
   getDashboard,
   updateDashboard,
+  deleteDashboard,
   createVersion,
   listVersions,
   publishDashboard,

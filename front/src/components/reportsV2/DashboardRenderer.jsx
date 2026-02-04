@@ -131,7 +131,7 @@ export default function DashboardRenderer({
         return (
           <div
             key={widget.id}
-            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)]"
+            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-none transition-shadow hover:shadow-[var(--shadow-sm)] overflow-hidden"
             style={buildGridStyle(widget.layout)}
           >
             {showHeader ? (
@@ -149,8 +149,8 @@ export default function DashboardRenderer({
             <div
               className={
                 showHeader
-                  ? "h-[calc(100%-48px)] min-h-[120px]"
-                  : "h-full min-h-[120px]"
+                  ? "h-[calc(100%-48px)] min-h-0 overflow-auto"
+                  : "h-full min-h-0 overflow-auto"
               }
             >
               <WidgetRenderer

@@ -24,6 +24,7 @@ export default function WidgetEmptyState({
   actionLabel,
   onAction,
   variant = "no-data",
+  compact = false,
   className = "",
 }) {
   const config = VARIANT_META[variant] || VARIANT_META["no-data"];
@@ -32,7 +33,7 @@ export default function WidgetEmptyState({
   return (
     <div
       className={cn(
-        "rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-center",
+        "flex h-full flex-col items-center justify-center rounded-[16px] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-center",
         className
       )}
     >
@@ -47,7 +48,7 @@ export default function WidgetEmptyState({
         </div>
       ) : null}
       <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
-      {description ? (
+      {description && !compact ? (
         <p className="mt-1 text-xs text-[var(--text-muted)]">{description}</p>
       ) : null}
       {actionLabel && onAction ? (

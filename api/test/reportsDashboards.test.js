@@ -129,6 +129,12 @@ function createFakePrisma() {
         state.dashboards[index] = updated;
         return { ...updated };
       },
+      delete: async ({ where }) => {
+        const index = state.dashboards.findIndex((item) => item.id === where.id);
+        if (index === -1) return null;
+        const [removed] = state.dashboards.splice(index, 1);
+        return removed ? { ...removed } : null;
+      },
     },
     reportDashboardVersion: {
       create: async ({ data }) => {
@@ -326,6 +332,33 @@ test('clone dashboard creates draft with latest layout', async () => {
   assert.equal(cloneRes.body.status, 'DRAFT');
   assert.equal(cloneRes.body.latestVersion.versionNumber, 1);
   assert.equal(cloneRes.body.latestVersion.layoutJson.theme.brandColor, '#111111');
+});
+
+test('delete dashboard removes it from list', async () => {
+  const { app, state } = buildApp();
+  const brandId = randomUUID();
+  state.clients.push({ id: brandId, tenantId: 'tenant-1' });
+
+  const createRes = await request(app)
+    .post('/api/reports/dashboards')
+    .set('x-role', 'MEMBER')
+    .send({ name: 'Dashboard apagar', brandId });
+
+  const deleteRes = await request(app)
+    .delete(`/api/reports/dashboards/${createRes.body.id}`)
+    .set('x-role', 'MEMBER');
+
+  assert.equal(deleteRes.statusCode, 200);
+
+  const listRes = await request(app)
+    .get('/api/reports/dashboards')
+    .set('x-role', 'MEMBER');
+
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(
+    listRes.body.items.some((item) => item.id === createRes.body.id),
+    false,
+  );
 });
 
 test('publish rejects invalid layout', async () => {

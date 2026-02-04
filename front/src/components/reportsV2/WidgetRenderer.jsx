@@ -238,6 +238,7 @@ export default function WidgetRenderer({
   const showLegend = widget?.viz?.showLegend !== false;
   const vizOptions = widget?.viz?.options || {};
   const isTable = widgetType === "table";
+  const isCompact = Number(widget?.layout?.h || 0) <= 3;
   const showGrid = vizOptions.showGrid !== false;
   const legendProps = resolveLegendProps(vizOptions.legendPosition);
   const widgetLimitRaw = Number(widget?.query?.limit);
@@ -359,31 +360,32 @@ export default function WidgetRenderer({
           reason="MISSING_CONNECTIONS"
           onStatusChange={onStatusChange}
         />
-        <WidgetEmptyState
-          title="Dados parcialmente indisponiveis"
-          description={
-            isPublic
-              ? "Dados indisponiveis. Conecte a plataforma para visualizar."
-              : `Dados indisponiveis. Conecte ${platformLabel} para visualizar este grafico.`
-          }
-          variant="connection"
-          actionLabel={isPublic ? undefined : "Conectar agora"}
-          onAction={
-            isPublic
-              ? undefined
-              : () => {
+      <WidgetEmptyState
+        title="Dados parcialmente indisponiveis"
+        description={
+          isPublic
+            ? "Dados indisponiveis. Conecte a plataforma para visualizar."
+            : `Dados indisponiveis. Conecte ${platformLabel} para visualizar este grafico.`
+        }
+        variant="connection"
+        actionLabel={isPublic ? undefined : "Conectar agora"}
+        onAction={
+          isPublic
+            ? undefined
+            : () => {
                   const params = new URLSearchParams();
                   if (brandId) params.set("brandId", brandId);
                   if (healthIssue.platform) params.set("platform", healthIssue.platform);
                   const query = params.toString();
                   navigate(`/relatorios/v2/conexoes${query ? `?${query}` : ""}`);
                 }
-          }
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+        }
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   if (healthReason === "INVALID_QUERY") {
     return (
@@ -394,21 +396,22 @@ export default function WidgetRenderer({
           reason="INVALID_QUERY"
           onStatusChange={onStatusChange}
         />
-        <WidgetEmptyState
-          title="Configuracao invalida"
-          description="Configuracao invalida neste widget. Abra no Editor para corrigir."
-          variant="metrics"
-          actionLabel={isPublic ? undefined : "Abrir no editor"}
-          onAction={
-            isPublic
-              ? undefined
-              : () => navigate(`/relatorios/v2/${dashboardId}/edit`)
-          }
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+      <WidgetEmptyState
+        title="Configuracao invalida"
+        description="Configuracao invalida neste widget. Abra no Editor para corrigir."
+        variant="metrics"
+        actionLabel={isPublic ? undefined : "Abrir no editor"}
+        onAction={
+          isPublic
+            ? undefined
+            : () => navigate(`/relatorios/v2/${dashboardId}/edit`)
+        }
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   if (!metrics.length) {
     return (
@@ -419,15 +422,16 @@ export default function WidgetRenderer({
           reason="MISSING_METRICS"
           onStatusChange={onStatusChange}
         />
-        <WidgetEmptyState
-          title="Widget sem metricas"
-          description="Edite este widget para selecionar metricas."
-          variant="metrics"
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+      <WidgetEmptyState
+        title="Widget sem metricas"
+        description="Edite este widget para selecionar metricas."
+        variant="metrics"
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   if (isLoading && !data) {
     return (
@@ -460,24 +464,25 @@ export default function WidgetRenderer({
           reason="MISSING_CONNECTIONS"
           onStatusChange={onStatusChange}
         />
-        <WidgetEmptyState
-          title="Conexoes pendentes"
-          description={`Conecte ${formatPlatformList(missing)} para ver este widget.`}
-          variant="connection"
-          actionLabel={isPublic ? undefined : "Ir para conexoes"}
-          onAction={
-            isPublic
-              ? undefined
-              : () =>
-                  navigate(
-                    `/relatorios/v2/conexoes${brandId ? `?brandId=${brandId}` : ""}`
-                  )
-          }
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+      <WidgetEmptyState
+        title="Conexoes pendentes"
+        description={`Conecte ${formatPlatformList(missing)} para ver este widget.`}
+        variant="connection"
+        actionLabel={isPublic ? undefined : "Ir para conexoes"}
+        onAction={
+          isPublic
+            ? undefined
+            : () =>
+                navigate(
+                  `/relatorios/v2/conexoes${brandId ? `?brandId=${brandId}` : ""}`
+                )
+        }
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   if (error) {
     const friendlyError = resolveFriendlyError(error);
@@ -489,15 +494,16 @@ export default function WidgetRenderer({
           reason="QUERY_ERROR"
           onStatusChange={onStatusChange}
         />
-        <WidgetErrorState
-          title={friendlyError.title}
-          description={friendlyError.description}
-          onRetry={() => refetch()}
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+      <WidgetErrorState
+        title={friendlyError.title}
+        description={friendlyError.description}
+        onRetry={() => refetch()}
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const totals = data?.totals || {};
@@ -517,15 +523,16 @@ export default function WidgetRenderer({
           reason="EMPTY_DATA"
           onStatusChange={onStatusChange}
         />
-        <WidgetEmptyState
-          title="Sem dados para este periodo"
-          description="Ajuste os filtros globais para ver resultados."
-          variant="no-data"
-          className="border-0 bg-transparent p-0"
-        />
-      </>
-    );
-  }
+      <WidgetEmptyState
+        title="Sem dados para este periodo"
+        description="Ajuste os filtros globais para ver resultados."
+        variant="no-data"
+        compact={isCompact}
+        className="border-0 bg-transparent p-0"
+      />
+    </>
+  );
+}
 
   if (widgetType === "kpi") {
     const metric = metrics[0];
@@ -821,12 +828,13 @@ export default function WidgetRenderer({
         reason="UNSUPPORTED_WIDGET"
         onStatusChange={onStatusChange}
       />
-      <WidgetEmptyState
-        title="Tipo nao suportado"
-        description="Este widget ainda nao possui visualizacao."
-        variant="metrics"
-        className="border-0 bg-transparent p-0"
-      />
+    <WidgetEmptyState
+      title="Tipo nao suportado"
+      description="Este widget ainda nao possui visualizacao."
+      variant="metrics"
+      compact={isCompact}
+      className="border-0 bg-transparent p-0"
+    />
     </>
   );
 }

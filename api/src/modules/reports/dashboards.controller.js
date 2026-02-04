@@ -117,6 +117,23 @@ async function update(req, res) {
   }
 }
 
+async function remove(req, res) {
+  try {
+    const removed = await dashboardsService.deleteDashboard(
+      req.tenantId,
+      req.params.id,
+    );
+    if (!removed) {
+      return res.status(404).json({
+        error: { code: 'DASHBOARD_NOT_FOUND', message: 'Dashboard não encontrado', details: null },
+      });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
 async function createVersion(req, res) {
   const parsed = createVersionSchema.safeParse(req.body || {});
   if (!parsed.success) {
@@ -368,6 +385,7 @@ module.exports = {
   list,
   get,
   update,
+  remove,
   createVersion,
   listVersions,
   publish,

@@ -76,7 +76,7 @@ export default function DataPanel({
             Blocos de texto nao usam metricas.
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {metricOptions.map((metric) => {
               const active = metrics.includes(metric.value);
               return (
@@ -85,7 +85,7 @@ export default function DataPanel({
                   type="button"
                   onClick={() => onToggleMetric(metric.value)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-semibold transition",
+                    "rounded-[10px] border px-2 py-1 text-[11px] font-semibold transition",
                     active
                       ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]"
                       : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-slate-300"
