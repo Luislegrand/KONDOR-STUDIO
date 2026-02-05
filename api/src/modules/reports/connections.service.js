@@ -1,4 +1,5 @@
 const { prisma } = require('../../prisma');
+const { syncAfterConnection } = require('../../services/factMetricsSyncService');
 
 const PLATFORM_SOURCE_MAP = {
   META_ADS: 'META_ADS',
@@ -155,7 +156,7 @@ async function linkConnection(tenantId, userId, payload) {
   const name =
     externalAccountName || available.displayName || String(externalAccountId);
 
-  return prisma.brandSourceConnection.upsert({
+  const result = await prisma.brandSourceConnection.upsert({
     where: {
       brandId_platform_externalAccountId: {
         brandId,
@@ -176,6 +177,15 @@ async function linkConnection(tenantId, userId, payload) {
       status: 'ACTIVE',
     },
   });
+
+  syncAfterConnection({
+    tenantId,
+    brandId,
+    platform,
+    externalAccountId: String(externalAccountId),
+  });
+
+  return result;
 }
 
 module.exports = {

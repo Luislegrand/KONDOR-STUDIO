@@ -16,12 +16,14 @@ import {
 } from "lucide-react";
 import DashboardCanvas from "@/components/reportsV2/editor/DashboardCanvas.jsx";
 import DashboardRenderer from "@/components/reportsV2/DashboardRenderer.jsx";
+import WidgetRenderer from "@/components/reportsV2/WidgetRenderer.jsx";
 import GlobalFiltersBar from "@/components/reportsV2/GlobalFiltersBar.jsx";
 import ThemeProvider from "@/components/reportsV2/ThemeProvider.jsx";
 import SidePanel from "@/components/reportsV2/editor/SidePanel.jsx";
 import AddMenu from "@/components/reportsV2/editor/AddMenu.jsx";
 import WidgetContextMenu from "@/components/reportsV2/editor/WidgetContextMenu.jsx";
 import GuidesOverlay from "@/components/reportsV2/editor/GuidesOverlay.jsx";
+import MetricsLibraryPanel from "@/components/reportsV2/editor/MetricsLibraryPanel.jsx";
 import useHistoryState from "@/components/reportsV2/editor/useHistoryState.js";
 import {
   SNAP_THRESHOLD,
@@ -87,19 +89,57 @@ const WIDGET_TYPES = [
 ];
 
 const METRIC_OPTIONS = [
-  { value: "spend", label: "Spend" },
-  { value: "impressions", label: "Impressions" },
-  { value: "clicks", label: "Clicks" },
+  { value: "spend", label: "Valor investido" },
   { value: "ctr", label: "CTR" },
   { value: "cpc", label: "CPC" },
   { value: "cpm", label: "CPM" },
-  { value: "cpa", label: "CPA" },
-  { value: "conversions", label: "Conversions" },
-  { value: "revenue", label: "Revenue" },
+  { value: "impressions", label: "Impressões" },
+  { value: "clicks", label: "Cliques" },
+  { value: "conversions", label: "Conversões" },
+  { value: "revenue", label: "Receita" },
   { value: "roas", label: "ROAS" },
-  { value: "sessions", label: "Sessions" },
+  { value: "cpa", label: "CPA" },
+  { value: "sessions", label: "Sessões" },
   { value: "leads", label: "Leads" },
 ];
+
+const METRIC_LABELS = METRIC_OPTIONS.reduce((acc, item) => {
+  acc[item.value] = item.label;
+  return acc;
+}, {});
+
+const ADS_METRIC_KEYS = [
+  "spend",
+  "ctr",
+  "cpc",
+  "cpm",
+  "impressions",
+  "clicks",
+  "conversions",
+  "revenue",
+  "roas",
+  "cpa",
+];
+const GA4_METRIC_KEYS = ["sessions", "conversions", "revenue", "leads"];
+
+const PLATFORM_LABELS = {
+  META_ADS: "Meta Ads",
+  GOOGLE_ADS: "Google Ads",
+  TIKTOK_ADS: "TikTok Ads",
+  LINKEDIN_ADS: "LinkedIn Ads",
+  GA4: "GA4",
+  GMB: "Google Meu Negocio",
+  FB_IG: "Facebook/Instagram",
+};
+
+const METRICS_BY_PLATFORM = {
+  META_ADS: ADS_METRIC_KEYS,
+  GOOGLE_ADS: ADS_METRIC_KEYS,
+  TIKTOK_ADS: ADS_METRIC_KEYS,
+  LINKEDIN_ADS: ADS_METRIC_KEYS,
+  FB_IG: ADS_METRIC_KEYS,
+  GA4: GA4_METRIC_KEYS,
+};
 
 const DIMENSION_OPTIONS = [
   { value: "none", label: "Nenhuma" },
@@ -119,6 +159,7 @@ const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const CANVAS_COLS = 12;
 const CANVAS_ROW_HEIGHT = 28;
 const CANVAS_MARGIN = [16, 16];
+const METRIC_DRAG_TYPE = "application/kondor-metric";
 
 const WIDGET_PRESETS = {
   kpi: {
@@ -161,6 +202,75 @@ const WIDGET_PRESETS = {
     layout: { w: 6, h: 4, minW: 3, minH: 2 },
   },
 };
+
+function normalizePlatformValue(value) {
+  if (!value) return "";
+  return String(value).trim().toUpperCase();
+}
+
+function resolveDropPosition({
+  clientX,
+  clientY,
+  rect,
+  containerWidth,
+  cols,
+  rowHeight,
+  margin,
+}) {
+  if (!rect || !containerWidth) return null;
+  const [marginX, marginY] = margin;
+  const width = Math.max(0, Number(containerWidth) || 0);
+  const columnWidth = (width - marginX * (cols - 1)) / cols;
+  if (!Number.isFinite(columnWidth) || columnWidth <= 0) return null;
+  const relX = clientX - rect.left;
+  const relY = clientY - rect.top;
+  const x = Math.floor((relX + marginX) / (columnWidth + marginX));
+  const y = Math.floor((relY + marginY) / (rowHeight + marginY));
+  return {
+    x: Math.max(0, Math.min(cols - 1, x)),
+    y: Math.max(0, y),
+  };
+}
+
+function buildMetricWidget({ metricKey, label, platform, position }) {
+  const preset = WIDGET_PRESETS.kpi;
+  const metric = String(metricKey || "").trim();
+  const title = String(label || METRIC_LABELS[metric] || metric || "Metrica");
+  const normalizedPlatform = normalizePlatformValue(platform);
+  const x = Math.max(
+    0,
+    Math.min(CANVAS_COLS - preset.layout.w, Number(position?.x || 0))
+  );
+  const y = Math.max(0, Number(position?.y || 0));
+  const filters = normalizedPlatform
+    ? [{ field: "platform", op: "eq", value: normalizedPlatform }]
+    : [];
+  return {
+    id: generateUuid(),
+    type: "kpi",
+    title,
+    layout: {
+      x,
+      y,
+      w: preset.layout.w,
+      h: preset.layout.h,
+      minW: preset.layout.minW,
+      minH: preset.layout.minH,
+    },
+    query: {
+      metrics: metric ? [metric] : [],
+      dimensions: [],
+      filters,
+      ...(normalizedPlatform ? { requiredPlatforms: [normalizedPlatform] } : {}),
+    },
+    viz: {
+      variant: "default",
+      showLegend: false,
+      format: "auto",
+      options: {},
+    },
+  };
+}
 
 function mergeLayoutDefaults(layout) {
   const normalized = normalizeLayoutFront(layout) || DEFAULT_LAYOUT;
@@ -515,6 +625,10 @@ function formatVersionDate(value) {
 
 function EditorWidgetCard({
   widget,
+  dashboardId,
+  brandId,
+  globalFilters,
+  pageId,
   selected,
   hasErrors,
   errorCount,
@@ -561,8 +675,14 @@ function EditorWidgetCard({
           />
         </div>
       </div>
-      <div className="mt-3 text-xs text-[var(--text-muted)]">
-        {buildWidgetSummary(widget)}
+      <div className="mt-3 min-h-0 flex-1 overflow-hidden">
+        <WidgetRenderer
+          widget={widget}
+          dashboardId={dashboardId}
+          brandId={brandId}
+          pageId={pageId}
+          globalFilters={globalFilters}
+        />
       </div>
     </div>
   );
@@ -613,9 +733,13 @@ export default function ReportsV2Editor() {
   const [lastSavedKey, setLastSavedKey] = React.useState("");
   const [hasHydrated, setHasHydrated] = React.useState(false);
   const [activeGuides, setActiveGuides] = React.useState(null);
+  const [metricsSearch, setMetricsSearch] = React.useState("");
+  const [activeMetricPlatform, setActiveMetricPlatform] = React.useState("");
+  const [isMetricDragOver, setIsMetricDragOver] = React.useState(false);
   const interactionRef = React.useRef(false);
   const skipNextLayoutChangeRef = React.useRef(false);
   const guidesRef = React.useRef(null);
+  const metricDragCounterRef = React.useRef(0);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["reportsV2-dashboard", id],
@@ -640,6 +764,43 @@ export default function ReportsV2Editor() {
     enabled: Boolean(dashboard?.brandId),
   });
   const connections = connectionsQuery.data?.items || [];
+  const activeConnections = React.useMemo(() => {
+    if (!Array.isArray(connections)) return [];
+    return connections.filter(
+      (item) => String(item?.status || "").toUpperCase() === "ACTIVE"
+    );
+  }, [connections]);
+  const connectedPlatforms = React.useMemo(() => {
+    const platforms = activeConnections.map((item) =>
+      normalizePlatformValue(item?.platform)
+    );
+    return Array.from(new Set(platforms)).filter(Boolean);
+  }, [activeConnections]);
+  const metricsPlatformOptions = React.useMemo(() => {
+    const buildOptions = (platforms) => {
+      const unique = Array.from(
+        new Set((platforms || []).map(normalizePlatformValue).filter(Boolean))
+      );
+      return unique
+        .filter((platform) => (METRICS_BY_PLATFORM[platform] || []).length)
+        .map((platform) => ({
+          value: platform,
+          label: PLATFORM_LABELS[platform] || platform,
+        }));
+    };
+    const preferred = buildOptions(connectedPlatforms);
+    if (preferred.length) return preferred;
+    return buildOptions(Object.keys(METRICS_BY_PLATFORM));
+  }, [connectedPlatforms]);
+  const metricsForActivePlatform = React.useMemo(() => {
+    const metrics = METRICS_BY_PLATFORM[activeMetricPlatform] || [];
+    return metrics
+      .map((metric) => ({
+        value: metric,
+        label: METRIC_LABELS[metric] || metric,
+      }))
+      .filter((metric) => Boolean(metric.value));
+  }, [activeMetricPlatform]);
   const debouncedLayoutJson = useDebouncedValue(layoutJson, 1500);
 
   React.useEffect(() => {
@@ -673,6 +834,19 @@ export default function ReportsV2Editor() {
       return pages[0].id;
     });
   }, [layoutJson.pages]);
+
+  React.useEffect(() => {
+    if (!metricsPlatformOptions.length) return;
+    setActiveMetricPlatform((current) => {
+      if (
+        current &&
+        metricsPlatformOptions.some((option) => option.value === current)
+      ) {
+        return current;
+      }
+      return metricsPlatformOptions[0].value;
+    });
+  }, [metricsPlatformOptions]);
 
   React.useEffect(() => {
     const activePage = getActivePage(layoutJson, activePageId);
@@ -1165,6 +1339,160 @@ export default function ReportsV2Editor() {
       setSelectedWidgetId(widget.id);
     },
     [activePageId, commitLayoutChange]
+  );
+
+  const handleGlobalFiltersChange = React.useCallback(
+    (nextFilters) => {
+      const normalized = {
+        ...DEFAULT_LAYOUT.globalFilters,
+        ...(nextFilters || {}),
+        dateRange: {
+          ...DEFAULT_LAYOUT.globalFilters.dateRange,
+          ...(nextFilters?.dateRange || {}),
+        },
+        controls: {
+          ...DEFAULT_FILTER_CONTROLS,
+          ...(nextFilters?.controls || {}),
+        },
+      };
+      setPreviewFilters(normalized);
+      commitLayoutChange((prev) => ({
+        ...prev,
+        globalFilters: {
+          ...(prev.globalFilters || {}),
+          ...normalized,
+          dateRange: {
+            ...(prev.globalFilters?.dateRange || {}),
+            ...normalized.dateRange,
+          },
+          controls: {
+            ...DEFAULT_FILTER_CONTROLS,
+            ...(prev.globalFilters?.controls || {}),
+            ...normalized.controls,
+          },
+        },
+      }));
+    },
+    [commitLayoutChange]
+  );
+
+  const handleMetricDragStart = React.useCallback(
+    (event, metric) => {
+      if (!metric?.value) return;
+      const payload = {
+        metric: metric.value,
+        label: metric.label,
+        platform: activeMetricPlatform,
+      };
+      try {
+        event.dataTransfer.setData(METRIC_DRAG_TYPE, JSON.stringify(payload));
+        event.dataTransfer.setData(
+          "text/plain",
+          String(metric.label || metric.value)
+        );
+      } catch (err) {
+        // ignore drag payload errors
+      }
+      event.dataTransfer.effectAllowed = "copy";
+    },
+    [activeMetricPlatform]
+  );
+
+  const handleMetricClick = React.useCallback(
+    (metric) => {
+      if (!metric?.value) return;
+      const position = getNextWidgetPosition(activeWidgets);
+      const widget = buildMetricWidget({
+        metricKey: metric.value,
+        label: metric.label,
+        platform: activeMetricPlatform,
+        position,
+      });
+      addWidgetToActivePage(widget);
+    },
+    [activeMetricPlatform, activeWidgets, addWidgetToActivePage]
+  );
+
+  const hasMetricPayload = React.useCallback((event) => {
+    const types = Array.from(event?.dataTransfer?.types || []);
+    return types.includes(METRIC_DRAG_TYPE);
+  }, []);
+
+  const parseMetricPayload = React.useCallback((event) => {
+    if (!event?.dataTransfer) return null;
+    const raw = event.dataTransfer.getData(METRIC_DRAG_TYPE);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      return null;
+    }
+  }, []);
+
+  const handleMetricDragEnter = React.useCallback(
+    (event) => {
+      if (!hasMetricPayload(event)) return;
+      event.preventDefault();
+      metricDragCounterRef.current += 1;
+      setIsMetricDragOver(true);
+    },
+    [hasMetricPayload]
+  );
+
+  const handleMetricDragOver = React.useCallback(
+    (event) => {
+      if (!hasMetricPayload(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    },
+    [hasMetricPayload]
+  );
+
+  const handleMetricDragLeave = React.useCallback(
+    (event) => {
+      if (!hasMetricPayload(event)) return;
+      event.preventDefault();
+      metricDragCounterRef.current = Math.max(
+        0,
+        metricDragCounterRef.current - 1
+      );
+      if (metricDragCounterRef.current === 0) {
+        setIsMetricDragOver(false);
+      }
+    },
+    [hasMetricPayload]
+  );
+
+  const handleMetricDrop = React.useCallback(
+    (event) => {
+      const payload = parseMetricPayload(event);
+      if (!payload?.metric) return;
+      event.preventDefault();
+      metricDragCounterRef.current = 0;
+      setIsMetricDragOver(false);
+      const rect = containerRef.current?.getBoundingClientRect();
+      const position =
+        rect && width
+          ? resolveDropPosition({
+              clientX: event.clientX,
+              clientY: event.clientY,
+              rect,
+              containerWidth: width,
+              cols: CANVAS_COLS,
+              rowHeight: CANVAS_ROW_HEIGHT,
+              margin: CANVAS_MARGIN,
+            })
+          : null;
+      const fallback = getNextWidgetPosition(activeWidgets);
+      const widget = buildMetricWidget({
+        metricKey: payload.metric,
+        label: payload.label,
+        platform: payload.platform,
+        position: position || fallback,
+      });
+      addWidgetToActivePage(widget);
+    },
+    [activeWidgets, addWidgetToActivePage, containerRef, parseMetricPayload, width]
   );
 
   const handleAddWidget = (type) => {
@@ -1993,7 +2321,33 @@ export default function ReportsV2Editor() {
       </div>
 
       <div className="mx-auto flex w-full max-w-[1400px] gap-6 px-6 py-6">
+        <aside className="hidden w-full max-w-[260px] self-start xl:block sticky top-24">
+          <MetricsLibraryPanel
+            platforms={metricsPlatformOptions}
+            activePlatform={activeMetricPlatform}
+            onPlatformChange={setActiveMetricPlatform}
+            metrics={metricsForActivePlatform}
+            searchTerm={metricsSearch}
+            onSearchChange={setMetricsSearch}
+            onMetricClick={handleMetricClick}
+            onMetricDragStart={handleMetricDragStart}
+          />
+        </aside>
+
         <main className="flex-1">
+          <div className="mb-4 xl:hidden">
+            <MetricsLibraryPanel
+              platforms={metricsPlatformOptions}
+              activePlatform={activeMetricPlatform}
+              onPlatformChange={setActiveMetricPlatform}
+              metrics={metricsForActivePlatform}
+              searchTerm={metricsSearch}
+              onSearchChange={setMetricsSearch}
+              onMetricClick={handleMetricClick}
+              onMetricDragStart={handleMetricDragStart}
+            />
+          </div>
+
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
@@ -2089,77 +2443,104 @@ export default function ReportsV2Editor() {
             }}
             onMouseDown={(event) => {
               if (event.target.closest("[data-editor-widget-card='true']")) return;
+              if (event.target.closest("[data-global-filters='true']")) return;
               setSelectedWidgetId(null);
             }}
           >
+            <div className="mb-4" data-global-filters="true">
+              <GlobalFiltersBar
+                filters={previewFilters}
+                controls={controlFlags}
+                onChange={handleGlobalFiltersChange}
+                connections={connections}
+                collapsible={false}
+              />
+            </div>
+
             {previewMode ? (
-              <div>
-                <div className="mb-4">
-                  <GlobalFiltersBar
-                    filters={previewFilters}
-                    controls={controlFlags}
-                    onChange={setPreviewFilters}
-                    connections={connections}
+              <DashboardRenderer
+                layout={layoutJson}
+                dashboardId={dashboard.id}
+                brandId={dashboard.brandId}
+                globalFilters={debouncedPreviewFilters}
+                activePageId={activePageId}
+              />
+            ) : (
+              <div
+                className={cn(
+                  "relative",
+                  isMetricDragOver &&
+                    "rounded-[16px] ring-2 ring-[var(--primary)] ring-offset-2 ring-offset-[var(--surface)]"
+                )}
+                onDragEnter={handleMetricDragEnter}
+                onDragOver={handleMetricDragOver}
+                onDragLeave={handleMetricDragLeave}
+                onDrop={handleMetricDrop}
+              >
+                {activeWidgets.length ? (
+                  <DashboardCanvas
+                    layout={rglLayout}
+                    items={activeWidgets}
+                    width={width}
+                    containerRef={containerRef}
+                    isEditable
+                    rowHeight={CANVAS_ROW_HEIGHT}
+                    margin={CANVAS_MARGIN}
+                    onLayoutChange={handleLayoutChange}
+                    onDragStart={handleDragStart}
+                    onDrag={handleDrag}
+                    onDragStop={handleDragStop}
+                    onResizeStart={handleResizeStart}
+                    onResize={handleResize}
+                    onResizeStop={handleResizeStop}
+                    renderItem={(widget) => (
+                      <EditorWidgetCard
+                        widget={widget}
+                        dashboardId={dashboard.id}
+                        brandId={dashboard.brandId}
+                        globalFilters={debouncedPreviewFilters}
+                        pageId={activePageId}
+                        selected={selectedWidgetId === widget.id}
+                        hasErrors={Boolean(validation.widgetIssues[widget.id])}
+                        errorCount={validation.widgetIssues[widget.id]?.length || 0}
+                        onSelect={setSelectedWidgetId}
+                        onDuplicate={handleDuplicateWidget}
+                        onRemove={handleRemoveWidget}
+                      />
+                    )}
                   />
-                </div>
-                <DashboardRenderer
-                  layout={layoutJson}
-                  dashboardId={dashboard.id}
-                  brandId={dashboard.brandId}
-                  globalFilters={debouncedPreviewFilters}
-                  activePageId={activePageId}
-                />
-              </div>
-            ) : activeWidgets.length ? (
-              <div className="relative">
-                <DashboardCanvas
-                  layout={rglLayout}
-                  items={activeWidgets}
-                  width={width}
-                  containerRef={containerRef}
-                  isEditable
-                  rowHeight={CANVAS_ROW_HEIGHT}
-                  margin={CANVAS_MARGIN}
-                  onLayoutChange={handleLayoutChange}
-                  onDragStart={handleDragStart}
-                  onDrag={handleDrag}
-                  onDragStop={handleDragStop}
-                  onResizeStart={handleResizeStart}
-                  onResize={handleResize}
-                  onResizeStop={handleResizeStop}
-                  renderItem={(widget) => (
-                    <EditorWidgetCard
-                      widget={widget}
-                      selected={selectedWidgetId === widget.id}
-                      hasErrors={Boolean(validation.widgetIssues[widget.id])}
-                      errorCount={validation.widgetIssues[widget.id]?.length || 0}
-                      onSelect={setSelectedWidgetId}
-                      onDuplicate={handleDuplicateWidget}
-                      onRemove={handleRemoveWidget}
-                    />
-                  )}
-                />
+                ) : (
+                  <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-sm text-[var(--text-muted)]">
+                    <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-[var(--border)]">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <p className="font-semibold text-[var(--text)]">
+                      Sem widgets
+                    </p>
+                    <p className="max-w-[320px] text-xs text-[var(--text-muted)]">
+                      Clique em "Adicionar" ou arraste uma metrica para criar um
+                      KPI.
+                    </p>
+                  </div>
+                )}
+
+                {isMetricDragOver ? (
+                  <div className="pointer-events-none absolute inset-3 z-20 flex items-center justify-center rounded-[14px] border-2 border-dashed border-[var(--primary)] bg-white/80 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+                    Solte para adicionar
+                  </div>
+                ) : null}
+
                 <GuidesOverlay
                   guides={activeGuides}
                   width={width}
                   height={guidesCanvasHeight}
                 />
               </div>
-            ) : (
-              <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-sm text-[var(--text-muted)]">
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-[var(--border)]">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <p className="font-semibold text-[var(--text)]">Sem widgets</p>
-                <p className="max-w-[320px] text-xs text-[var(--text-muted)]">
-                  Clique em "Adicionar" para inserir KPIs, series ou tabelas.
-                </p>
-              </div>
             )}
           </div>
         </main>
 
-        <aside className="w-full max-w-[360px] space-y-4 self-start">
+        <aside className="w-full max-w-[360px] space-y-4 self-start sticky top-24">
           <SidePanel
             selectedWidget={selectedWidget}
             activeTab={activeTab}

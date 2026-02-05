@@ -29,6 +29,29 @@ function normalizeList(value) {
   return [];
 }
 
+const TIKTOK_CONVERSIONS_FIELD =
+  process.env.TIKTOK_CONVERSIONS_METRIC || process.env.TIKTOK_CONVERSION_METRIC || 'conversion';
+const TIKTOK_REVENUE_FIELD =
+  process.env.TIKTOK_REVENUE_METRIC || 'conversion_value';
+
+const METRIC_ALIAS = {
+  [TIKTOK_CONVERSIONS_FIELD]: 'conversions',
+  [TIKTOK_REVENUE_FIELD]: 'revenue',
+};
+
+const METRIC_FIELD_MAP = {
+  conversions: TIKTOK_CONVERSIONS_FIELD,
+  revenue: TIKTOK_REVENUE_FIELD,
+};
+
+function mapMetricField(metric) {
+  return METRIC_FIELD_MAP[metric] || metric;
+}
+
+function mapMetricName(field) {
+  return METRIC_ALIAS[field] || field;
+}
+
 function normalizeDimensionFilters(filters) {
   if (!Array.isArray(filters)) return [];
   return filters
@@ -116,7 +139,9 @@ async function fetchAccountMetrics(integration, options = {}) {
     dimensions.push(String(breakdown));
   }
 
-  const metricsList = metrics.length ? metrics : ['impressions', 'clicks', 'spend'];
+  const metricsList = metrics.length
+    ? Array.from(new Set(metrics.map(mapMetricField)))
+    : ['impressions', 'clicks', 'spend'];
   const filteringPayload = buildFilteringPayload(
     normalizeDimensionFilters(options?.filters && typeof options.filters === 'object'
       ? options.filters.dimensionFilters
@@ -212,7 +237,7 @@ async function fetchAccountMetrics(integration, options = {}) {
       const numVal = Number(rawVal);
       if (Number.isNaN(numVal)) return;
       metricsRows.push({
-        name: metric,
+        name: mapMetricName(metric),
         value: numVal,
         collectedAt,
         meta: { provider: 'tiktok_ads' },

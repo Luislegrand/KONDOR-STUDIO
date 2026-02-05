@@ -80,10 +80,17 @@ function resolvePivot(level, breakdown) {
   return 'ACCOUNT';
 }
 
+const LINKEDIN_CONVERSIONS_FIELD =
+  process.env.LINKEDIN_CONVERSIONS_METRIC || 'conversions';
+const LINKEDIN_REVENUE_FIELD =
+  process.env.LINKEDIN_REVENUE_METRIC || 'conversionValueInLocalCurrency';
+
 const METRIC_ALIAS = {
   costInLocalCurrency: 'spend',
   costInUsd: 'spend_usd',
   totalEngagements: 'engagements',
+  [LINKEDIN_CONVERSIONS_FIELD]: 'conversions',
+  [LINKEDIN_REVENUE_FIELD]: 'revenue',
 };
 
 function mapMetricName(field) {
@@ -94,6 +101,8 @@ const METRIC_FIELD_MAP = {
   spend: 'costInLocalCurrency',
   spend_usd: 'costInUsd',
   engagements: 'totalEngagements',
+  conversions: LINKEDIN_CONVERSIONS_FIELD,
+  revenue: LINKEDIN_REVENUE_FIELD,
 };
 
 function mapMetricField(metric) {
