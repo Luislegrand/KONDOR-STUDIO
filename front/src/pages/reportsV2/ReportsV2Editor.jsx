@@ -2399,10 +2399,10 @@ export default function ReportsV2Editor() {
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-[var(--text)]">
+              <p className="text-sm font-semibold text-slate-900">
                 Canvas do dashboard
               </p>
-              <p className="text-xs text-[var(--text-muted)]">
+              <p className="text-xs text-slate-500">
                 Arraste, redimensione e configure os widgets.
               </p>
             </div>
@@ -2434,12 +2434,12 @@ export default function ReportsV2Editor() {
           ) : null}
 
           <div
-            className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4"
+            className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.05)]"
             style={{
-              minHeight: "520px",
+              minHeight: "560px",
               backgroundImage:
-                "linear-gradient(to right, rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
+                "radial-gradient(circle, rgba(148,163,184,0.18) 1px, transparent 0)",
+              backgroundSize: "24px 24px",
             }}
             onMouseDown={(event) => {
               if (event.target.closest("[data-editor-widget-card='true']")) return;
@@ -2454,6 +2454,7 @@ export default function ReportsV2Editor() {
                 onChange={handleGlobalFiltersChange}
                 connections={connections}
                 collapsible={false}
+                className="bg-white shadow-none hover:shadow-none border-slate-200"
               />
             </div>
 
@@ -2514,10 +2515,10 @@ export default function ReportsV2Editor() {
                     <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-[var(--border)]">
                       <Plus className="h-5 w-5" />
                     </div>
-                    <p className="font-semibold text-[var(--text)]">
+                    <p className="font-semibold text-slate-900">
                       Sem widgets
                     </p>
-                    <p className="max-w-[320px] text-xs text-[var(--text-muted)]">
+                    <p className="max-w-[320px] text-xs text-slate-500">
                       Clique em "Adicionar" ou arraste uma metrica para criar um
                       KPI.
                     </p>

@@ -24,6 +24,15 @@ function normalizePlatform(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+function normalizeGa4PropertyId(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('properties/')) {
+    return raw.replace(/^properties\//, '');
+  }
+  return raw;
+}
+
 function toNumber(value) {
   if (value === null || value === undefined) return 0;
   const parsed = Number(value);
@@ -325,7 +334,9 @@ async function ensureGa4FactMetrics({
     return { skipped: true, reason: 'missing_params' };
   }
 
-  const accountFilter = extractFilterValues(filters, 'account_id');
+  const accountFilter = extractFilterValues(filters, 'account_id')
+    .map(normalizeGa4PropertyId)
+    .filter(Boolean);
   const platformFilters = extractFilterValues(filters, 'platform').map(normalizePlatform);
   const hasPlatformFilter = platformFilters.length > 0;
   const platformAllowsGa4 = !hasPlatformFilter || platformFilters.includes('GA4');
@@ -341,7 +352,7 @@ async function ensureGa4FactMetrics({
 
   if (accountFilter.length) {
     connections = connections.filter((conn) =>
-      accountFilter.includes(String(conn.externalAccountId))
+      accountFilter.includes(normalizeGa4PropertyId(conn.externalAccountId))
     );
   }
 
@@ -364,18 +375,29 @@ async function ensureGa4FactMetrics({
     extractFilterValues(filters, 'campaign_id').length > 0;
 
   for (const connection of connections) {
-    const propertyId = String(connection.externalAccountId || '').trim();
+    const propertyId = normalizeGa4PropertyId(connection.externalAccountId);
     if (!propertyId) continue;
 
     const cacheKey = buildFactCacheKey({ tenantId, brandId, propertyId, dateRange });
 
     await withFactCache(cacheKey, async () => {
-      const resolved = await resolveGa4IntegrationContext({
-        tenantId,
-        propertyId,
-        integrationId: null,
-        userId: null,
-      });
+      let resolved = null;
+      try {
+        resolved = await resolveGa4IntegrationContext({
+          tenantId,
+          propertyId,
+          integrationId: null,
+          userId: null,
+        });
+      } catch (err) {
+        if (
+          err?.code === 'GA4_INTEGRATION_NOT_CONNECTED' ||
+          err?.code === 'GA4_PROPERTY_NOT_SELECTED'
+        ) {
+          return;
+        }
+        throw err;
+      }
 
       let campaignDimension = wantsCampaign ? 'campaignId' : null;
       let metricsForRequest = Array.isArray(metricPlan.metrics) ? [...metricPlan.metrics] : [];
@@ -449,6 +471,9 @@ async function ensureGa4FactMetrics({
             ...(attempt.error.details || {}),
             propertyId,
           };
+          if (attempt.error.code === 'GA4_DATA_ERROR') {
+            return;
+          }
           throw attempt.error;
         }
       }

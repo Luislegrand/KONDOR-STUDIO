@@ -233,6 +233,16 @@ async function computeDashboardHealthForDashboard(dashboard) {
       .map((item) => normalizePlatform(item.platform))
       .filter(Boolean),
   );
+
+  if (connectedPlatforms.has('GA4')) {
+    const ga4Integration = await prisma.integrationGoogleGa4.findFirst({
+      where: { tenantId: dashboard.tenantId, status: 'CONNECTED' },
+      select: { id: true },
+    });
+    if (!ga4Integration) {
+      connectedPlatforms.delete('GA4');
+    }
+  }
   const expandedConnectedPlatforms = expandPlatformSet(connectedPlatforms);
 
   const missingPlatforms = Array.from(requiredPlatforms).filter(
